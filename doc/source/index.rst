@@ -3,14 +3,33 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to chroma's documentation!
-==================================
+Chroma: Ultra-fast Photon Monte Carlo
+=====================================
 
 Chroma is a high performance optical photon simulation for particle physics detectors.  It tracks individual photons passing through a triangle-mesh detector geometry, simulating standard physics processes like diffuse and specular reflections, refraction, Rayleigh scattering and absorption.  
 
 With the assistance of a CUDA-enabled GPU, Chroma can propagate 2.5 million photons per second in a detector with 29,000 photomultiplier tubes.  This is 200x faster than the same simulation with GEANT4.
 
-Contents:
+Development
+-----------
+
+Chroma is under heavy development.  Tagged releases will happen soon,
+but in the meantime we encourage people to obtain the code directly
+from the Mercurial repository hosted at Bitbucket:
+
+  http://bitbucket.org/chroma/chroma
+
+For questions, ideas, and discussion, join the Chroma development mailing list:
+
+  http://groups.google.com/group/chroma-sim
+
+For bug reports, please create a Bitbucket account and use the Bitbucket issue tracker:
+
+  https://bitbucket.org/chroma/chroma/issues?status=new&status=open
+
+
+Documentation
+-------------
 
 .. toctree::
    :maxdepth: 2
@@ -20,6 +39,7 @@ Contents:
    render
    simulation
    likelihood
+
 
 Indices and tables
 ==================
