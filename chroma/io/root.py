@@ -174,6 +174,7 @@ class RootWriter(object):
             if pyev.primary_vertex.pol is not None:
                 self.ev.primary_vertex.pol.SetXYZ(*pyev.primary_vertex.pol)
             self.ev.primary_vertex.ke = pyev.primary_vertex.ke
+            self.ev.primary_vertex.t0 = pyev.primary_vertex.t0
 
         if pyev.photons_beg is not None:
             photons = pyev.photons_beg

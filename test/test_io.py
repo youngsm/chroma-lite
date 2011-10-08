@@ -6,7 +6,7 @@ import numpy as np
 class TestRootIO(unittest.TestCase):
     def test_file_write_and_read(self):
         ev = event.Event(1, event.Vertex('e-', pos=(0,0,1), dir=(1,0,0),
-                                         ke=15.0, pol=(0,1,0)))
+                                         ke=15.0, pol=(0,1,0), t0=40.0))
 
         photons_beg = root.make_photon_with_arrays(1)
         photons_beg.pos[0] = (1,2,3)
