@@ -263,7 +263,7 @@ distribute module prior to installation, but the rest should be
 automatic::
 
   pip install -U distribute
-  pip install -e chroma
+  pip install -e hg+http://bitbucket.org/chroma/chroma#egg=Chroma
 
 Now you can enable the Chroma environment whenever you want by typing
 ``source $HOME/chroma_env/bin/activate``, or by placing that line in the
