@@ -1,0 +1,175 @@
+import numpy as np
+import sys
+import gc
+from pycuda import gpuarray as ga
+
+from chroma.tools import profile_if_possible
+from chroma import event
+from chroma.gpu.tools import get_cu_module, cuda_options, GPUFuncs, \
+    chunk_iterator, to_float3
+
+
+class GPUPhotons(object):
+    def __init__(self, photons, ncopies=1):
+        """Load ``photons`` onto the GPU, replicating as requested.
+
+           Args:
+               - photons: chroma.Event.Photons
+                   Photon state information to load onto GPU
+               - ncopies: int, *optional*
+                   Number of times to replicate the photons
+                   on the GPU.  This is used if you want
+                   to propagate the same event many times,
+                   for example in a likelihood calculation.
+
+                   The amount of GPU storage will be proportionally
+                   larger if ncopies > 1, so be careful.
+        """
+        nphotons = len(photons)
+        self.pos = ga.empty(shape=nphotons*ncopies, dtype=ga.vec.float3)
+        self.dir = ga.empty(shape=nphotons*ncopies, dtype=ga.vec.float3)
+        self.pol = ga.empty(shape=nphotons*ncopies, dtype=ga.vec.float3)
+        self.wavelengths = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
+        self.t = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
+        self.last_hit_triangles = ga.empty(shape=nphotons*ncopies, dtype=np.int32)
+        self.flags = ga.empty(shape=nphotons*ncopies, dtype=np.uint32)
+
+        # Assign the provided photons to the beginning (possibly
+        # the entire array if ncopies is 1
+        self.pos[:nphotons].set(to_float3(photons.pos))
+        self.dir[:nphotons].set(to_float3(photons.dir))
+        self.pol[:nphotons].set(to_float3(photons.pol))
+        self.wavelengths[:nphotons].set(photons.wavelengths.astype(np.float32))
+        self.t[:nphotons].set(photons.t.astype(np.float32))
+        self.last_hit_triangles[:nphotons].set(photons.last_hit_triangles.astype(np.int32))
+        self.flags[:nphotons].set(photons.flags.astype(np.uint32))
+
+        module = get_cu_module('propagate.cu', options=cuda_options)
+        self.gpu_funcs = GPUFuncs(module)
+
+        # Replicate the photons to the rest of the slots if needed
+        if ncopies > 1:
+            max_blocks = 1024
+            nthreads_per_block = 64
+            for first_photon, photons_this_round, blocks in \
+                    chunk_iterator(nphotons, nthreads_per_block, max_blocks):
+                self.gpu_funcs.photon_duplicate(np.int32(first_photon), np.int32(photons_this_round),
+                                                self.pos, self.dir, self.wavelengths, self.pol, self.t, 
+                                                self.flags, self.last_hit_triangles, 
+                                                np.int32(ncopies-1), 
+                                                np.int32(nphotons),
+                                                block=(nthreads_per_block,1,1), grid=(blocks, 1))
+
+
+        # Save the duplication information for the iterate_copies() method
+        self.true_nphotons = nphotons
+        self.ncopies = ncopies
+
+    def get(self):
+        pos = self.pos.get().view(np.float32).reshape((len(self.pos),3))
+        dir = self.dir.get().view(np.float32).reshape((len(self.dir),3))
+        pol = self.pol.get().view(np.float32).reshape((len(self.pol),3))
+        wavelengths = self.wavelengths.get()
+        t = self.t.get()
+        last_hit_triangles = self.last_hit_triangles.get()
+        flags = self.flags.get()
+        return event.Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags)
+
+    def iterate_copies(self):
+        '''Returns an iterator that yields GPUPhotonsSlice objects
+        corresponding to the event copies stored in ``self``.'''
+        for i in xrange(self.ncopies):
+            window = slice(self.true_nphotons*i, self.true_nphotons*(i+1))
+            yield GPUPhotonsSlice(pos=self.pos[window],
+                                  dir=self.dir[window],
+                                  pol=self.pol[window],
+                                  wavelengths=self.wavelengths[window],
+                                  t=self.t[window],
+                                  last_hit_triangles=self.last_hit_triangles[window],
+                                  flags=self.flags[window])
+
+    @profile_if_possible
+    def propagate(self, gpu_geometry, rng_states, nthreads_per_block=64,
+                  max_blocks=1024, max_steps=10):
+        """Propagate photons on GPU to termination or max_steps, whichever
+        comes first.
+
+        May be called repeatedly without reloading photon information if
+        single-stepping through photon history.
+
+        ..warning::
+            `rng_states` must have at least `nthreads_per_block`*`max_blocks`
+            number of curandStates.
+        """
+        nphotons = self.pos.size
+        step = 0
+        input_queue = np.empty(shape=nphotons+1, dtype=np.uint32)
+        input_queue[0] = 0
+        # Order photons initially in the queue to put the clones next to each other
+        for copy in xrange(self.ncopies):
+            input_queue[1+copy::self.ncopies] = np.arange(self.true_nphotons, dtype=np.uint32) + copy * self.true_nphotons
+        input_queue_gpu = ga.to_gpu(input_queue)
+        output_queue = np.zeros(shape=nphotons+1, dtype=np.uint32)
+        output_queue[0] = 1
+        output_queue_gpu = ga.to_gpu(output_queue)
+
+        while step < max_steps:
+            # Just finish the rest of the steps if the # of photons is low
+            if nphotons < nthreads_per_block * 16 * 8:
+                nsteps = max_steps - step
+            else:
+                nsteps = 1
+
+            for first_photon, photons_this_round, blocks in \
+                    chunk_iterator(nphotons, nthreads_per_block, max_blocks):
+                self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, np.int32(nsteps), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
+
+            step += nsteps
+
+            if step < max_steps:
+                temp = input_queue_gpu
+                input_queue_gpu = output_queue_gpu
+                output_queue_gpu = temp
+                output_queue_gpu[:1].set(np.uint32(1))
+                nphotons = input_queue_gpu[:1].get()[0] - 1
+
+        if ga.max(self.flags).get() & (1 << 31):
+            print >>sys.stderr, "WARNING: ABORTED PHOTONS"
+
+    def __del__(self):
+        del self.pos
+        del self.dir
+        del self.pol
+        del self.wavelengths
+        del self.t
+        del self.flags
+        del self.last_hit_triangles
+        # Free up GPU memory quickly if now available
+        #gc.collect()
+
+class GPUPhotonsSlice(GPUPhotons):
+    '''A `slice`-like view of a subrange of another GPU photons array.
+    Works exactly like an instance of GPUPhotons, but the GPU storage
+    is taken from another GPUPhotons instance.
+
+    Returned by the GPUPhotons.iterate_copies() iterator.'''
+    def __init__(self, pos, dir, pol, wavelengths, t, last_hit_triangles,
+                 flags):
+        '''Create new object using slices of GPUArrays from an instance
+        of GPUPhotons.  NOTE THESE ARE NOT CPU ARRAYS!'''
+        self.pos = pos
+        self.dir = dir
+        self.pol = pol
+        self.wavelengths = wavelengths
+        self.t = t
+        self.last_hit_triangles = last_hit_triangles
+        self.flags = flags
+
+        module = get_cu_module('propagate.cu', options=cuda_options)
+        self.gpu_funcs = GPUFuncs(module)
+
+        self.true_nphotons = len(pos)
+        self.ncopies = 1
+
+    def __del__(self):
+        pass # Do nothing, because we don't own any of our GPU memory
