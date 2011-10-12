@@ -82,7 +82,7 @@ class Likelihood(object):
         hit_channel_prob = np.log(hit_prob[self.event.channels.hit]).sum() + np.log(1.0-hit_prob[~self.event.channels.hit])[1:].sum()
         hit_channel_prob_uncert = ( (ntotal * hit_prob * (1.0 - hit_prob)) / hit_prob**2 ).sum()**0.5
         log_likelihood = ufloat((hit_channel_prob, 0.0))
-        log_likelihood = ufloat((0.0,0.0)) # FIXME: skipping hit/not hit probabilities for now
+        #log_likelihood = ufloat((0.0,0.0)) # FIXME: skipping hit/not hit probabilities for now
 
         # Then include the probability densities of the observed
         # charges and times.
@@ -90,7 +90,7 @@ class Likelihood(object):
                                         pdf_prob_uncert[self.event.channels.hit]))
         log_likelihood += unumpy.log(hit_pdf_ufloat).sum()
         
-        return -log_likelihood, pdf_prob
+        return -log_likelihood
 
     def setup_kernel(self, vertex_generator, nevals, nreps, ndaq, oversample_factor):
         bandwidth_generator = islice(vertex_generator, nevals*oversample_factor)
