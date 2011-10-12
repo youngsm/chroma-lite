@@ -681,6 +681,7 @@ class EventViewer(Camera):
     def __init__(self, geometry, filename, **kwargs):
         Camera.__init__(self, geometry, **kwargs)
         self.rr = RootReader(filename)
+        self.show_charge = True
 
     def render_particle_track(self):
         x = 10.0
@@ -706,7 +707,12 @@ class EventViewer(Camera):
         q = self.ev.channels.q
 
         # Important: Compute range only with HIT channels
-        channel_color = map_to_color(q, range=(q[hit].min(),q[hit].max()))
+        if self.show_charge:
+            channel_color = map_to_color(q, range=(q[hit].min(),q[hit].max()))
+            print 'charge'
+        else:
+            channel_color = map_to_color(t, range=(t[hit].min(),t[hit].mean()))
+            print 'time'
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
         solid_color = np.zeros(len(self.geometry.mesh.triangles), dtype=np.uint32)
 
@@ -743,6 +749,15 @@ class EventViewer(Camera):
                         self.render_particle_track()
 
                     self.update()
+                return
+            elif event.key == K_PERIOD:
+                self.show_charge = not self.show_charge # flip bit
+                self.color_hit_pmts()
+
+                if self.ev.photons_beg is not None:
+                    self.render_particle_track()
+
+                self.update()
                 return
 
         Camera.process_event(self, event)
