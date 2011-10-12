@@ -3,9 +3,11 @@ from chroma import geometry
 from chroma import event
 from chroma.io import root
 from chroma import generator
+from chroma.generator import constant_particle_gun
 from chroma import gpu
 from chroma import itertoolset
 from chroma import likelihood
+from chroma.likelihood import Likelihood
 from chroma import make
 from chroma.demo import optics
 from chroma import project
