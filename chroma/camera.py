@@ -706,8 +706,14 @@ class EventViewer(Camera):
         q = self.ev.channels.q
 
         # Important: Compute range only with HIT channels
-        solid_colors = map_to_color(q, range=(q[hit].min(),q[hit].max()))
-        self.gpu_geometry.color_solids(hit, solid_colors)
+        channel_color = map_to_color(q, range=(q[hit].min(),q[hit].max()))
+        solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
+        solid_color = np.zeros(len(self.geometry.mesh.triangles), dtype=np.uint32)
+
+        solid_hit[self.geometry.channel_index_to_solid_id] = hit
+        solid_color[self.geometry.channel_index_to_solid_id] = channel_color
+
+        self.gpu_geometry.color_solids(solid_hit, solid_color)
 
     def process_event(self, event):
         if event.type == KEYDOWN:
