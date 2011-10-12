@@ -31,18 +31,34 @@ For bug reports, please create a Bitbucket account and use the Bitbucket issue t
 Documentation
 -------------
 
+The core concepts are described in the :download:`Chroma whitepaper
+<chroma.pdf>`.
+
+The software documentation is evolving rapidly, so
+many of the following sections are incomplete at the moment.
+Subscribe to the mailing list for update announcements!
+
 .. toctree::
    :maxdepth: 2
 
    install
+   tour
    geometry
+   detector
    render
    simulation
    likelihood
 
+Authors
+-------
+
+Chroma is developed by Anthony LaTorre and `Stan Seibert
+<mailto:sseibert@hep.upenn.edu>`_. Chroma contains some material
+properties found in the `WCSim application
+<https://wiki.bnl.gov/dusel/index.php/WCSim>`_.
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
