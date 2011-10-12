@@ -683,7 +683,7 @@ class EventViewer(Camera):
         self.rr = RootReader(filename)
 
     def render_particle_track(self):
-        x = 0.01
+        x = 10.0
         h = x*np.sqrt(3)/2
         pyramid = make.linear_extrude([-x/2,0,x/2], [-h/2,h/2,-h/2], h,
                                       [0]*3, [0]*3)
