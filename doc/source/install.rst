@@ -157,6 +157,9 @@ Finally, we can enable the virtual environment::
 
   source $HOME/chroma_env/bin/activate
 
+This will put the appropriate version of python in the path and also
+set the ``$VIRTUAL_ENV`` environment variable we will use in the
+remainder of the directions.
 
 Step 4: ROOT
 ^^^^^^^^^^^^
@@ -167,17 +170,17 @@ want to use ROOT to analyze the output of Chroma.
 
 Begin by downloading the ROOT 5.30 tarball from `the ROOT download
 page <http://root.cern.ch/drupal/content/production-version-530>`_.
-As of this writing, the latest version is 5.30.01.  Then, from the
+As of this writing, the latest version is 5.30.02.  Then, from the
 download directory, execute the following commands::
 
-  tar xvf root_v5.30.01.source.tar.gz
-  mkdir $HOME/chroma_env/src/
-  mv root $HOME/chroma_env/src/root-5.30.01
-  cd $HOME/chroma_env/src/root-5.30.01
+  tar xvf root_v5.30.02.source.tar.gz
+  mkdir $VIRTUAL_ENV/src/
+  mv root $VIRTUAL_ENV/src/root-5.30.02
+  cd $VIRTUAL_ENV/src/root-5.30.02
   ./configure
   make
 
-We also need to append a ``source`` line to ``$HOME/chroma_env/bin/activate``::
+We also need to append a ``source`` line to ``$VIRTUAL_ENV/bin/activate``::
 
   source $VIRTUAL_ENV/src/root-5.30.01/bin/thisroot.sh
 
@@ -196,12 +199,12 @@ download the latest 2.1 series source file.  From your download
 directory, run the following commands::
 
   tar xvf clhep-2.1.1.0.tgz
-  mv 2.1.1.0 $HOME/chroma_env/src/clhep-2.1.1.0
-  cd $HOME/chroma_env/src/clhep-2.1.1.0/CLHEP
+  mv 2.1.1.0 $VIRTUAL_ENV/src/clhep-2.1.1.0
+  cd $VIRTUAL_ENV/src/clhep-2.1.1.0/CLHEP
   ./configure --prefix=$VIRTUAL_ENV/
   make install
   
-Now go to the GEANT4 download page and download:
+Now go to the `GEANT4 Download Page <http://geant4.cern.ch/support/download.shtml>`_ and download:
 
 * GNU or Linux tar format source code
 * Neutron data files with thermal cross sections
@@ -223,15 +226,15 @@ Next go to your download directory and run the following commands::
   tar xvf G4NEUTRONXS.1.0.tar.gz
   mkdir geant4.9.4.p02/data
   mv G4EMLOW6.19 PhotonEvaporation2.1 RadioactiveDecay3.3 G4ABLA3.0 G4NEUTRONXS1.0 geant4.9.4.p02/data/
-  mv geant4.9.4.p02 $HOME/chroma_env/src/
-  cd $HOME/chroma_env/src/
+  mv geant4.9.4.p02 $VIRTUAL_ENV/src/
+  cd $VIRTUAL_ENV/src/
   mkdir geant4.9.4.p02-build
   cd geant4.9.4.p02-build
   cmake -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV ../geant4.9.4.p02
   make install
 
 GEANT4 requires several environment variables to locate data files.  Set
-these by appending the following lines to ``$HOME/chroma_env/bin/activate``::
+these by appending the following lines to ``$VIRTUAL_ENV/bin/activate``::
 
   export G4LEVELGAMMADATA=$VIRTUAL_ENV/geant4.9.4.p02/data/PhotonEvaporation2.1
   export G4LEDATA=$VIRTUAL_ENV/geant4.9.4.p02/data/G4EMLOW6.19
