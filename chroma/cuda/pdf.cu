@@ -97,7 +97,7 @@ accumulate_pdf_eval(int time_only, int nchannels, unsigned int *event_hit,
     }
 
     // Do we need to keep updating the nearest_mc list?
-    if (channel_bincount + 1 >= min_bin_content)
+    if (channel_bincount >= min_bin_content)
       return; // No need to perform insertion into nearest_mc because bincount is a better estimate of the PDF value
 
     // insertion sort the distance into the array of nearest MC points
