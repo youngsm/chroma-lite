@@ -122,7 +122,7 @@ class Simulation(object):
         
         return self.gpu_pdf.get_pdfs()
 
-    def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=200, nreps=1, ndaq=1, time_only=True):
+    def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=50, nreps=1, ndaq=1, time_only=True):
         """Returns tuple: 1D array of channel hit counts, 1D array of PDF
         probability densities."""
         self.gpu_pdf.setup_pdf_eval(event_channels.hit,
