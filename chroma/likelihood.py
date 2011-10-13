@@ -79,10 +79,8 @@ class Likelihood(object):
 
         # NLL calculation: note that negation is at the end
         # Start with the probabilties of hitting (or not) the channels
-        hit_channel_prob = np.log(hit_prob[self.event.channels.hit]).sum() + np.log(1.0-hit_prob[~self.event.channels.hit])[1:].sum()
-        hit_channel_prob_uncert = ( (ntotal * hit_prob * (1.0 - hit_prob)) / hit_prob**2 ).sum()**0.5
+        hit_channel_prob = np.log(hit_prob[self.event.channels.hit]).sum() + np.log(1.0-hit_prob[~self.event.channels.hit]).sum()
         log_likelihood = ufloat((hit_channel_prob, 0.0))
-        #log_likelihood = ufloat((0.0,0.0)) # FIXME: skipping hit/not hit probabilities for now
 
         # Then include the probability densities of the observed
         # charges and times.
