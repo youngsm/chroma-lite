@@ -41,14 +41,14 @@ class Likelihood(object):
         "Set the detector event being reconstructed."
         self.event = event
 
-    @profile_if_possible
-    def eval(self, vertex_generator, nevals, nreps=16, ndaq=50):
-        """
-        Return the negative log likelihood that the detector event set in the
-        constructor or by set_event() was the result of a particle generated
-        by `vertex_generator`.  If `nreps` set to > 1, each set of photon
-        vertices will be propagated `nreps` times.
-        """
+    def eval_channel_vbin(self, vertex_generator, nevals, nreps=16, ndaq=50):
+        '''Evaluate the hit probability and observable (time or
+        time+charge) probability density for each channel using the
+        variable bin window method.
+
+        Returns: (array of hit probabilities, array of PDF values)
+        '''
+
         ntotal = nevals * nreps * ndaq
 
         vertex_generator = islice(vertex_generator, nevals)
@@ -77,9 +77,24 @@ class Likelihood(object):
 
         print 'channels with no data:', (bad_value & self.event.channels.hit).astype(int).sum()
 
+        return hit_prob, pdf_prob, pdf_prob_uncert
+        
+    @profile_if_possible
+    def eval(self, vertex_generator, nevals, nreps=16, ndaq=50):
+        """
+        Return the negative log likelihood that the detector event set in the
+        constructor or by set_event() was the result of a particle generated
+        by `vertex_generator`.  If `nreps` set to > 1, each set of photon
+        vertices will be propagated `nreps` times.
+        """
+
+        hit_prob, pdf_prob, pdf_prob_uncert = \
+            self.eval_channel_vbin(vertex_generator, nevals, nreps, ndaq)
+
         # NLL calculation: note that negation is at the end
         # Start with the probabilties of hitting (or not) the channels
-        hit_channel_prob = np.log(hit_prob[self.event.channels.hit]).sum() + np.log(1.0-hit_prob[~self.event.channels.hit]).sum()
+        hit_channel_prob = np.log(hit_prob[self.event.channels.hit]).sum() \
+            + np.log(1.0-hit_prob[~self.event.channels.hit]).sum()
         log_likelihood = ufloat((hit_channel_prob, 0.0))
 
         # Then include the probability densities of the observed
