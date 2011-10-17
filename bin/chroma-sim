@@ -10,6 +10,7 @@ def main():
     import os
     import inspect
     import numpy as np
+    import itertools
 
     from chroma import event
     from chroma import itertoolset
@@ -17,6 +18,8 @@ def main():
     from chroma import root
     from chroma.rootimport import ROOT
     ROOT.gROOT.SetBatch()
+
+    from chroma.generator.vertex import constant_particle_gun
 
     from chroma.log import logger, logging
     logger.setLevel(logging.INFO)
@@ -87,7 +90,8 @@ def main():
     pos = np.array([float(s) for s in options.pos.split(',')], dtype=float)
     dir = np.array([float(s) for s in options.dir.split(',')], dtype=float)
 
-    vertex = event.Vertex(options.particle, pos, dir, options.ke)
+    ev_gen = constant_particle_gun(particle_name=options.particle, 
+                                   pos=pos, dir=dir, ke=options.ke)
 
     sim = Simulation(detector, seed=options.seed, cuda_device=options.device,
                      geant4_processes=options.ngenerators)
@@ -97,8 +101,8 @@ def main():
     writer = root.RootWriter(options.output_filename)
 
     for i, ev in \
-            enumerate(sim.simulate(itertoolset.repeatcopy(vertex,
-                                                          options.nevents),
+            enumerate(sim.simulate(itertools.islice(ev_gen, 
+                                                    options.nevents),
                                    keep_photons_beg=options.save_photons_beg,
                                    keep_photons_end=options.save_photons_end)):
         print '\rEvent: %i' % (i+1),
