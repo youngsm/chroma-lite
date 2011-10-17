@@ -145,7 +145,7 @@ class GPUPhotons(object):
         del self.flags
         del self.last_hit_triangles
         # Free up GPU memory quickly if now available
-        #gc.collect()
+        gc.collect()
 
 class GPUPhotonsSlice(GPUPhotons):
     '''A `slice`-like view of a subrange of another GPU photons array.
