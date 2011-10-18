@@ -180,7 +180,9 @@ accumulate_kernel_eval(int time_only, int nchannels, unsigned int *event_hit,
 		       float *inv_time_bandwidths,
 		       float *inv_charge_bandwidths,
 		       unsigned int *hitcount,
-		       float *pdf_values)
+		       float *time_pdf_values,
+		       float *charge_pdf_values)
+		       
 {
     int id = threadIdx.x + blockDim.x * blockIdx.x;
 	
@@ -217,7 +219,7 @@ accumulate_kernel_eval(int time_only, int nchannels, unsigned int *event_hit,
 	  float hiarg = (tmax - channel_mc_time)*inv_bandwidth*invroot2;
 	  norm = (erff(hiarg) - erff(loarg)) * rootPiBy2;
 	}
-	pdf_values[id] += term / norm;
+	time_pdf_values[id] += term / norm;
     }
     else { // time and charge PDF
 	float channel_mc_charge = mc_charge[id]; // int->float conversion because DAQ just returns an integer
@@ -240,23 +242,31 @@ accumulate_kernel_eval(int time_only, int nchannels, unsigned int *event_hit,
 	float inv_bandwidth = inv_time_bandwidths[id];
 	float arg = (channel_mc_time - channel_event_obs) * inv_bandwidth;
 
-	float loarg = (tmin - channel_mc_time)*inv_bandwidth*invroot2;
-	float hiarg = (tmax - channel_mc_time)*inv_bandwidth*invroot2;
-	float norm = (erff(hiarg) - erff(loarg)) * rootPiBy2;
-
-	// Kernel argument: charge dim
-	channel_event_obs = event_time[id];
-	inv_bandwidth = inv_time_bandwidths[id];
-	arg *= (channel_mc_charge - channel_event_obs) * inv_bandwidth;
-
-	loarg = (tmin - channel_mc_charge)*inv_bandwidth*invroot2;
-	hiarg = (tmax - channel_mc_charge)*inv_bandwidth*invroot2;
-	norm *= (erff(hiarg) - erff(loarg)) * rootPiBy2;
-
-	// evaluate 2D Gaussian normalized within time window
+	float norm = tmax - tmin;
+	if (inv_bandwidth > 0.0f) {
+	  float loarg = (tmin - channel_mc_time)*inv_bandwidth*invroot2;
+	  float hiarg = (tmax - channel_mc_time)*inv_bandwidth*invroot2;
+	  norm = (erff(hiarg) - erff(loarg)) * rootPiBy2;
+	}
 	float term = expf(-0.5f * arg * arg);
 
-	pdf_values[id] += term / norm;
+	time_pdf_values[id] += term / norm;
+
+	// Kernel argument: charge dim
+	channel_event_obs = event_charge[id];
+	inv_bandwidth = inv_charge_bandwidths[id];
+	arg = (channel_mc_charge - channel_event_obs) * inv_bandwidth;
+	
+	norm = qmax - qmin;
+	if (inv_bandwidth > 0.0f) {
+	  float loarg = (qmin - channel_mc_charge)*inv_bandwidth*invroot2;
+	  float hiarg = (qmax - channel_mc_charge)*inv_bandwidth*invroot2;
+	  norm = (erff(hiarg) - erff(loarg)) * rootPiBy2;
+	}
+
+	term = expf(-0.5f * arg * arg);
+
+	charge_pdf_values[id] += term / norm;
     }
 }
 

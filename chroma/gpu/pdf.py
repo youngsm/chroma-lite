@@ -1,6 +1,6 @@
 import numpy as np
 from pycuda import gpuarray as ga
-
+import pycuda.driver as cuda
 from chroma.gpu.tools import get_cu_module, cuda_options, GPUFuncs
 
 class GPUKernelPDF(object):
@@ -56,10 +56,14 @@ class GPUKernelPDF(object):
                                           self.qmom2_gpu,
                                           block=(nthreads_per_block,1,1), 
                                           grid=(len(gpuchannels.t)//nthreads_per_block+1,1))
+        cuda
         
-    def compute_bandwidth(self, scale_factor=1.0):
+    def compute_bandwidth(self, event_hit, event_time, event_charge, 
+                          scale_factor=1.0):
         """Use the MC information accumulated by accumulate_moments() to
         estimate the best bandwidth to use when kernel estimating."""
+
+        rho = 1.0
 
         hitcount = self.hitcount_gpu.get()
         mom0 = np.maximum(hitcount, 1)
@@ -75,11 +79,10 @@ class GPUKernelPDF(object):
         else:
             d = 2
         dimensionality_factor = ((4.0/(d+2)) / (mom0/scale_factor))**(-1.0/(d+4))
-                                 
-        time_bandwidths = dimensionality_factor * trms
+        gaussian_density = np.minimum(1.0/trms, (1.0/np.sqrt(2.0*np.pi)) * np.exp(-0.5*((event_time - tmean)/trms))  / trms)
+        time_bandwidths = dimensionality_factor / gaussian_density * rho
         inv_time_bandwidths = np.zeros_like(time_bandwidths)
         inv_time_bandwidths[time_bandwidths  > 0] = time_bandwidths[time_bandwidths > 0] ** -1
-        #inv_time_bandwidths /= 4.0
 
         # precompute inverse to speed up GPU evaluation
         self.inv_time_bandwidths_gpu = ga.to_gpu(
@@ -98,7 +101,10 @@ class GPUKernelPDF(object):
 
             qmean = qmom1 / mom0
             qrms = (qmom2 / mom0 - qmean**2)**0.5
-            charge_bandwidths = dimensionality_factor * qrms
+
+            gaussian_density = np.minimum(1.0/qrms, (1.0/np.sqrt(2.0*np.pi)) * np.exp(-0.5*((event_charge - qmean)/qrms))  / qrms)
+
+            charge_bandwidths = dimensionality_factor / gaussian_density * rho
 
             # precompute inverse to speed up GPU evaluation
             self.inv_charge_bandwidths_gpu = ga.to_gpu( 
@@ -122,11 +128,13 @@ class GPUKernelPDF(object):
         self.event_time_gpu = ga.to_gpu(event_time.astype(np.float32))
         self.event_charge_gpu = ga.to_gpu(event_charge.astype(np.float32))
         self.hitcount_gpu.fill(0)
-        self.pdf_values_gpu = ga.zeros(len(event_hit), dtype=np.float32)
+        self.time_pdf_values_gpu = ga.zeros(len(event_hit), dtype=np.float32)
+        self.charge_pdf_values_gpu = ga.zeros(len(event_hit), dtype=np.float32)
 
     def clear_kernel(self):
         self.hitcount_gpu.fill(0)
-        self.pdf_values_gpu.fill(0.0)
+        self.time_pdf_values_gpu.fill(0.0)
+        self.charge_pdf_values_gpu.fill(0.0)
             
     def accumulate_kernel(self, gpuchannels, nthreads_per_block=64):
         "Add the most recent results of run_daq() to the kernel PDF evaluation."
@@ -144,18 +152,26 @@ class GPUKernelPDF(object):
                                               self.inv_time_bandwidths_gpu,
                                               self.inv_charge_bandwidths_gpu,
                                               self.hitcount_gpu,
-                                              self.pdf_values_gpu,
+                                              self.time_pdf_values_gpu,
+                                              self.charge_pdf_values_gpu,
                                               block=(nthreads_per_block,1,1), 
                                               grid=(len(gpuchannels.t)//nthreads_per_block+1,1))
 
 
     def get_kernel_eval(self):
-        evhit = self.event_hit_gpu.get().astype(bool)
         hitcount = self.hitcount_gpu.get()
+        hit = self.event_hit_gpu.get().astype(bool)
+        time_pdf_values = self.time_pdf_values_gpu.get()
+        time_pdf_values /= np.maximum(1, hitcount) # avoid divide by zero
 
-        pdf_values = self.pdf_values_gpu.get()
-        pdf_values /= np.maximum(1, hitcount) # avoid divide by zero
+        charge_pdf_values = self.charge_pdf_values_gpu.get()
+        charge_pdf_values /= np.maximum(1, hitcount) # avoid divide by zero
 
+        if self.time_only:
+            pdf_values = time_pdf_values
+        else:
+            pdf_values = time_pdf_values * charge_pdf_values
+        
         return hitcount, pdf_values, np.zeros_like(pdf_values)
 
 class GPUPDF(object):

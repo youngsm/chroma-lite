@@ -7,7 +7,7 @@ from chroma.tools import profile_if_possible
 class Likelihood(object):
     "Class to evaluate likelihoods for detector events."
     def __init__(self, sim, event=None, tbins=100, trange=(-0.5, 999.5), 
-                 qbins=10, qrange=(-0.5, 9.5), time_only=True):
+                 qbins=10, qrange=(-0.5, 49.5), time_only=True):
         """
         Args:
             - sim: chroma.sim.Simulation
@@ -46,7 +46,8 @@ class Likelihood(object):
         time+charge) probability density for each channel using the
         variable bin window method.
 
-        Returns: (array of hit probabilities, array of PDF values)
+        Returns: (array of hit probabilities, array of PDF values, 
+                  array of PDF uncertainties)
         '''
 
         ntotal = nevals * nreps * ndaq
@@ -108,7 +109,7 @@ class Likelihood(object):
     def setup_kernel(self, vertex_generator, nevals, nreps, ndaq, oversample_factor):
         bandwidth_generator = islice(vertex_generator, nevals*oversample_factor)
 
-        self.sim.setup_kernel(len(self.event.channels.hit),
+        self.sim.setup_kernel(self.event.channels,
                               bandwidth_generator,
                               self.trange,
                               self.qrange,
@@ -116,7 +117,6 @@ class Likelihood(object):
                               ndaq=ndaq,
                               time_only=self.time_only,
                               scale_factor=oversample_factor)
-        
 
     @profile_if_possible
     def eval_kernel(self, vertex_generator, nevals, nreps=16, ndaq=50, navg=10):
@@ -128,6 +128,7 @@ class Likelihood(object):
         """
         ntotal = nevals * nreps * ndaq
 
+        mom0 = 0
         mom1 = 0.0
         mom2 = 0.0
         for i in xrange(navg):
@@ -143,7 +144,7 @@ class Likelihood(object):
         
             # Normalize probabilities and put a floor to keep the log finite
             hit_prob = hitcount.astype(np.float32) / ntotal
-            hit_prob = np.maximum(hit_prob, 0.5 / ntotal)
+            hit_prob[self.event.channels.hit] = np.maximum(hit_prob[self.event.channels.hit], 0.5 / ntotal)
 
             # Set all zero or nan probabilities to limiting PDF value
             bad_value = (pdf_prob <= 0.0) | np.isnan(pdf_prob)
@@ -158,20 +159,22 @@ class Likelihood(object):
 
             # NLL calculation: note that negation is at the end
             # Start with the probabilties of hitting (or not) the channels
-            log_likelihood = np.log(hit_prob[self.event.channels.hit]).sum() + np.log(1.0-hit_prob[~self.event.channels.hit])[1:].sum()
+            log_likelihood = np.log(hit_prob[self.event.channels.hit]).sum() + np.log(1.0-hit_prob[~self.event.channels.hit]).sum()
             log_likelihood = 0.0 # FIXME: Skipping hit/not-hit probabilities for now
 
             # Then include the probability densities of the observed
             # charges and times.
             log_likelihood += np.log(pdf_prob[self.event.channels.hit]).sum()
             print 'll', log_likelihood
-            mom1 += log_likelihood
-            mom2 += log_likelihood**2
+            if np.isfinite(log_likelihood):
+                mom0 += 1
+                mom1 += log_likelihood
+                mom2 += log_likelihood**2
         
-        avg_like = mom1 / navg
-        rms_like = (mom2 / navg - avg_like**2)**0.5
+        avg_like = mom1 / mom0
+        rms_like = (mom2 / mom0 - avg_like**2)**0.5
         # Don't forget to return a negative log likelihood
-        return ufloat((-avg_like, rms_like/sqrt(navg))), pdf_prob
+        return ufloat((-avg_like, rms_like/sqrt(mom0)))
 
 if __name__ == '__main__':
     from chroma.demo import detector as build_detector

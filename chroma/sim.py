@@ -152,13 +152,14 @@ class Simulation(object):
         
         return self.gpu_pdf.get_pdf_eval()
 
-    def setup_kernel(self, nchannels, bandwidth_iterable,
+    def setup_kernel(self, event_channels, bandwidth_iterable,
                          trange, qrange, 
                          nreps=1, ndaq=1, time_only=True, scale_factor=1.0):
         '''Call this before calling eval_pdf_kernel().  Sets up the
         event information and computes an appropriate kernel bandwidth'''
+        nchannels = len(event_channels.hit)
         self.gpu_pdf_kernel.setup_moments(nchannels, trange, qrange,
-                                          time_only=True)
+                                          time_only=time_only)
         # Compute bandwidth
         first_element, bandwidth_iterable = itertoolset.peek(bandwidth_iterable)
         if isinstance(first_element, event.Event):
@@ -174,9 +175,12 @@ class Simulation(object):
                     gpu_channels = self.gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
                     self.gpu_pdf_kernel.accumulate_moments(gpu_channels)
             
-        self.gpu_pdf_kernel.compute_bandwidth(scale_factor=scale_factor)
+        self.gpu_pdf_kernel.compute_bandwidth(event_channels.hit,
+                                              event_channels.t,
+                                              event_channels.q,
+                                              scale_factor=scale_factor)
 
-    def eval_kernel(self, event_channels, 
+    def eval_kernel(self, event_channels,
                     kernel_iterable,
                     trange, qrange, 
                     nreps=1, ndaq=1, naverage=1, time_only=True):
