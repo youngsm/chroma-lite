@@ -18,7 +18,7 @@ class G4GeneratorProcess(multiprocessing.Process):
 
     def run(self):
         gen = g4gen.G4Generator(self.material, seed=self.seed)
-        context = zmq.Context()
+        context = zmq.Context.instance()
         vertex_socket = context.socket(zmq.PULL)
         vertex_socket.connect(self.vertex_socket_address)
         photon_socket = context.socket(zmq.PUSH)
@@ -75,7 +75,7 @@ class G4ParallelGenerator(object):
         for p in self.processes:
             p.start()
 
-        self.zmq_context = zmq.Context()
+        self.zmq_context = zmq.Context.instance()
         self.vertex_socket = self.zmq_context.socket(zmq.PUSH)
         self.vertex_socket.bind(self.vertex_address)
         self.photon_socket = self.zmq_context.socket(zmq.PULL)
