@@ -1,4 +1,7 @@
-from chroma.camera import Camera, EventViewer, view, build
+try:
+    from chroma.camera import Camera, EventViewer, view, build
+except ImportError:
+    pass # Allow chroma usage when pygame not present
 from chroma import geometry
 from chroma import event
 from chroma.io import root
