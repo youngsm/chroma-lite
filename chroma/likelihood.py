@@ -57,11 +57,12 @@ class Likelihood(object):
         hitcount, pdf_prob, pdf_prob_uncert = \
             self.sim.eval_pdf(self.event.channels,
                               vertex_generator,
-                              0.1, self.trange, 
+                              0.2, self.trange, 
                               1, self.qrange,
                               nreps=nreps,
                               ndaq=ndaq,
-                              time_only=self.time_only)
+                              time_only=self.time_only,
+                              min_bin_content=ndaq*10)
         
         # Normalize probabilities and put a floor to keep the log finite
         hit_prob = hitcount.astype(np.float32) / ntotal
@@ -80,7 +81,6 @@ class Likelihood(object):
 
         return hit_prob, pdf_prob, pdf_prob_uncert
         
-    @profile_if_possible
     def eval(self, vertex_generator, nevals, nreps=16, ndaq=50):
         """
         Return the negative log likelihood that the detector event set in the
@@ -100,9 +100,8 @@ class Likelihood(object):
 
         # Then include the probability densities of the observed
         # charges and times.
-        hit_pdf_ufloat = unumpy.uarray((pdf_prob[self.event.channels.hit],
-                                        pdf_prob_uncert[self.event.channels.hit]))
-        log_likelihood += unumpy.log(hit_pdf_ufloat).sum()
+        log_likelihood += ufloat((np.log(pdf_prob[self.event.channels.hit]).sum(),
+                                  0.0))
         
         return -log_likelihood
 

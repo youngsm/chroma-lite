@@ -146,6 +146,7 @@ def pdf(gpu_detector, npdfs=10, nevents=100, nreps=16, ndaq=1,
 
     return nevents*nreps*ndaq/ufloat((np.mean(run_times),np.std(run_times)))
 
+@tools.profile_if_possible
 def pdf_eval(gpu_detector, npdfs=10, nevents=25, nreps=16, ndaq=128,
              nthreads_per_block=64, max_blocks=1024):
     """
@@ -179,6 +180,7 @@ def pdf_eval(gpu_detector, npdfs=10, nevents=25, nreps=16, ndaq=128,
     data_ev_channels = gpu_daq.acquire(gpu_photons, rng_states, nthreads_per_block, max_blocks).get()
     
     # Setup PDF evaluation
+    gpu_daq = gpu.GPUDaq(gpu_detector, ndaq=ndaq)
     gpu_pdf = gpu.GPUPDF()
     gpu_pdf.setup_pdf_eval(data_ev_channels.hit,
                            data_ev_channels.t,
@@ -205,10 +207,10 @@ def pdf_eval(gpu_detector, npdfs=10, nevents=25, nreps=16, ndaq=128,
             gpu_photons.propagate(gpu_detector, rng_states,
                                   nthreads_per_block, max_blocks)
             for gpu_photon_slice in gpu_photons.iterate_copies():
-                for idaq in xrange(ndaq):
-                    gpu_channels = gpu_daq.acquire(gpu_photon_slice, rng_states,
-                                                   nthreads_per_block, max_blocks)
-                    gpu_pdf.accumulate_pdf_eval(gpu_channels, nthreads_per_block)
+                gpu_photon_slice = gpu_photon_slice.select(event.SURFACE_DETECT)
+                gpu_channels = gpu_daq.acquire(gpu_photon_slice, rng_states,
+                                               nthreads_per_block, max_blocks)
+                gpu_pdf.accumulate_pdf_eval(gpu_channels, nthreads_per_block)
 
         cuda.Context.get_current().synchronize()        
         elapsed = time.time() - t0
@@ -223,6 +225,8 @@ def pdf_eval(gpu_detector, npdfs=10, nevents=25, nreps=16, ndaq=128,
 if __name__ == '__main__':
     from chroma import demo
     import gc
+
+    tools.enable_debug_on_crash()
 
     # Default to run all tests
     tests = ['ray', 'load', 'propagate', 'pdf', 'pdf_eval']

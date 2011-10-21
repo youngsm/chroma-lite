@@ -9,13 +9,14 @@ from chroma import event
 from chroma import itertoolset
 from chroma.tools import profile_if_possible
 
+import pycuda.driver as cuda
+
 def pick_seed():
     """Returns a seed for a random number generator selected using
     a mixture of the current time and the current process ID."""
     return int(time.time()) ^ (os.getpid() << 16)
 
 class Simulation(object):
-    @profile_if_possible
     def __init__(self, detector, seed=None, cuda_device=None,
                  geant4_processes=4, nthreads_per_block=64, max_blocks=1024):
         self.detector = detector
@@ -122,9 +123,12 @@ class Simulation(object):
         
         return self.gpu_pdf.get_pdfs()
 
-    def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=50, nreps=1, ndaq=1, time_only=True):
+    @profile_if_possible
+    def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=100, nreps=1, ndaq=1, time_only=True):
         """Returns tuple: 1D array of channel hit counts, 1D array of PDF
         probability densities."""
+        gpu_daq = gpu.GPUDaq(self.gpu_geometry, ndaq=ndaq)
+
         self.gpu_pdf.setup_pdf_eval(event_channels.hit,
                                     event_channels.t,
                                     event_channels.q,
@@ -145,10 +149,16 @@ class Simulation(object):
             gpu_photons.propagate(self.gpu_geometry, self.rng_states,
                                   nthreads_per_block=self.nthreads_per_block,
                                   max_blocks=self.max_blocks)
-            for gpu_photon_slice in gpu_photons.iterate_copies():
-                for idaq in xrange(ndaq):
-                    gpu_channels = self.gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
-                    self.gpu_pdf.accumulate_pdf_eval(gpu_channels)
+            nphotons = gpu_photons.true_nphotons
+            for i in xrange(gpu_photons.ncopies):
+                start_photon = i * nphotons
+                gpu_photon_slice = gpu_photons.select(event.SURFACE_DETECT,
+                                                           start_photon=start_photon,
+                                                           nphotons=nphotons)
+                if len(gpu_photon_slice) == 0:
+                    continue
+                gpu_channels = gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                self.gpu_pdf.accumulate_pdf_eval(gpu_channels, 32)
         
         return self.gpu_pdf.get_pdf_eval()
 

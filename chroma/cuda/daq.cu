@@ -79,6 +79,65 @@ run_daq(curandState *s, unsigned int detection_state,
 }
 
 __global__ void
+run_daq_many(curandState *s, unsigned int detection_state,
+	     int first_photon, int nphotons, float *photon_times,
+	     unsigned int *photon_histories, int *last_hit_triangles,
+	     int *solid_map,
+	     Detector *detector,
+	     unsigned int *earliest_time_int,
+	     unsigned int *channel_q_int, unsigned int *channel_histories,
+	     int ndaq, int channel_stride)
+{
+    __shared__ int photon_id;
+    __shared__ int triangle_id;
+    __shared__ int solid_id;
+    __shared__ int channel_index;
+    __shared__ unsigned int history;
+    __shared__ float photon_time;
+    
+
+    if (threadIdx.x == 0) {
+	photon_id = first_photon + blockIdx.x;
+	triangle_id = last_hit_triangles[photon_id];
+	
+	if (triangle_id > -1) {
+	    solid_id = solid_map[triangle_id];
+	    history = photon_histories[photon_id];
+	    channel_index = detector->solid_id_to_channel_index[solid_id];
+	    photon_time = photon_times[photon_id];
+	}
+    }
+
+    __syncthreads();
+
+    if (triangle_id == -1 || channel_index < 0 || !(history & detection_state))
+      return;
+
+    int id = threadIdx.x + blockDim.x * blockIdx.x;
+    curandState rng = s[id];
+
+    for (int i = threadIdx.x; i < ndaq; i += blockDim.x) {
+	int channel_offset = channel_index + i * channel_stride;
+
+	float time = photon_time + curand_normal(&rng) * 1.2f;// + 
+	//sample_cdf(&rng, detector->time_cdf_len,
+	//	       detector->time_cdf_x, detector->time_cdf_y);
+	unsigned int time_int = float_to_sortable_int(time);
+	
+	float charge = 1.0f; //sample_cdf(&rng, detector->charge_cdf_len,
+	//detector->charge_cdf_x,
+	//detector->charge_cdf_y);
+	unsigned int charge_int = roundf(charge / detector->charge_unit);
+	
+	atomicMin(earliest_time_int + channel_offset, time_int);
+	atomicAdd(channel_q_int + channel_offset, charge_int);
+	atomicOr(channel_histories + channel_offset, history);
+    }
+
+    s[id] = rng;
+}
+
+__global__ void
 convert_sortable_int_to_float(int n, unsigned int *sortable_ints,
 			      float *float_output)
 {

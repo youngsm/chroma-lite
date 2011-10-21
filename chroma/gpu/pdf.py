@@ -1,12 +1,13 @@
 import numpy as np
 from pycuda import gpuarray as ga
 import pycuda.driver as cuda
-from chroma.gpu.tools import get_cu_module, cuda_options, GPUFuncs
+from chroma.gpu.tools import get_cu_module, cuda_options, GPUFuncs, chunk_iterator
+from chroma.tools import profile_if_possible
 
 class GPUKernelPDF(object):
     def __init__(self):
         self.module = get_cu_module('pdf.cu', options=cuda_options,
-                                    include_source_directory=False)
+                                    include_source_directory=True)
         self.gpu_funcs = GPUFuncs(self.module)
 
     def setup_moments(self, nchannels, trange, qrange, time_only=True):
@@ -56,7 +57,6 @@ class GPUKernelPDF(object):
                                           self.qmom2_gpu,
                                           block=(nthreads_per_block,1,1), 
                                           grid=(len(gpuchannels.t)//nthreads_per_block+1,1))
-        cuda
         
     def compute_bandwidth(self, event_hit, event_time, event_charge, 
                           scale_factor=1.0):
@@ -177,7 +177,7 @@ class GPUKernelPDF(object):
 class GPUPDF(object):
     def __init__(self):
         self.module = get_cu_module('pdf.cu', options=cuda_options,
-                                    include_source_directory=False)
+                                    include_source_directory=True)
         self.gpu_funcs = GPUFuncs(self.module)
 
     def setup_pdf(self, nchannels, tbins, trange, qbins, qrange):
@@ -259,21 +259,31 @@ class GPUPDF(object):
             time_only: bool
               If True, only the time observable will be used in the PDF.
         """
+        self.event_nhit = np.count_nonzero(event_hit)
+        
+        # Define a mapping from an array of len(event_hit) to an array of length event_nhit
+        self.map_hit_offset_to_channel_id = np.where(event_hit)[0].astype(np.uint32)
+        self.map_hit_offset_to_channel_id_gpu = ga.to_gpu(self.map_hit_offset_to_channel_id)
+        self.map_channel_id_to_hit_offset = np.maximum(0, event_hit.cumsum() - 1).astype(np.uint32)
+        self.map_channel_id_to_hit_offset_gpu = ga.to_gpu(self.map_channel_id_to_hit_offset)
+
         self.event_hit_gpu = ga.to_gpu(event_hit.astype(np.uint32))
         self.event_time_gpu = ga.to_gpu(event_time.astype(np.float32))
         self.event_charge_gpu = ga.to_gpu(event_charge.astype(np.float32))
 
         self.eval_hitcount_gpu = ga.zeros(len(event_hit), dtype=np.uint32)
         self.eval_bincount_gpu = ga.zeros(len(event_hit), dtype=np.uint32)
-        self.nearest_mc_gpu = ga.empty(shape=len(event_hit) * min_bin_content, 
+        self.nearest_mc_gpu = ga.empty(shape=self.event_nhit * min_bin_content, 
                                              dtype=np.float32)
         self.nearest_mc_gpu.fill(1e9)
-
+        
         self.min_twidth = min_twidth
         self.trange = trange
         self.min_qwidth = min_qwidth
         self.qrange = qrange
         self.min_bin_content = min_bin_content
+
+        assert time_only # Only support time right now
         self.time_only = time_only
 
     def clear_pdf_eval(self):
@@ -282,27 +292,38 @@ class GPUPDF(object):
         self.eval_bincount_gpu.fill(0)
         self.nearest_mc_gpu.fill(1e9)
 
-    def accumulate_pdf_eval(self, gpuchannels, nthreads_per_block=64):
+    @profile_if_possible
+    def accumulate_pdf_eval(self, gpuchannels, nthreads_per_block=64, max_blocks=10000):
         "Add the most recent results of run_daq() to the PDF evaluation."
-        self.gpu_funcs.accumulate_pdf_eval(np.int32(self.time_only),
-                                           np.int32(len(self.event_hit_gpu)),
+        self.work_queues = ga.empty(shape=self.event_nhit * (gpuchannels.ndaq+1), dtype=np.uint32)
+        self.work_queues.fill(1)
+
+        self.gpu_funcs.accumulate_bincount(np.int32(self.event_hit_gpu.size),
+                                           np.int32(gpuchannels.ndaq),
                                            self.event_hit_gpu,
                                            self.event_time_gpu,
-                                           self.event_charge_gpu,
                                            gpuchannels.t,
-                                           gpuchannels.q,
                                            self.eval_hitcount_gpu,
                                            self.eval_bincount_gpu,
                                            np.float32(self.min_twidth),
                                            np.float32(self.trange[0]),
                                            np.float32(self.trange[1]),
-                                           np.float32(self.min_qwidth),
-                                           np.float32(self.qrange[0]),
-                                           np.float32(self.qrange[1]),
-                                           self.nearest_mc_gpu,
                                            np.int32(self.min_bin_content),
+                                           self.map_channel_id_to_hit_offset_gpu,
+                                           self.work_queues,
                                            block=(nthreads_per_block,1,1), 
-                                           grid=(len(gpuchannels.t)//nthreads_per_block+1,1))
+                                           grid=(self.event_hit_gpu.size//nthreads_per_block+1,1))
+        self.gpu_funcs.accumulate_nearest_neighbor_block(np.int32(self.event_nhit),
+                                                         np.int32(gpuchannels.ndaq),
+                                                         self.map_hit_offset_to_channel_id_gpu,
+                                                         self.work_queues,
+                                                         self.event_time_gpu,
+                                                         gpuchannels.t,
+                                                         self.nearest_mc_gpu,
+                                                         np.int32(self.min_bin_content),
+                                                         block=(nthreads_per_block,1,1), 
+                                                         grid=(self.event_nhit,1))
+        cuda.Context.get_current().synchronize()
 
     def get_pdf_eval(self):
         evhit = self.event_hit_gpu.get().astype(bool)
@@ -325,14 +346,16 @@ class GPUPDF(object):
         # PDF value for low stats bins
         low_stats = ~high_stats & (hitcount > 0) & evhit
 
-        nearest_mc = self.nearest_mc_gpu.get().reshape((len(hitcount), self.min_bin_content))
+        nearest_mc_by_hit = self.nearest_mc_gpu.get().reshape((self.event_nhit, self.min_bin_content))
+        nearest_mc = np.empty(shape=(len(hitcount), self.min_bin_content), dtype=np.float32)
+        nearest_mc.fill(1e9)
+        nearest_mc[self.map_hit_offset_to_channel_id,:] = nearest_mc_by_hit
 
         # Deal with the case where we did not even get min_bin_content events
         # in the PDF but also clamp the lower range to ensure we don't index
         # by a negative number in 2 lines
         last_valid_entry = np.maximum(0, (nearest_mc < 1e9).astype(int).sum(axis=1) - 1)
         distance = nearest_mc[np.arange(len(last_valid_entry)),last_valid_entry]
-
         if low_stats.any():
             if self.time_only:
                 pdf_value[low_stats] = (last_valid_entry[low_stats] + 1).astype(float) / hitcount[low_stats] / distance[low_stats] / 2.0
@@ -344,5 +367,4 @@ class GPUPDF(object):
         # PDFs with no stats got zero by default during array creation
         
         print 'high_stats:', high_stats.sum(), 'low_stats', low_stats.sum()
-
         return hitcount, pdf_value, pdf_value * pdf_frac_uncert
