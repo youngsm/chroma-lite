@@ -2,6 +2,7 @@ import numpy as np
 import sys
 import gc
 from pycuda import gpuarray as ga
+import pycuda.driver as cuda
 
 from chroma.tools import profile_if_possible
 from chroma import event
@@ -135,6 +136,57 @@ class GPUPhotons(object):
 
         if ga.max(self.flags).get() & (1 << 31):
             print >>sys.stderr, "WARNING: ABORTED PHOTONS"
+        cuda.Context.get_current().synchronize()
+
+
+    @profile_if_possible
+    def select(self, target_flag, nthreads_per_block=64, max_blocks=1024,
+               start_photon=None, nphotons=None):
+        '''Return a new GPUPhoton object containing only photons that
+        have a particular bit set in their history word.'''
+        cuda.Context.get_current().synchronize()
+        index_counter_gpu = ga.zeros(shape=1, dtype=np.uint32)
+        cuda.Context.get_current().synchronize()
+        if start_photon is None:
+            start_photon = 0
+        if nphotons is None:
+            nphotons = self.pos.size - start_photon
+
+        # First count how much space we need
+        for first_photon, photons_this_round, blocks in \
+                chunk_iterator(nphotons, nthreads_per_block, max_blocks):
+            self.gpu_funcs.count_photons(np.int32(start_photon+first_photon), 
+                                         np.int32(photons_this_round),
+                                         np.uint32(target_flag),
+                                         index_counter_gpu, self.flags,
+                                         block=(nthreads_per_block,1,1), 
+                                         grid=(blocks, 1))
+        cuda.Context.get_current().synchronize()
+        reduced_nphotons = int(index_counter_gpu.get()[0])
+        # Then allocate new storage space
+        pos = ga.empty(shape=reduced_nphotons, dtype=ga.vec.float3)
+        dir = ga.empty(shape=reduced_nphotons, dtype=ga.vec.float3)
+        pol = ga.empty(shape=reduced_nphotons, dtype=ga.vec.float3)
+        wavelengths = ga.empty(shape=reduced_nphotons, dtype=np.float32)
+        t = ga.empty(shape=reduced_nphotons, dtype=np.float32)
+        last_hit_triangles = ga.empty(shape=reduced_nphotons, dtype=np.int32)
+        flags = ga.empty(shape=reduced_nphotons, dtype=np.uint32)
+
+        # And finaly copy photons, if there are any
+        if reduced_nphotons > 0:
+            index_counter_gpu.fill(0)
+            for first_photon, photons_this_round, blocks in \
+                    chunk_iterator(nphotons, nthreads_per_block, max_blocks):
+                self.gpu_funcs.copy_photons(np.int32(start_photon+first_photon), 
+                                            np.int32(photons_this_round), 
+                                            np.uint32(target_flag),
+                                            index_counter_gpu, 
+                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles,
+                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles,
+                                            block=(nthreads_per_block,1,1), 
+                                            grid=(blocks, 1))
+            assert index_counter_gpu.get()[0] == reduced_nphotons
+        return GPUPhotonsSlice(pos, dir, pol, wavelengths, t, last_hit_triangles, flags)
 
     def __del__(self):
         del self.pos
@@ -146,6 +198,10 @@ class GPUPhotons(object):
         del self.last_hit_triangles
         # Free up GPU memory quickly if now available
         gc.collect()
+
+
+    def __len__(self):
+        return self.pos.size
 
 class GPUPhotonsSlice(GPUPhotons):
     '''A `slice`-like view of a subrange of another GPU photons array.
