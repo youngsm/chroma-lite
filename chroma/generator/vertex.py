@@ -48,15 +48,20 @@ def particle_gun(particle_name_iter, pos_iter, dir_iter, ke_iter,
         ev_vertex = event.Event(i, vertex, [vertex])
         yield ev_vertex
 
-def pi0_gun(pos_iter, dir_iter, ke_iter, t0_iter=constant(0.0), start_id=0):
-    for i, pos, dir, ke, t0 in izip(count(start_id), pos_iter, dir_iter, ke_iter, t0_iter):
+def pi0_gun(pos_iter, dir_iter, ke_iter, t0_iter=constant(0.0), start_id=0, gamma1_dir_iter=None):
+
+    if gamma1_dir_iter is None:
+        gamma1_dir_iter = isotropic()
+
+    for i, pos, dir, ke, t0, gamma1_dir in izip(count(start_id), pos_iter, dir_iter, ke_iter, t0_iter, gamma1_dir_iter):
         dir /= np.linalg.norm(dir)
         primary_vertex = event.Vertex('pi0', pos, dir, ke, t0=t0)
 
-        cos_theta_rest = np.random.random_sample() * 2 - 1
-        theta_rest = np.arccos(cos_theta_rest)
-        phi_rest = np.random.random_sample() * 2 * np.pi
+        # In rest frame
+        theta_rest = np.arccos(gamma1_dir[2])
+        phi_rest = np.arctan2(gamma1_dir[0], gamma1_dir[1])
 
+        # In lab frame
         (gamma1_e, gamma1_dir), (gamma2_e, gamma2_dir) = \
             pi0_decay(ke+134.9766, dir, theta_rest, phi_rest)
 
