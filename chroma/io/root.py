@@ -146,6 +146,8 @@ class RootReader(object):
         if index < 0 or index >= len(self):
             raise IndexError
         
+        self.i = index
+
         self.T.GetEntry(self.i)
         return root_event_to_python_event(self.T.ev)
 
