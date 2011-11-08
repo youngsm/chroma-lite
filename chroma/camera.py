@@ -678,10 +678,15 @@ class Camera(multiprocessing.Process):
         self.context.pop()
 
 class EventViewer(Camera):
+    # Constants for display_mode
+    CHARGE = 0
+    TIME = 1
+    HIT = 2
+
     def __init__(self, geometry, filename, **kwargs):
         Camera.__init__(self, geometry, **kwargs)
         self.rr = RootReader(filename)
-        self.show_charge = True
+        self.display_mode = EventViewer.CHARGE
 
     def render_particle_track(self):
         x = 10.0
@@ -707,12 +712,16 @@ class EventViewer(Camera):
         q = self.ev.channels.q
 
         # Important: Compute range only with HIT channels
-        if self.show_charge:
+        if self.display_mode == EventViewer.CHARGE:
             channel_color = map_to_color(q, range=(q[hit].min(),q[hit].max()))
             print 'charge'
-        else:
+        elif self.display_mode == EventViewer.TIME:
             channel_color = map_to_color(t, range=(t[hit].min(),t[hit].mean()))
             print 'time'
+        elif self.display_mode == EventViewer.HIT:
+            channel_color = map_to_color(hit, range=(0, 2))
+            print 'hit'
+
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
         solid_color = np.zeros(len(self.geometry.mesh.triangles), dtype=np.uint32)
 
@@ -751,7 +760,7 @@ class EventViewer(Camera):
                     self.update()
                 return
             elif event.key == K_PERIOD:
-                self.show_charge = not self.show_charge # flip bit
+                self.display_mode = (self.display_mode + 1) % 3
                 self.color_hit_pmts()
 
                 if self.ev.photons_beg is not None:
