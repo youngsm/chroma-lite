@@ -7,6 +7,7 @@ import os
 from subprocess import call
 import shutil
 import tempfile
+import sys
 
 import pycuda.driver as cuda
 from pycuda import gpuarray as ga
@@ -687,6 +688,7 @@ class EventViewer(Camera):
         Camera.__init__(self, geometry, **kwargs)
         self.rr = RootReader(filename)
         self.display_mode = EventViewer.CHARGE
+        self.sum_mode = False
 
     def render_particle_track(self):
         x = 10.0
@@ -704,35 +706,68 @@ class EventViewer(Camera):
 
         self.gpu_geometries = [self.gpu_geometry, gpu_geometry]
 
+    def sum_events(self):
+        print 'Summing events in file...'
+        nchannels = self.geometry.num_channels()
+        sum_hit = np.zeros(shape=nchannels, dtype=np.float)
+        sum_t = np.zeros(shape=nchannels, dtype=np.float)
+        sum_q = np.zeros(shape=nchannels, dtype=np.float)
+
+        nevents = len(self.rr)
+
+        for i, ev in enumerate(self.rr):
+            sum_hit += ev.channels.hit
+            sum_t[ev.channels.hit]   += ev.channels.t[ev.channels.hit]
+            sum_q[ev.channels.hit]   += ev.channels.q[ev.channels.hit]
+            
+            if i % (nevents / 100 + 1) == 0:
+                print >>sys.stderr, '.',
+
+        self.sum_hit = sum_hit
+        self.sum_t   = sum_t / sum_hit
+        self.sum_q   = sum_q / sum_hit
+        print 'Done.'
+
     def color_hit_pmts(self):
         self.gpu_geometry.reset_colors()
 
-        hit = self.ev.channels.hit
-        t = self.ev.channels.t
-        q = self.ev.channels.q
+        if self.sum_mode:
+            hit = self.sum_hit
+            t = self.sum_t
+            q = self.sum_q
+            select = hit > 0
+        else:
+            hit = self.ev.channels.hit
+            t = self.ev.channels.t
+            q = self.ev.channels.q
+            select = hit
 
         # Important: Compute range only with HIT channels
         if self.display_mode == EventViewer.CHARGE:
-            channel_color = map_to_color(q, range=(q[hit].min(),q[hit].max()))
+            channel_color = map_to_color(q, range=(q[select].min(),q[select].max()))
             print 'charge'
         elif self.display_mode == EventViewer.TIME:
-            channel_color = map_to_color(t, range=(t[hit].min(),t[hit].mean()))
-            print 'time'
+            if self.sum_mode:
+                crange = (t[select].min(), t[select].max())
+            else:
+                crange = (t[select].min(), t[select].mean())
+            channel_color = map_to_color(t, range=crange)
+            print 'time'#, crange
         elif self.display_mode == EventViewer.HIT:
-            channel_color = map_to_color(hit, range=(0, 2))
-            print 'hit'
+            channel_color = map_to_color(hit, range=(hit.min(), hit.max()))
+            print 'hit'#, hit.min(), hit.max()
 
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
         solid_color = np.zeros(len(self.geometry.mesh.triangles), dtype=np.uint32)
 
-        solid_hit[self.geometry.channel_index_to_solid_id] = hit
+        solid_hit[self.geometry.channel_index_to_solid_id] = select
         solid_color[self.geometry.channel_index_to_solid_id] = channel_color
 
         self.gpu_geometry.color_solids(solid_hit, solid_color)
 
     def process_event(self, event):
         if event.type == KEYDOWN:
-            if event.key == K_PAGEUP:
+            if event.key == K_PAGEUP and not self.sum_mode:
                 try:
                     self.ev = self.rr.next()
                 except StopIteration:
@@ -746,7 +781,7 @@ class EventViewer(Camera):
                     self.update()
                 return
 
-            elif event.key == K_PAGEDOWN:
+            elif event.key == K_PAGEDOWN and not self.sum_mode:
                 try:
                     self.ev = self.rr.prev()
                 except StopIteration:
@@ -763,9 +798,19 @@ class EventViewer(Camera):
                 self.display_mode = (self.display_mode + 1) % 3
                 self.color_hit_pmts()
 
-                if self.ev.photons_beg is not None:
+                if not self.sum_mode and self.ev.photons_beg is not None:
                     self.render_particle_track()
 
+                self.update()
+                return
+            elif event.key == K_s:
+                self.sum_mode = not self.sum_mode
+                if self.sum_mode and not hasattr(self, 'sum_hit'):
+                    self.sum_events()
+                elif not self.sum_mode and not hasattr(self, 'ev'):
+                    return
+
+                self.color_hit_pmts()
                 self.update()
                 return
 
