@@ -115,6 +115,11 @@ class RootReader(object):
         '''Returns number of events in this file.'''
         return self.T.GetEntries()
 
+    def __iter__(self):
+        for i in xrange(self.T.GetEntries()):
+            self.T.GetEntry(i)
+            yield root_event_to_python_event(self.T.ev)
+
     def next(self):
         '''Return the next event in the file. Raises StopIteration
         when you get to the end.'''
@@ -138,7 +143,7 @@ class RootReader(object):
 
     def current(self):
         '''Return the current event in the file.'''
-        self.T.GetEntry(self.i) # just in case?
+        self.T.GetEntry(self.i) # in case we were iterated over elsewhere
         return root_event_to_python_event(self.T.ev)
 
     def jump_to(self, index):
