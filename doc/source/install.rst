@@ -236,10 +236,10 @@ Next go to your download directory and run the following commands::
 GEANT4 requires several environment variables to locate data files.  Set
 these by appending the following lines to ``$VIRTUAL_ENV/bin/activate``::
 
-  export G4LEVELGAMMADATA=$VIRTUAL_ENV/geant4.9.4.p02/data/PhotonEvaporation2.1
-  export G4LEDATA=$VIRTUAL_ENV/geant4.9.4.p02/data/G4EMLOW6.19
-  export G4NEUTRONHPDATA=$VIRTUAL_ENV/geant4.9.4.p02/data/G4NDL3.14
-  export G4RADIOACTIVEDATA=$VIRTUAL_ENV/geant4.9.4.p02/data/RadioactiveDecay3.3
+  export G4LEVELGAMMADATA=$VIRTUAL_ENV/src/geant4.9.4.p02/data/PhotonEvaporation2.1
+  export G4LEDATA=$VIRTUAL_ENV/src/geant4.9.4.p02/data/G4EMLOW6.19
+  export G4NEUTRONHPDATA=$VIRTUAL_ENV/src/geant4.9.4.p02/data/G4NDL3.14
+  export G4RADIOACTIVEDATA=$VIRTUAL_ENV/src/geant4.9.4.p02/data/RadioactiveDecay3.3
 
 
 Step 6: g4py
