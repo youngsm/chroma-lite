@@ -6,7 +6,7 @@ import math
 
 def count_nonzero(array):
     '''Return the number of nonzero elements in this array'''
-    return (array != 0).sum()
+    return int((array != 0).sum())
 
 def filled_array(value, shape, dtype):
     '''Create a numpy array of given `shape` and `dtype` filled with the scalar `value`.'''
