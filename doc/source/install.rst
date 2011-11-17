@@ -262,17 +262,20 @@ Step 7: Chroma
 
 Finally, we are getting close to being able to use ``pip`` to do the
 rest of the installation.  In order for PyUblas to find boost, we have
-to create a file in your ``$HOME`` directory called ``.aksetup-defaults.py`` that contains the following lines::
+to create a file in your ``$HOME`` directory called
+``.aksetup-defaults.py`` that contains the following lines::
+
   BOOST_INC_DIR = ['/usr/include/boost']
   BOOST_LIB_DIR = ['/usr/lib64']
   BOOST_PYTHON_LIBNAME = ['boost_python-mt-py27']
 
-Now we at a stage where the automatic dependency resolution
-features of ``pip`` can do their magic.  We need to upgrade the
-distribute module prior to installation, but the rest should be
-automatic::
+Now we at a stage where the automatic dependency resolution features
+of ``pip`` can do their magic.  We need to upgrade the distribute
+module and install PyUblas prior to installation, but the rest should
+be automatic::
 
   pip install -U distribute
+  pip install pyublas
   pip install -e hg+http://bitbucket.org/chroma/chroma#egg=Chroma
 
 Now you can enable the Chroma environment whenever you want by typing
