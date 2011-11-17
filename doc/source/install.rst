@@ -96,7 +96,7 @@ it should be executed as one line::
   sudo apt-get install build-essential xorg-dev python-dev gcc-4.4 gfortran-4.4 \
        g++-4.4 python-virtualenv python-numpy python-pygame libglu1-mesa-dev \
        glutg3-dev cmake uuid-dev liblapack-dev mercurial git subversion \
-       libboost-all-dev
+       libboost-all-dev libatlas-base-dev
 
 To be able to generate the documentation, we also need these tools::
 
