@@ -2,7 +2,7 @@ import numpy as np
 from pycuda import gpuarray as ga
 import pycuda.driver as cuda
 from chroma.gpu.tools import get_cu_module, cuda_options, GPUFuncs, chunk_iterator
-from chroma.tools import profile_if_possible
+from chroma.tools import profile_if_possible, count_nonzero
 
 class GPUKernelPDF(object):
     def __init__(self):
@@ -259,7 +259,7 @@ class GPUPDF(object):
             time_only: bool
               If True, only the time observable will be used in the PDF.
         """
-        self.event_nhit = np.count_nonzero(event_hit)
+        self.event_nhit = count_nonzero(event_hit)
         
         # Define a mapping from an array of len(event_hit) to an array of length event_nhit
         self.map_hit_offset_to_channel_id = np.where(event_hit)[0].astype(np.uint32)

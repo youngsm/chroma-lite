@@ -2,7 +2,7 @@ import os, os.path
 import shutil
 import numpy as np
 import chroma.event as event
-
+from chroma.tools import count_nonzero
 from chroma.rootimport import ROOT
 
 # Check if we have already imported the ROOT class due to a user's
@@ -216,7 +216,7 @@ class RootWriter(object):
                 self.ev.vertices[i].t0 = vertex.t0
 
         if pyev.channels is not None:
-            nhit = np.count_nonzero(pyev.channels.hit)
+            nhit = count_nonzero(pyev.channels.hit)
             if nhit > 0:
                 ROOT.fill_channels(self.ev, nhit, np.arange(len(pyev.channels.t))[pyev.channels.hit].astype(np.int32), pyev.channels.t, pyev.channels.q, pyev.channels.flags, len(pyev.channels.hit))
             else:

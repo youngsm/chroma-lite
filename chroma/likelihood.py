@@ -2,7 +2,7 @@ import numpy as np
 from math import sqrt
 from uncertainties import ufloat, unumpy
 from itertools import islice, izip, repeat
-from chroma.tools import profile_if_possible
+from chroma.tools import profile_if_possible, count_nonzero
 
 class Likelihood(object):
     "Class to evaluate likelihoods for detector events."
@@ -189,7 +189,7 @@ if __name__ == '__main__':
 
     event = sim.simulate(islice(constant_particle_gun('e-',(0,0,0),(1,0,0),100.0), 1)).next()
 
-    print 'nhit = %i' % np.count_nonzero(event.channels.hit)
+    print 'nhit = %i' % count_nonzero(event.channels.hit)
 
     likelihood = Likelihood(sim, event)
 

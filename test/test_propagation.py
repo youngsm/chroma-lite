@@ -5,6 +5,7 @@ from chroma.geometry import Solid, Geometry, vacuum
 from chroma.make import box
 from chroma.sim import Simulation
 from chroma.event import Photons
+from chroma.tools import count_nonzero
 
 class TestPropagation(unittest.TestCase):
     def testAbort(self):
@@ -51,6 +52,6 @@ class TestPropagation(unittest.TestCase):
                                    max_steps=10).next().photons_end
         aborted = (photons_end.flags & (1 << 31)) > 0
         print 'aborted photons: %1.1f' % \
-            (float(np.count_nonzero(aborted)) / nphotons)
+            (float(count_nonzero(aborted)) / nphotons)
         self.assertFalse(aborted.any())
         
