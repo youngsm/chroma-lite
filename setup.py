@@ -40,9 +40,10 @@ setup(
                   extra_link_args=geant4_libs,
                   libraries=['boost_python']),
         ],
-    
+ 
+    setup_requires = ['pyublas'],
     install_requires = ['uncertainties','pyzmq-static','spnav', 'pycuda',
-                      'numpy>1.6', 'pygame'],
+                        'numpy>=1.6','pygame'],
     test_suite = 'nose.collector',
     
 )
