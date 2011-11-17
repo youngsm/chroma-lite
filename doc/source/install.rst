@@ -150,7 +150,7 @@ Next, append the following lines to the end of
 ``$HOME/chroma_env/bin/activate`` to add the CUDA tools to the path::
 
   export PATH=/usr/local/cuda/bin:$PATH
-  export LD_LIBRARY_PATH=/usr/local/cuda/lib64
+  export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$VIRTUAL_ENV/lib:$LD_LIBRARY_PATH
 
 
 Finally, we can enable the virtual environment::
@@ -260,7 +260,14 @@ Chroma, so for now you will need to use our fork of g4py::
 Step 7: Chroma
 ^^^^^^^^^^^^^^
 
-Finally, we are at a stage where the automatic dependency resolution
+Finally, we are getting close to being able to use ``pip`` to do the
+rest of the installation.  In order for PyUblas to find boost, we have
+to create a file in your ``$HOME`` directory called ``.aksetup-defaults.py`` that contains the following lines::
+  BOOST_INC_DIR = ['/usr/include/boost']
+  BOOST_LIB_DIR = ['/usr/lib64']
+  BOOST_PYTHON_LIBNAME = ['boost_python-mt-py27']
+
+Now we at a stage where the automatic dependency resolution
 features of ``pip`` can do their magic.  We need to upgrade the
 distribute module prior to installation, but the rest should be
 automatic::
