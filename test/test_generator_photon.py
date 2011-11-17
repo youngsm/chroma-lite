@@ -16,6 +16,6 @@ class TestG4ParallelGenerator(unittest.TestCase):
     def test_off_center(self):
         '''Generate Cherenkov light at (1 m, 0 m, 0 m)'''
         gen = generator.photon.G4ParallelGenerator(1, water)
-        vertex = itertools.islice(constant_particle_gun('e-', (1,0,0), (1,0,0), 100), 10)
+        vertex = itertools.islice(constant_particle_gun('e-', (1000,0,0), (1,0,0), 100), 10)
         for event in gen.generate_events(vertex):
             self.assertGreater(len(event.photons_beg.pos), 0)
