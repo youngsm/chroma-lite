@@ -43,7 +43,7 @@ setup(
  
     setup_requires = ['pyublas'],
     install_requires = ['uncertainties','pyzmq-static','spnav', 'pycuda', 
-                        'numpy', 'pygame', 'nose', 'sphinx'],
+                        'numpy>=1.6', 'pygame', 'nose', 'sphinx'],
     test_suite = 'nose.collector',
     
 )

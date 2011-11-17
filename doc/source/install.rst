@@ -269,13 +269,15 @@ to create a file in your ``$HOME`` directory called
   BOOST_LIB_DIR = ['/usr/lib64']
   BOOST_PYTHON_LIBNAME = ['boost_python-mt-py27']
 
-Now we at a stage where the automatic dependency resolution features
-of ``pip`` can do their magic.  We need to upgrade the distribute
-module and install PyUblas prior to installation, but the rest should
-be automatic::
+Some of the python dependencies of Chroma have fiddly installation
+scripts, so we need to add them individually before doing the final
+install of the Chroma package::
 
   pip install -U distribute
   pip install pyublas
+  # Bug workaround for Numpy 1.6.1
+  mkdir $VIRTUAL_ENV/local
+  ln -s $VIRTUAL_ENV/lib $VIRTUAL_ENV/local/lib
   pip install -e hg+http://bitbucket.org/chroma/chroma#egg=Chroma
 
 Now you can enable the Chroma environment whenever you want by typing
