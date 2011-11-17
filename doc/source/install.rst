@@ -170,19 +170,19 @@ want to use ROOT to analyze the output of Chroma.
 
 Begin by downloading the ROOT 5.30 tarball from `the ROOT download
 page <http://root.cern.ch/drupal/content/production-version-530>`_.
-As of this writing, the latest version is 5.30.02.  Then, from the
+As of this writing, the latest version is 5.30.04.  Then, from the
 download directory, execute the following commands::
 
-  tar xvf root_v5.30.02.source.tar.gz
+  tar xvf root_v5.30.04.source.tar.gz
   mkdir $VIRTUAL_ENV/src/
-  mv root $VIRTUAL_ENV/src/root-5.30.02
-  cd $VIRTUAL_ENV/src/root-5.30.02
+  mv root $VIRTUAL_ENV/src/root-5.30.04
+  cd $VIRTUAL_ENV/src/root-5.30.04
   ./configure
   make
 
 We also need to append a ``source`` line to ``$VIRTUAL_ENV/bin/activate``::
 
-  source $VIRTUAL_ENV/src/root-5.30.01/bin/thisroot.sh
+  source $VIRTUAL_ENV/src/root-5.30.04/bin/thisroot.sh
 
 
 Step 5: CLHEP and GEANT4
