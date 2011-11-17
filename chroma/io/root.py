@@ -218,7 +218,7 @@ class RootWriter(object):
         if pyev.channels is not None:
             nhit = count_nonzero(pyev.channels.hit)
             if nhit > 0:
-                ROOT.fill_channels(self.ev, nhit, np.arange(len(pyev.channels.t))[pyev.channels.hit].astype(np.int32), pyev.channels.t, pyev.channels.q, pyev.channels.flags, len(pyev.channels.hit))
+                ROOT.fill_channels(self.ev, nhit, np.arange(len(pyev.channels.t))[pyev.channels.hit].astype(np.uint32), pyev.channels.t, pyev.channels.q, pyev.channels.flags, len(pyev.channels.hit))
             else:
                 self.ev.nhit = 0
                 self.ev.channels.resize(0)
