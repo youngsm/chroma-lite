@@ -21,6 +21,31 @@ class Vertex(object):
 
 class Photons(object):
     def __init__(self, pos, dir, pol, wavelengths, t=None, last_hit_triangles=None, flags=None):
+        '''Create a new list of n photons.
+
+            pos: numpy.ndarray(dtype=numpy.float32, shape=(n,3))
+               Position 3-vectors (mm)
+
+            dir: numpy.ndarray(dtype=numpy.float32, shape=(n,3))
+               Direction 3-vectors (normalized)
+
+            pol: numpy.ndarray(dtype=numpy.float32, shape=(n,3))
+               Polarization direction 3-vectors (normalized)
+
+            wavelengths: numpy.ndarray(dtype=numpy.float32, shape=n)
+               Photon wavelengths (nm)
+
+            t: numpy.ndarray(dtype=numpy.float32, shape=n)
+               Photon times (ns)
+
+            last_hit_triangles: numpy.ndarray(dtype=numpy.int32, shape=n)
+               ID number of last intersected triangle.  -1 if no triangle hit in last step
+               If set to None, a default array filled with -1 is created
+
+            flags: numpy.ndarray(dtype=numpy.uint32, shape=n)
+               Bit-field indicating the physics interaction history of the photon.  See 
+               history bit constants in chroma.event for definition.
+        '''
         self.pos = pos
         self.dir = dir
         self.pol = pol
