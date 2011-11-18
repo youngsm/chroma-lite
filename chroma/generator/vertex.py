@@ -59,7 +59,7 @@ def pi0_gun(pos_iter, dir_iter, ke_iter, t0_iter=constant(0.0), start_id=0, gamm
 
         # In rest frame
         theta_rest = np.arccos(gamma1_dir[2])
-        phi_rest = np.arctan2(gamma1_dir[0], gamma1_dir[1])
+        phi_rest = np.arctan2(gamma1_dir[1], gamma1_dir[0])
 
         # In lab frame
         (gamma1_e, gamma1_dir), (gamma2_e, gamma2_dir) = \
