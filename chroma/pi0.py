@@ -59,7 +59,7 @@ def pi0_decay(energy, direction, theta, phi):
     pi0_v = pi0_p/pi0_e
 
     photon_e0 = _pi0_mass/2.0
-    photon_p0 = photon_e0*np.array([np.cos(theta)*np.sin(phi), np.sin(theta)*np.sin(phi), np.cos(phi)])
+    photon_p0 = photon_e0*np.array([np.cos(phi)*np.sin(theta), np.sin(phi)*np.sin(theta), np.cos(theta)])
 
     e1, p1 = rocket_to_lab(photon_e0, photon_p0, pi0_v)
     v1 = p1/np.linalg.norm(p1)
