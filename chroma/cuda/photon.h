@@ -9,6 +9,8 @@
 #include "mesh.h"
 #include "geometry.h"
 
+#define WEIGHT_LOWER_THRESHOLD 0.01f
+
 struct Photon
 {
     float3 position;
@@ -16,7 +18,9 @@ struct Photon
     float3 polarization;
     float wavelength;
     float time;
-
+  
+    float weight;
+  
     unsigned int history;
 
     int last_hit_triangle;
@@ -175,10 +179,16 @@ rayleigh_scatter(Photon &p, curandState &rng)
     p.polarization /= norm(p.polarization);
 } // scatter
 
-__device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng)
+__device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
+                                     bool use_weights=false)
 {
     float absorption_distance = -s.absorption_length*logf(curand_uniform(&rng));
     float scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
+
+    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD) // Prevent absorption
+	absorption_distance = 1e30;
+    else
+	use_weights = false;
 
     if (absorption_distance <= scattering_distance) {
 	if (absorption_distance <= s.distance_to_boundary) {
@@ -193,6 +203,11 @@ __device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng)
     }
     else {
 	if (scattering_distance <= s.distance_to_boundary) {
+
+	    // Scale weight by absorption probability along this distance
+	    if (use_weights)
+		p.weight *= expf(-scattering_distance/s.absorption_length);
+
 	    p.time += scattering_distance/(SPEED_OF_LIGHT/s.refractive_index1);
 	    p.position += scattering_distance*p.direction;
 
@@ -206,6 +221,10 @@ __device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng)
 	} // photon is scattered in material1
     } // if scattering_distance < absorption_distance
 
+    // Scale weight by absorption probability along this distance
+    if (use_weights)
+	p.weight *= expf(-s.distance_to_boundary/s.absorption_length);
+    
     p.position += s.distance_to_boundary*p.direction;
     p.time += s.distance_to_boundary/(SPEED_OF_LIGHT/s.refractive_index1);
 
@@ -269,7 +288,8 @@ propagate_at_boundary(Photon &p, State &s, curandState &rng)
 } // propagate_at_boundary
 
 __device__ int
-propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry)
+propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
+                     bool use_weights=false)
 {
     Surface *surface = geometry->surfaces[s.surface_index];
 
@@ -282,6 +302,25 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry)
     float reflect_specular = interp_property(surface, p.wavelength, surface->reflect_specular);
 
     float uniform_sample = curand_uniform(&rng);
+
+    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD 
+	&& absorb < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
+	// Prevent absorption and reweight accordingly
+	float survive = 1.0f - absorb;
+	absorb = 0.0f;
+	p.weight *= survive;
+
+	// Renormalize remaining probabilities
+	detect /= survive;
+	reflect_diffuse /= survive;
+	reflect_specular /= survive;
+    }
+
+    if (use_weights && detect > 0.0f) {
+	p.history |= SURFACE_DETECT;
+	p.weight *= detect;
+	return BREAK;
+    }
 
     if (uniform_sample < absorb) {
 	p.history |= SURFACE_ABSORB;

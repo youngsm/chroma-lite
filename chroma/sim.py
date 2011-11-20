@@ -127,7 +127,8 @@ class Simulation(object):
     def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=100, nreps=1, ndaq=1, time_only=True):
         """Returns tuple: 1D array of channel hit counts, 1D array of PDF
         probability densities."""
-        gpu_daq = gpu.GPUDaq(self.gpu_geometry, ndaq=ndaq)
+        ndaq_reps = ndaq // 32
+        gpu_daq = gpu.GPUDaq(self.gpu_geometry, ndaq=32)
 
         self.gpu_pdf.setup_pdf_eval(event_channels.hit,
                                     event_channels.t,
@@ -148,7 +149,8 @@ class Simulation(object):
             gpu_photons = gpu.GPUPhotons(ev.photons_beg, ncopies=nreps)
             gpu_photons.propagate(self.gpu_geometry, self.rng_states,
                                   nthreads_per_block=self.nthreads_per_block,
-                                  max_blocks=self.max_blocks)
+                                  max_blocks=self.max_blocks,
+                                  use_weights=True)
             nphotons = gpu_photons.true_nphotons
             for i in xrange(gpu_photons.ncopies):
                 start_photon = i * nphotons
@@ -157,8 +159,12 @@ class Simulation(object):
                                                            nphotons=nphotons)
                 if len(gpu_photon_slice) == 0:
                     continue
-                gpu_channels = gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
-                self.gpu_pdf.accumulate_pdf_eval(gpu_channels, 32)
+
+                #weights = gpu_photon_slice.weights.get()
+                #print 'weights', weights.min(), weights.max()
+                for j in xrange(ndaq_reps):
+                    gpu_channels = gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                    self.gpu_pdf.accumulate_pdf_eval(gpu_channels, nthreads_per_block=32)
         
         return self.gpu_pdf.get_pdf_eval()
 

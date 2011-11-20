@@ -313,6 +313,9 @@ class GPUPDF(object):
                                            self.work_queues,
                                            block=(nthreads_per_block,1,1), 
                                            grid=(self.event_hit_gpu.size//nthreads_per_block+1,1))
+        cuda.Context.get_current().synchronize()
+        return # FIXME
+
         self.gpu_funcs.accumulate_nearest_neighbor_block(np.int32(self.event_nhit),
                                                          np.int32(gpuchannels.ndaq),
                                                          self.map_hit_offset_to_channel_id_gpu,

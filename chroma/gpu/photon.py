@@ -34,6 +34,7 @@ class GPUPhotons(object):
         self.t = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
         self.last_hit_triangles = ga.empty(shape=nphotons*ncopies, dtype=np.int32)
         self.flags = ga.empty(shape=nphotons*ncopies, dtype=np.uint32)
+        self.weights = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
 
         # Assign the provided photons to the beginning (possibly
         # the entire array if ncopies is 1
@@ -44,6 +45,7 @@ class GPUPhotons(object):
         self.t[:nphotons].set(photons.t.astype(np.float32))
         self.last_hit_triangles[:nphotons].set(photons.last_hit_triangles.astype(np.int32))
         self.flags[:nphotons].set(photons.flags.astype(np.uint32))
+        self.weights[:nphotons].set(photons.weights.astype(np.float32))
 
         module = get_cu_module('propagate.cu', options=cuda_options)
         self.gpu_funcs = GPUFuncs(module)
@@ -56,7 +58,7 @@ class GPUPhotons(object):
                     chunk_iterator(nphotons, nthreads_per_block, max_blocks):
                 self.gpu_funcs.photon_duplicate(np.int32(first_photon), np.int32(photons_this_round),
                                                 self.pos, self.dir, self.wavelengths, self.pol, self.t, 
-                                                self.flags, self.last_hit_triangles, 
+                                                self.flags, self.last_hit_triangles, self.weights,
                                                 np.int32(ncopies-1), 
                                                 np.int32(nphotons),
                                                 block=(nthreads_per_block,1,1), grid=(blocks, 1))
@@ -74,7 +76,8 @@ class GPUPhotons(object):
         t = self.t.get()
         last_hit_triangles = self.last_hit_triangles.get()
         flags = self.flags.get()
-        return event.Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags)
+        weights = self.weights.get()
+        return event.Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights)
 
     def iterate_copies(self):
         '''Returns an iterator that yields GPUPhotonsSlice objects
@@ -87,11 +90,12 @@ class GPUPhotons(object):
                                   wavelengths=self.wavelengths[window],
                                   t=self.t[window],
                                   last_hit_triangles=self.last_hit_triangles[window],
-                                  flags=self.flags[window])
+                                  flags=self.flags[window],
+                                  weights=self.weights[window])
 
     @profile_if_possible
     def propagate(self, gpu_geometry, rng_states, nthreads_per_block=64,
-                  max_blocks=1024, max_steps=10):
+                  max_blocks=1024, max_steps=10, use_weights=False):
         """Propagate photons on GPU to termination or max_steps, whichever
         comes first.
 
@@ -123,7 +127,7 @@ class GPUPhotons(object):
 
             for first_photon, photons_this_round, blocks in \
                     chunk_iterator(nphotons, nthreads_per_block, max_blocks):
-                self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, np.int32(nsteps), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
+                self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, np.int32(nsteps), np.int32(use_weights), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
 
             step += nsteps
 
@@ -171,6 +175,7 @@ class GPUPhotons(object):
         t = ga.empty(shape=reduced_nphotons, dtype=np.float32)
         last_hit_triangles = ga.empty(shape=reduced_nphotons, dtype=np.int32)
         flags = ga.empty(shape=reduced_nphotons, dtype=np.uint32)
+        weights = ga.empty(shape=reduced_nphotons, dtype=np.float32)
 
         # And finaly copy photons, if there are any
         if reduced_nphotons > 0:
@@ -181,12 +186,12 @@ class GPUPhotons(object):
                                             np.int32(photons_this_round), 
                                             np.uint32(target_flag),
                                             index_counter_gpu, 
-                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles,
-                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles,
+                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights,
+                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles, weights,
                                             block=(nthreads_per_block,1,1), 
                                             grid=(blocks, 1))
             assert index_counter_gpu.get()[0] == reduced_nphotons
-        return GPUPhotonsSlice(pos, dir, pol, wavelengths, t, last_hit_triangles, flags)
+        return GPUPhotonsSlice(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights)
 
     def __del__(self):
         del self.pos
@@ -210,7 +215,7 @@ class GPUPhotonsSlice(GPUPhotons):
 
     Returned by the GPUPhotons.iterate_copies() iterator.'''
     def __init__(self, pos, dir, pol, wavelengths, t, last_hit_triangles,
-                 flags):
+                 flags, weights):
         '''Create new object using slices of GPUArrays from an instance
         of GPUPhotons.  NOTE THESE ARE NOT CPU ARRAYS!'''
         self.pos = pos
@@ -220,6 +225,7 @@ class GPUPhotonsSlice(GPUPhotons):
         self.t = t
         self.last_hit_triangles = last_hit_triangles
         self.flags = flags
+        self.weights = weights
 
         module = get_cu_module('propagate.cu', options=cuda_options)
         self.gpu_funcs = GPUFuncs(module)

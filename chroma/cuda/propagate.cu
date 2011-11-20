@@ -14,7 +14,7 @@ photon_duplicate(int first_photon, int nthreads,
 		 float3 *positions, float3 *directions,
 		 float *wavelengths, float3 *polarizations,
 		 float *times, unsigned int *histories,
-		 int *last_hit_triangles, 
+		 int *last_hit_triangles, float *weights,
 		 int copies, int stride)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -32,6 +32,7 @@ photon_duplicate(int first_photon, int nthreads,
     p.time = times[photon_id];
     p.last_hit_triangle = last_hit_triangles[photon_id];
     p.history = histories[photon_id];
+    p.weight = weights[photon_id];
 
     for (int i=1; i <= copies; i++) {
       int target_photon_id = photon_id + stride * i;
@@ -43,6 +44,7 @@ photon_duplicate(int first_photon, int nthreads,
       times[target_photon_id] = p.time;
       last_hit_triangles[target_photon_id] = p.last_hit_triangle;
       histories[target_photon_id] = p.history;
+      weights[target_photon_id] = p.weight;
     }
 }
 
@@ -79,11 +81,11 @@ copy_photons(int first_photon, int nthreads, unsigned int target_flag,
 	     float3 *positions, float3 *directions,
 	     float *wavelengths, float3 *polarizations,
 	     float *times, unsigned int *histories,
-	     int *last_hit_triangles, 
+	     int *last_hit_triangles, float *weights,
 	     float3 *new_positions, float3 *new_directions,
 	     float *new_wavelengths, float3 *new_polarizations,
 	     float *new_times, unsigned int *new_histories,
-	     int *new_last_hit_triangles)
+	     int *new_last_hit_triangles, float *new_weights)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -102,6 +104,7 @@ copy_photons(int first_photon, int nthreads, unsigned int target_flag,
 	new_times[offset] = times[photon_id];
 	new_histories[offset] = histories[photon_id];
 	new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
+	new_weights[offset] = weights[photon_id];
     }
 }
 
@@ -112,7 +115,8 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
 	  float3 *positions, float3 *directions,
 	  float *wavelengths, float3 *polarizations,
 	  float *times, unsigned int *histories,
-	  int *last_hit_triangles, int max_steps,
+	  int *last_hit_triangles, float *weights,
+	  int max_steps, int use_weights,
 	  Geometry *g)
 {
     __shared__ Geometry sg;
@@ -143,6 +147,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
     p.time = times[photon_id];
     p.last_hit_triangle = last_hit_triangles[photon_id];
     p.history = histories[photon_id];
+    p.weight = weights[photon_id];
 
     if (p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB))
 	return;
@@ -166,7 +171,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
 	if (p.last_hit_triangle == -1)
 	    break;
 
-	command = propagate_to_boundary(p, s, rng);
+	command = propagate_to_boundary(p, s, rng, use_weights);
 
 	if (command == BREAK)
 	    break;
@@ -175,7 +180,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
 	    continue;
 
 	if (s.surface_index != -1) {
-	    command = propagate_at_surface(p, s, rng, g);
+	  command = propagate_at_surface(p, s, rng, g, use_weights);
 
 	    if (command == BREAK)
 		break;
@@ -196,7 +201,8 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
     times[photon_id] = p.time;
     histories[photon_id] = p.history;
     last_hit_triangles[photon_id] = p.last_hit_triangle;
-	
+    weights[photon_id] = p.weight;
+
     // Not done, put photon in output queue
     if ((p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB)) == 0) {
 	int out_idx = atomicAdd(output_queue, 1);
