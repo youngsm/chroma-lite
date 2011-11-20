@@ -62,7 +62,7 @@ class Likelihood(object):
                               nreps=nreps,
                               ndaq=ndaq,
                               time_only=self.time_only,
-                              min_bin_content=ndaq*10)
+                              min_bin_content=320)
         
         # Normalize probabilities and put a floor to keep the log finite
         hit_prob = hitcount.astype(np.float32) / ntotal
@@ -100,8 +100,8 @@ class Likelihood(object):
 
         # Then include the probability densities of the observed
         # charges and times.
-        log_likelihood += ufloat((np.log(pdf_prob[self.event.channels.hit]).sum(),
-                                  0.0))
+        #log_likelihood += ufloat((np.log(pdf_prob[self.event.channels.hit]).sum(),
+        #0.0))
         
         return -log_likelihood
 
