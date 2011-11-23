@@ -127,7 +127,8 @@ class Simulation(object):
     def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=100, nreps=1, ndaq=1, time_only=True):
         """Returns tuple: 1D array of channel hit counts, 1D array of PDF
         probability densities."""
-        ndaq_reps = ndaq // 32
+        ndaq_per_rep = 64
+        ndaq_reps = ndaq // ndaq_per_rep
         gpu_daq = gpu.GPUDaq(self.gpu_geometry, ndaq=32)
 
         self.gpu_pdf.setup_pdf_eval(event_channels.hit,
@@ -164,7 +165,7 @@ class Simulation(object):
                 #print 'weights', weights.min(), weights.max()
                 for j in xrange(ndaq_reps):
                     gpu_channels = gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
-                    self.gpu_pdf.accumulate_pdf_eval(gpu_channels, nthreads_per_block=32)
+                    self.gpu_pdf.accumulate_pdf_eval(gpu_channels, nthreads_per_block=ndaq_per_rep)
         
         return self.gpu_pdf.get_pdf_eval()
 
