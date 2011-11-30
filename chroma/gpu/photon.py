@@ -120,7 +120,7 @@ class GPUPhotons(object):
 
         while step < max_steps:
             # Just finish the rest of the steps if the # of photons is low
-            if nphotons < nthreads_per_block * 16 * 8:
+            if nphotons < nthreads_per_block * 16 * 8 or use_weights:
                 nsteps = max_steps - step
             else:
                 nsteps = 1
