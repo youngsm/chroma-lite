@@ -1,13 +1,13 @@
 import numpy as np
 
 # Photon history bits (see photon.h for source)
-NO_HIT           = 0x1 << 0,
-BULK_ABSORB      = 0x1 << 1,
-SURFACE_DETECT   = 0x1 << 2,
-SURFACE_ABSORB   = 0x1 << 3,
-RAYLEIGH_SCATTER = 0x1 << 4,
-REFLECT_DIFFUSE  = 0x1 << 5,
-REFLECT_SPECULAR = 0x1 << 6,
+NO_HIT           = 0x1 << 0
+BULK_ABSORB      = 0x1 << 1
+SURFACE_DETECT   = 0x1 << 2
+SURFACE_ABSORB   = 0x1 << 3
+RAYLEIGH_SCATTER = 0x1 << 4
+REFLECT_DIFFUSE  = 0x1 << 5
+REFLECT_SPECULAR = 0x1 << 6
 NAN_ABORT        = 0x1 << 31
 
 class Vertex(object):
