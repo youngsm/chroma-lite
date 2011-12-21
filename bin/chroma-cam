@@ -32,10 +32,13 @@ if __name__ == '__main__':
         obj = mesh_from_stl(args[0])
     else:
         module_name, function_name = args[0].rsplit('.', 1)
-
+        orig_sys_path = list(sys.path)
         try:
+            sys.path.append('.')
             module = __import__(module_name, fromlist=[function_name])
+            sys.path = orig_sys_path
         except ImportError:
+            sys.path = orig_sys_path
             raise
 
         obj = getattr(module, function_name)
