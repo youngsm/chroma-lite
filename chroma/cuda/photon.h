@@ -127,10 +127,10 @@ __device__ float3
 pick_new_direction(float3 axis, float theta, float phi)
 {
     // Taken from SNOMAN rayscatter.for
-    float cos_theta = cosf(theta);
-    float sin_theta = sinf(theta);
-    float cos_phi   = cosf(phi);
-    float sin_phi   = sinf(phi);
+    float cos_theta, sin_theta;
+    sincosf(theta, &sin_theta, &cos_theta);
+    float cos_phi, sin_phi;
+    sincosf(phi, &sin_phi, &cos_phi);
 	
     float sin_axis_theta = sqrt(1.0f - axis.z*axis.z);
     float cos_axis_phi, sin_axis_phi;
