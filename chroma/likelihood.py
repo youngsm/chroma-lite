@@ -64,9 +64,8 @@ class Likelihood(object):
                               time_only=self.time_only,
                               min_bin_content=320)
         
-        # Normalize probabilities and put a floor to keep the log finite
+        # Normalize probabilities
         hit_prob = hitcount.astype(np.float32) / ntotal
-        hit_prob = np.maximum(hit_prob, 0.5 / ntotal)
 
         # Set all zero or nan probabilities to limiting PDF value
         bad_value = (pdf_prob <= 0.0) | np.isnan(pdf_prob)
@@ -88,14 +87,20 @@ class Likelihood(object):
         by `vertex_generator`.  If `nreps` set to > 1, each set of photon
         vertices will be propagated `nreps` times.
         """
+        ntotal = nevals * nreps * ndaq
 
         hit_prob, pdf_prob, pdf_prob_uncert = \
             self.eval_channel_vbin(vertex_generator, nevals, nreps, ndaq)
 
         # NLL calculation: note that negation is at the end
         # Start with the probabilties of hitting (or not) the channels
-        hit_channel_prob = np.log(hit_prob[self.event.channels.hit]).sum() \
-            + np.log(1.0-hit_prob[~self.event.channels.hit]).sum()
+        
+        # Flip probability for channels in event that were not hit
+        hit_prob[~self.event.channels.hit] = 1.0 - hit_prob[~self.event.channels.hit]
+        # Apply a floor so that we don't take the log of zero
+        hit_prob = np.maximum(hit_prob, 0.5 / ntotal)
+
+        hit_channel_prob = np.log(hit_prob).sum()
         log_likelihood = ufloat((hit_channel_prob, 0.0))
 
         # Then include the probability densities of the observed
