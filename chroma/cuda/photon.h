@@ -180,7 +180,7 @@ rayleigh_scatter(Photon &p, curandState &rng)
 } // scatter
 
 __device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
-                                     bool use_weights=false)
+                                     bool use_weights=false, int scatter_first=0)
 {
     float absorption_distance = -s.absorption_length*logf(curand_uniform(&rng));
     float scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
@@ -189,6 +189,35 @@ __device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
 	absorption_distance = 1e30;
     else
 	use_weights = false;
+
+    if (scatter_first == 1) {
+	// Force scatter
+	float scatter_prob = 1.0f - expf(-s.distance_to_boundary/s.scattering_length);
+
+	if (scatter_prob > WEIGHT_LOWER_THRESHOLD) {
+	    int i=0;
+	    const int max_i = 1000;
+	    while (i < max_i && scattering_distance > s.distance_to_boundary) {
+		scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
+		i++;
+	    }
+	    p.weight *= scatter_prob;
+	}
+
+    } else if (scatter_first == -1) {
+	// Prevent scatter
+	float no_scatter_prob = expf(-s.distance_to_boundary/s.scattering_length);
+
+	if (no_scatter_prob > WEIGHT_LOWER_THRESHOLD) {
+	    int i=0;
+	    const int max_i = 1000;
+	    while (i < max_i && scattering_distance <= s.distance_to_boundary) {
+		scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
+		i++;
+	    }
+	    p.weight *= no_scatter_prob;
+	}
+    }
 
     if (absorption_distance <= scattering_distance) {
 	if (absorption_distance <= s.distance_to_boundary) {

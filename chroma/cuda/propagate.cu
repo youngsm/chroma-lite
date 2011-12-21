@@ -116,7 +116,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
 	  float *wavelengths, float3 *polarizations,
 	  float *times, unsigned int *histories,
 	  int *last_hit_triangles, float *weights,
-	  int max_steps, int use_weights,
+	  int max_steps, int use_weights, int scatter_first,
 	  Geometry *g)
 {
     __shared__ Geometry sg;
@@ -171,7 +171,8 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
 	if (p.last_hit_triangle == -1)
 	    break;
 
-	command = propagate_to_boundary(p, s, rng, use_weights);
+	command = propagate_to_boundary(p, s, rng, use_weights, scatter_first);
+	scatter_first = 0; // Only use the scatter_first value once
 
 	if (command == BREAK)
 	    break;

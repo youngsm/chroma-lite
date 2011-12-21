@@ -95,7 +95,8 @@ class GPUPhotons(object):
 
     @profile_if_possible
     def propagate(self, gpu_geometry, rng_states, nthreads_per_block=64,
-                  max_blocks=1024, max_steps=10, use_weights=False):
+                  max_blocks=1024, max_steps=10, use_weights=False,
+                  scatter_first=0):
         """Propagate photons on GPU to termination or max_steps, whichever
         comes first.
 
@@ -127,9 +128,10 @@ class GPUPhotons(object):
 
             for first_photon, photons_this_round, blocks in \
                     chunk_iterator(nphotons, nthreads_per_block, max_blocks):
-                self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, np.int32(nsteps), np.int32(use_weights), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
+                self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, np.int32(nsteps), np.int32(use_weights), np.int32(scatter_first), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
 
             step += nsteps
+            scatter_first = 0 # Only allow non-zero in first pass
 
             if step < max_steps:
                 temp = input_queue_gpu
