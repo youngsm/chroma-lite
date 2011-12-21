@@ -51,12 +51,13 @@ class GPUDaq(object):
         self.ndaq = ndaq
         self.stride = gpu_detector.nchannels
 
-    def acquire(self, gpuphotons, rng_states, nthreads_per_block=64, max_blocks=1024, start_photon=None, nphotons=None):
-        self.gpu_funcs.reset_earliest_time_int(np.float32(1e9), np.int32(len(self.earliest_time_int_gpu)), self.earliest_time_int_gpu, block=(64,1,1), grid=(len(self.earliest_time_int_gpu)//nthreads_per_block+1,1))
+    def begin_acquire(self, nthreads_per_block=64):
+        self.gpu_funcs.reset_earliest_time_int(np.float32(1e9), np.int32(len(self.earliest_time_int_gpu)), self.earliest_time_int_gpu, block=(nthreads_per_block,1,1), grid=(len(self.earliest_time_int_gpu)//nthreads_per_block+1,1))
         self.channel_q_int_gpu.fill(0)
         self.channel_q_gpu.fill(0)
         self.channel_history_gpu.fill(0)
 
+    def acquire(self, gpuphotons, rng_states, nthreads_per_block=64, max_blocks=1024, start_photon=None, nphotons=None, weight=1.0):
         if start_photon is None:
             start_photon = 0
         if nphotons is None:
@@ -71,7 +72,8 @@ class GPUDaq(object):
                                        self.solid_id_map_gpu,
                                        self.detector_gpu,
                                        self.earliest_time_int_gpu, 
-                                       self.channel_q_int_gpu, self.channel_history_gpu, 
+                                       self.channel_q_int_gpu, self.channel_history_gpu,
+                                       np.float32(weight),
                                        block=(nthreads_per_block,1,1), grid=(blocks,1))
         else:
             for first_photon, photons_this_round, blocks in \
@@ -84,9 +86,11 @@ class GPUDaq(object):
                                             self.earliest_time_int_gpu, 
                                             self.channel_q_int_gpu, self.channel_history_gpu, 
                                             np.int32(self.ndaq), np.int32(self.stride),
+                                            np.float32(weight),
                                             block=(nthreads_per_block,1,1), grid=(blocks,1))
         cuda.Context.get_current().synchronize()
-            
+    
+    def end_acquire(self, nthreads_per_block=64):
         self.gpu_funcs.convert_sortable_int_to_float(np.int32(len(self.earliest_time_int_gpu)), self.earliest_time_int_gpu, self.earliest_time_gpu, block=(nthreads_per_block,1,1), grid=(len(self.earliest_time_int_gpu)//nthreads_per_block+1,1))
 
         self.gpu_funcs.convert_charge_int_to_float(self.detector_gpu, self.channel_q_int_gpu, self.channel_q_gpu, block=(nthreads_per_block,1,1), grid=(len(self.channel_q_int_gpu)//nthreads_per_block+1,1))
