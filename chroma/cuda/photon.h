@@ -9,7 +9,7 @@
 #include "mesh.h"
 #include "geometry.h"
 
-#define WEIGHT_LOWER_THRESHOLD 0.01f
+#define WEIGHT_LOWER_THRESHOLD 0.0001f
 
 struct Photon
 {
