@@ -1,13 +1,13 @@
 import numpy as np
 
 # Photon history bits (see photon.h for source)
-NO_HIT           = 0x1 << 0,
-BULK_ABSORB      = 0x1 << 1,
-SURFACE_DETECT   = 0x1 << 2,
-SURFACE_ABSORB   = 0x1 << 3,
-RAYLEIGH_SCATTER = 0x1 << 4,
-REFLECT_DIFFUSE  = 0x1 << 5,
-REFLECT_SPECULAR = 0x1 << 6,
+NO_HIT           = 0x1 << 0
+BULK_ABSORB      = 0x1 << 1
+SURFACE_DETECT   = 0x1 << 2
+SURFACE_ABSORB   = 0x1 << 3
+RAYLEIGH_SCATTER = 0x1 << 4
+REFLECT_DIFFUSE  = 0x1 << 5
+REFLECT_SPECULAR = 0x1 << 6
 NAN_ABORT        = 0x1 << 31
 
 class Vertex(object):
@@ -42,7 +42,7 @@ class Vertex(object):
         self.t0 = t0
 
 class Photons(object):
-    def __init__(self, pos, dir, pol, wavelengths, t=None, last_hit_triangles=None, flags=None):
+    def __init__(self, pos, dir, pol, wavelengths, t=None, last_hit_triangles=None, flags=None, weights=None):
         '''Create a new list of n photons.
 
             pos: numpy.ndarray(dtype=numpy.float32, shape=(n,3))
@@ -67,6 +67,10 @@ class Photons(object):
             flags: numpy.ndarray(dtype=numpy.uint32, shape=n)
                Bit-field indicating the physics interaction history of the photon.  See 
                history bit constants in chroma.event for definition.
+
+            weights: numpy.ndarray(dtype=numpy.float32, shape=n)
+               Survival probability for each photon.  Used by 
+               photon propagation code when computing likelihood functions.
         '''
         self.pos = pos
         self.dir = dir
@@ -89,6 +93,11 @@ class Photons(object):
         else:
             self.flags = flags
 
+        if weights is None:
+            self.weights = np.ones(len(pos), dtype=np.float32)
+        else:
+            self.weights = weights
+
     def __add__(self, other):
         '''Concatenate two Photons objects into one list of photons.
 
@@ -104,7 +113,9 @@ class Photons(object):
         t = np.concatenate((self.t, other.t))
         last_hit_triangles = np.concatenate((self.last_hit_triangles, other.last_hit_triangles))
         flags = np.concatenate((self.flags, other.flags))
-        return Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags)
+        weights = np.concatenate((self.weights, other.weights))
+        return Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags,
+                       weights)
 
     def __len__(self):
         '''Returns the number of photons in self.'''

@@ -9,6 +9,8 @@
 #include "mesh.h"
 #include "geometry.h"
 
+#define WEIGHT_LOWER_THRESHOLD 0.0001f
+
 struct Photon
 {
     float3 position;
@@ -16,7 +18,9 @@ struct Photon
     float3 polarization;
     float wavelength;
     float time;
-
+  
+    float weight;
+  
     unsigned int history;
 
     int last_hit_triangle;
@@ -123,10 +127,10 @@ __device__ float3
 pick_new_direction(float3 axis, float theta, float phi)
 {
     // Taken from SNOMAN rayscatter.for
-    float cos_theta = cosf(theta);
-    float sin_theta = sinf(theta);
-    float cos_phi   = cosf(phi);
-    float sin_phi   = sinf(phi);
+    float cos_theta, sin_theta;
+    sincosf(theta, &sin_theta, &cos_theta);
+    float cos_phi, sin_phi;
+    sincosf(phi, &sin_phi, &cos_phi);
 	
     float sin_axis_theta = sqrt(1.0f - axis.z*axis.z);
     float cos_axis_phi, sin_axis_phi;
@@ -175,10 +179,45 @@ rayleigh_scatter(Photon &p, curandState &rng)
     p.polarization /= norm(p.polarization);
 } // scatter
 
-__device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng)
+__device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
+                                     bool use_weights=false, int scatter_first=0)
 {
     float absorption_distance = -s.absorption_length*logf(curand_uniform(&rng));
     float scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
+
+    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD) // Prevent absorption
+	absorption_distance = 1e30;
+    else
+	use_weights = false;
+
+    if (scatter_first == 1) {
+	// Force scatter
+	float scatter_prob = 1.0f - expf(-s.distance_to_boundary/s.scattering_length);
+
+	if (scatter_prob > WEIGHT_LOWER_THRESHOLD) {
+	    int i=0;
+	    const int max_i = 1000;
+	    while (i < max_i && scattering_distance > s.distance_to_boundary) {
+		scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
+		i++;
+	    }
+	    p.weight *= scatter_prob;
+	}
+
+    } else if (scatter_first == -1) {
+	// Prevent scatter
+	float no_scatter_prob = expf(-s.distance_to_boundary/s.scattering_length);
+
+	if (no_scatter_prob > WEIGHT_LOWER_THRESHOLD) {
+	    int i=0;
+	    const int max_i = 1000;
+	    while (i < max_i && scattering_distance <= s.distance_to_boundary) {
+		scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
+		i++;
+	    }
+	    p.weight *= no_scatter_prob;
+	}
+    }
 
     if (absorption_distance <= scattering_distance) {
 	if (absorption_distance <= s.distance_to_boundary) {
@@ -193,6 +232,11 @@ __device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng)
     }
     else {
 	if (scattering_distance <= s.distance_to_boundary) {
+
+	    // Scale weight by absorption probability along this distance
+	    if (use_weights)
+		p.weight *= expf(-scattering_distance/s.absorption_length);
+
 	    p.time += scattering_distance/(SPEED_OF_LIGHT/s.refractive_index1);
 	    p.position += scattering_distance*p.direction;
 
@@ -206,6 +250,10 @@ __device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng)
 	} // photon is scattered in material1
     } // if scattering_distance < absorption_distance
 
+    // Scale weight by absorption probability along this distance
+    if (use_weights)
+	p.weight *= expf(-s.distance_to_boundary/s.absorption_length);
+    
     p.position += s.distance_to_boundary*p.direction;
     p.time += s.distance_to_boundary/(SPEED_OF_LIGHT/s.refractive_index1);
 
@@ -269,7 +317,8 @@ propagate_at_boundary(Photon &p, State &s, curandState &rng)
 } // propagate_at_boundary
 
 __device__ int
-propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry)
+propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
+                     bool use_weights=false)
 {
     Surface *surface = geometry->surfaces[s.surface_index];
 
@@ -282,6 +331,25 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry)
     float reflect_specular = interp_property(surface, p.wavelength, surface->reflect_specular);
 
     float uniform_sample = curand_uniform(&rng);
+
+    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD 
+	&& absorb < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
+	// Prevent absorption and reweight accordingly
+	float survive = 1.0f - absorb;
+	absorb = 0.0f;
+	p.weight *= survive;
+
+	// Renormalize remaining probabilities
+	detect /= survive;
+	reflect_diffuse /= survive;
+	reflect_specular /= survive;
+    }
+
+    if (use_weights && detect > 0.0f) {
+	p.history |= SURFACE_DETECT;
+	p.weight *= detect;
+	return BREAK;
+    }
 
     if (uniform_sample < absorb) {
 	p.history |= SURFACE_ABSORB;

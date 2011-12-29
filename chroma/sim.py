@@ -89,7 +89,9 @@ class Simulation(object):
 
             # Skip running DAQ if we don't have one
             if hasattr(self, 'gpu_daq') and run_daq:
-                gpu_channels = self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                self.gpu_daq.begin_acquire()
+                self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                gpu_channels = self.gpu_daq.end_acquire()
                 ev.channels = gpu_channels.get()
 
             yield ev
@@ -118,16 +120,20 @@ class Simulation(object):
             gpu_photons.propagate(self.gpu_geometry, self.rng_states,
                                   nthreads_per_block=self.nthreads_per_block,
                                   max_blocks=self.max_blocks)
-            gpu_channels = self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+            self.gpu_daq.begin_acquire()
+            self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+            gpu_channels = self.gpu_daq.end_acquire()
             self.gpu_pdf.add_hits_to_pdf(gpu_channels)
         
         return self.gpu_pdf.get_pdfs()
 
     @profile_if_possible
-    def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=100, nreps=1, ndaq=1, time_only=True):
+    def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=100, nreps=1, ndaq=1, nscatter=1, time_only=True):
         """Returns tuple: 1D array of channel hit counts, 1D array of PDF
         probability densities."""
-        gpu_daq = gpu.GPUDaq(self.gpu_geometry, ndaq=ndaq)
+        ndaq_per_rep = 64
+        ndaq_reps = ndaq // ndaq_per_rep
+        gpu_daq = gpu.GPUDaq(self.gpu_geometry, ndaq=ndaq_per_rep)
 
         self.gpu_pdf.setup_pdf_eval(event_channels.hit,
                                     event_channels.t,
@@ -145,20 +151,43 @@ class Simulation(object):
             iterable = self.photon_generator.generate_events(iterable)
 
         for ev in iterable:
-            gpu_photons = gpu.GPUPhotons(ev.photons_beg, ncopies=nreps)
-            gpu_photons.propagate(self.gpu_geometry, self.rng_states,
-                                  nthreads_per_block=self.nthreads_per_block,
-                                  max_blocks=self.max_blocks)
-            nphotons = gpu_photons.true_nphotons
-            for i in xrange(gpu_photons.ncopies):
+            gpu_photons_no_scatter = gpu.GPUPhotons(ev.photons_beg, ncopies=nreps)
+            gpu_photons_scatter = gpu.GPUPhotons(ev.photons_beg, ncopies=nreps*nscatter)
+            gpu_photons_no_scatter.propagate(self.gpu_geometry, self.rng_states,
+                                             nthreads_per_block=self.nthreads_per_block,
+                                             max_blocks=self.max_blocks,
+                                             use_weights=True,
+                                             scatter_first=-1,
+                                             max_steps=10)
+            gpu_photons_scatter.propagate(self.gpu_geometry, self.rng_states,
+                                          nthreads_per_block=self.nthreads_per_block,
+                                          max_blocks=self.max_blocks,
+                                          use_weights=True,
+                                          scatter_first=1,
+                                          max_steps=5)
+            nphotons = gpu_photons_no_scatter.true_nphotons # same for scatter
+            for i in xrange(gpu_photons_no_scatter.ncopies):
                 start_photon = i * nphotons
-                gpu_photon_slice = gpu_photons.select(event.SURFACE_DETECT,
-                                                           start_photon=start_photon,
-                                                           nphotons=nphotons)
-                if len(gpu_photon_slice) == 0:
+                gpu_photon_no_scatter_slice = gpu_photons_no_scatter.select(event.SURFACE_DETECT,
+                                                                            start_photon=start_photon,
+                                                                            nphotons=nphotons)
+                gpu_photon_scatter_slices = [gpu_photons_scatter.select(event.SURFACE_DETECT,
+                                                                        start_photon=(nscatter*i+j)*nphotons,
+                                                                        nphotons=nphotons)
+                                             for j in xrange(nscatter)]
+                
+                if len(gpu_photon_no_scatter_slice) == 0:
                     continue
-                gpu_channels = gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
-                self.gpu_pdf.accumulate_pdf_eval(gpu_channels, 32)
+
+                #weights = gpu_photon_slice.weights.get()
+                #print 'weights', weights.min(), weights.max()
+                for j in xrange(ndaq_reps):
+                    gpu_daq.begin_acquire()
+                    gpu_daq.acquire(gpu_photon_no_scatter_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                    for scatter_slice in gpu_photon_scatter_slices:
+                        gpu_daq.acquire(scatter_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks, weight=1.0/nscatter)
+                    gpu_channels = gpu_daq.end_acquire()
+                    self.gpu_pdf.accumulate_pdf_eval(gpu_channels, nthreads_per_block=ndaq_per_rep)
         
         return self.gpu_pdf.get_pdf_eval()
 
@@ -182,7 +211,9 @@ class Simulation(object):
                                   max_blocks=self.max_blocks)
             for gpu_photon_slice in gpu_photons.iterate_copies():
                 for idaq in xrange(ndaq):
-                    gpu_channels = self.gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                    self.gpu_daq.begin_acquire()
+                    self.gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                    gpu_channels = self.gpu_daq.end_acquire()
                     self.gpu_pdf_kernel.accumulate_moments(gpu_channels)
             
         self.gpu_pdf_kernel.compute_bandwidth(event_channels.hit,
@@ -213,7 +244,9 @@ class Simulation(object):
                                   max_blocks=self.max_blocks)
             for gpu_photon_slice in gpu_photons.iterate_copies():
                 for idaq in xrange(ndaq):
-                    gpu_channels = self.gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                    self.gpu_daq.begin_acquire()
+                    self.gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                    gpu_channels = self.gpu_daq.end_acquire()
                     self.gpu_pdf_kernel.accumulate_kernel(gpu_channels)
         
         return self.gpu_pdf_kernel.get_kernel_eval()
