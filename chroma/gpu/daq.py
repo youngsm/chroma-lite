@@ -79,7 +79,7 @@ class GPUDaq(object):
             for first_photon, photons_this_round, blocks in \
                     chunk_iterator(nphotons, 1, max_blocks):
                 self.gpu_funcs.run_daq_many(rng_states, np.uint32(0x1 << 2), 
-                                            np.int32(start_photon), np.int32(photons_this_round), gpuphotons.t, 
+                                            np.int32(start_photon+first_photon), np.int32(photons_this_round), gpuphotons.t, 
                                             gpuphotons.flags, gpuphotons.last_hit_triangles, gpuphotons.weights,
                                             self.solid_id_map_gpu,
                                             self.detector_gpu,
