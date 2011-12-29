@@ -105,8 +105,8 @@ class Likelihood(object):
 
         # Then include the probability densities of the observed
         # charges and times.
-        #log_likelihood += ufloat((np.log(pdf_prob[self.event.channels.hit]).sum(),
-        #0.0))
+        log_likelihood += ufloat((np.log(pdf_prob[self.event.channels.hit]).sum(),
+                                  0.0))
         
         return -log_likelihood
 
