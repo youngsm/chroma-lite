@@ -128,7 +128,7 @@ class Simulation(object):
         return self.gpu_pdf.get_pdfs()
 
     @profile_if_possible
-    def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=100, nreps=1, ndaq=1, nscatter=4, time_only=True):
+    def eval_pdf(self, event_channels, iterable, min_twidth, trange, min_qwidth, qrange, min_bin_content=100, nreps=1, ndaq=1, nscatter=1, time_only=True):
         """Returns tuple: 1D array of channel hit counts, 1D array of PDF
         probability densities."""
         ndaq_per_rep = 64
