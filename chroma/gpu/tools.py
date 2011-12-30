@@ -142,6 +142,8 @@ def create_cuda_context(device_id=None):
 
     return context
 
+vec_dtypes = set([ x for x in ga.vec.__dict__.values() if type(x) == np.dtype ])
+
 def make_gpu_struct(size, members):
     struct = cuda.mem_alloc(size)
 
@@ -158,7 +160,7 @@ def make_gpu_struct(size, members):
 
             cuda.memcpy_htod(int(struct)+i, np.intp(int(member)))
             i += 8
-        elif np.isscalar(member):
+        elif np.isscalar(member) or hasattr(member, 'dtype') and member.dtype in vec_dtypes:
             cuda.memcpy_htod(int(struct)+i, member)
             i += member.nbytes
         else:
