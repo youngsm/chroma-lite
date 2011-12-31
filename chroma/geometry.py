@@ -284,27 +284,13 @@ class Geometry(object):
 
         return len(self.solids)-1
 
-    @profile_if_possible
-    def build(self, bits=11, shift=3, use_cache=True):
+    def flatten(self):
         """
-        Build the bounding volume hierarchy, material/surface code arrays, and
-        color array for this geometry. If the bounding volume hierarchy is
-        cached, load the cache instead of rebuilding, else build and cache it.
+        Create the flat list of triangles (and triangle properties)
+        from the list of solids in this geometry.
 
-        Args:
-            - bits: int, *optional*
-                The number of bits to quantize each linear dimension with when
-                morton ordering the triangle centers for building the bounding
-                volume hierarchy. Defaults to 8.
-            - shift: int, *optional*
-                The number of bits to shift the zvalue of each node when
-                building the next layer of the bounding volume hierarchy.
-                Defaults to 3.
-            - use_cache: bool, *optional*
-                If true, the on-disk cache in ~/.chroma/ will be checked for
-                a previously built version of this geometry, otherwise the
-                BVH will be computed and saved to the cache.  If false,
-                the cache is ignored and also not updated.
+        This does not build the BVH!  If you want to use the geometry
+        for rendering or simulation, you should call build() instead.
         """
         nv = np.cumsum([0] + [len(solid.mesh.vertices) for solid in self.solids])
         nt = np.cumsum([0] + [len(solid.mesh.triangles) for solid in self.solids])
@@ -313,7 +299,7 @@ class Geometry(object):
         triangles = np.empty((nt[-1],3), dtype=np.uint32)
         
 
-        logger.info('Setting up BVH for detector mesh...')
+        logger.info('Flattening detector mesh...')
         logger.info('  triangles: %d' % len(triangles))
         logger.info('  vertices:  %d' % len(vertices))
 
@@ -348,6 +334,32 @@ class Geometry(object):
             self.surface_index[self.surface_index == surface_lookup[None]] = -1
         except KeyError:
             pass
+        
+
+
+    @profile_if_possible
+    def build(self, bits=11, shift=3, use_cache=True):
+        """
+        Build the bounding volume hierarchy, material/surface code arrays, and
+        color array for this geometry. If the bounding volume hierarchy is
+        cached, load the cache instead of rebuilding, else build and cache it.
+
+        Args:
+            - bits: int, *optional*
+                The number of bits to quantize each linear dimension with when
+                morton ordering the triangle centers for building the bounding
+                volume hierarchy. Defaults to 8.
+            - shift: int, *optional*
+                The number of bits to shift the zvalue of each node when
+                building the next layer of the bounding volume hierarchy.
+                Defaults to 3.
+            - use_cache: bool, *optional*
+                If true, the on-disk cache in ~/.chroma/ will be checked for
+                a previously built version of this geometry, otherwise the
+                BVH will be computed and saved to the cache.  If false,
+                the cache is ignored and also not updated.
+        """
+        self.flatten()
 
         checksum = md5(str(bits))
         checksum.update(str(shift))
