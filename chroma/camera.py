@@ -17,7 +17,6 @@ from chroma.geometry import Mesh, Solid, Geometry, vacuum
 from chroma.transform import rotate, make_rotation_matrix
 from chroma.sample import uniform_sphere
 from chroma.project import from_film
-from chroma.io.root import RootReader
 from chroma import make
 from chroma import gpu
 
@@ -686,6 +685,9 @@ class EventViewer(Camera):
 
     def __init__(self, geometry, filename, **kwargs):
         Camera.__init__(self, geometry, **kwargs)
+        # This is really slow, so we do it here in the constructor to 
+        # avoid slowing down the import of this module
+        from chroma.io.root import RootReader
         self.rr = RootReader(filename)
         self.display_mode = EventViewer.CHARGE
         self.sum_mode = False
