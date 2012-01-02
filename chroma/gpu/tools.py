@@ -160,7 +160,7 @@ def make_gpu_struct(size, members):
 
             cuda.memcpy_htod(int(struct)+i, np.intp(int(member)))
             i += 8
-        elif np.isscalar(member) or hasattr(member, 'dtype') and member.dtype in vec_dtypes:
+        elif np.isscalar(member) or (hasattr(member, 'dtype') and member.dtype in vec_dtypes and member.shape == ()):
             cuda.memcpy_htod(int(struct)+i, member)
             i += member.nbytes
         else:
