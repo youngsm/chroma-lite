@@ -6,11 +6,35 @@ from pycuda import characterize
 from chroma.geometry import standard_wavelengths
 from chroma.gpu.tools import get_cu_module, get_cu_source, cuda_options, \
     chunk_iterator, format_array, format_size, to_uint3, to_float3, \
-    make_gpu_struct
+    make_gpu_struct, GPUFuncs
+
 from chroma.log import logger
 
+def round_up_to_multiple(x, multiple):
+    remainder = x % multiple
+    if remainder == 0:
+        return x
+    else:
+        return x + multiple - remainder
+
+def compute_layer_configuration(n, branch_degree):
+    if n == 1:
+        # Special case for root
+        return [ (1, 1) ]
+    else:
+        layer_conf = [ (n, round_up_to_multiple(n, branch_degree)) ]
+
+    while layer_conf[0][1] > 1:
+        nparent = int(np.ceil( float(layer_conf[0][1]) / branch_degree ))
+        if nparent == 1:
+            layer_conf = [ (1, 1) ] + layer_conf
+        else:
+            layer_conf = [ (nparent, round_up_to_multiple(nparent, branch_degree)) ] + layer_conf
+
+    return layer_conf
+
 class GPUGeometry(object):
-    def __init__(self, geometry, wavelengths=None, print_usage=False):
+    def __init__(self, geometry, wavelengths=None, print_usage=False, branch_degree=32):
         if wavelengths is None:
             wavelengths = standard_wavelengths
 
@@ -19,7 +43,7 @@ class GPUGeometry(object):
         except ValueError:
             raise ValueError('wavelengths must be equally spaced apart.')
 
-        geometry_source = get_cu_source('geometry.h')
+        geometry_source = get_cu_source('geometry_types.h')
         material_struct_size = characterize.sizeof('Material', geometry_source)
         surface_struct_size = characterize.sizeof('Surface', geometry_source)
         geometry_struct_size = characterize.sizeof('Geometry', geometry_source)
@@ -104,32 +128,50 @@ class GPUGeometry(object):
         self.surface_pointer_array = \
             make_gpu_struct(8*len(self.surface_ptrs), self.surface_ptrs)
 
-        self.vertices = ga.to_gpu(to_float3(geometry.mesh.vertices))
-        self.triangles = ga.to_gpu(to_uint3(geometry.mesh.triangles))
+        self.pagelocked_vertices = cuda.pagelocked_empty(shape=len(geometry.mesh.vertices),
+                                                         dtype=ga.vec.float3,
+                                                         mem_flags=cuda.host_alloc_flags.DEVICEMAP | cuda.host_alloc_flags.WRITECOMBINED)
+        self.pagelocked_triangles = cuda.pagelocked_empty(shape=len(geometry.mesh.triangles),
+                                                         dtype=ga.vec.uint3,
+                                                         mem_flags=cuda.host_alloc_flags.DEVICEMAP | cuda.host_alloc_flags.WRITECOMBINED)
+        self.pagelocked_vertices[:] = to_float3(geometry.mesh.vertices)
+        self.pagelocked_triangles[:] = to_uint3(geometry.mesh.triangles)
+        self.vertices = np.intp(self.pagelocked_vertices.base.get_device_pointer())
+        self.triangles = np.intp(self.pagelocked_triangles.base.get_device_pointer())
+
+
+        self.branch_degree = branch_degree
+        print 'bvh', cuda.mem_get_info()
+        self.world_origin, self.world_scale, self.nodes = self.make_bvh(geometry.mesh.vertices,
+                                                                        self.vertices,
+                                                                        len(geometry.mesh.triangles),
+                                                                        self.triangles,
+                                                                        self.branch_degree)
+        print 'bvh after'
 
         material_codes = (((geometry.material1_index & 0xff) << 24) |
                           ((geometry.material2_index & 0xff) << 16) |
                           ((geometry.surface_index & 0xff) << 8)).astype(np.uint32)
+        self.pagelocked_material_codes = cuda.pagelocked_empty_like(material_codes, mem_flags=cuda.host_alloc_flags.DEVICEMAP | cuda.host_alloc_flags.WRITECOMBINED)
+        self.pagelocked_material_codes[:] = material_codes
+        self.material_codes = np.intp(self.pagelocked_material_codes.base.get_device_pointer())
 
-        self.material_codes = ga.to_gpu(material_codes)
-
-        self.lower_bounds = ga.to_gpu(to_float3(geometry.lower_bounds))
-        self.upper_bounds = ga.to_gpu(to_float3(geometry.upper_bounds))
-        self.colors = ga.to_gpu(geometry.colors.astype(np.uint32))
-        self.node_map = ga.to_gpu(geometry.node_map.astype(np.uint32))
-        self.node_map_end = ga.to_gpu(geometry.node_map_end.astype(np.uint32))
+        colors = geometry.colors.astype(np.uint32)
+        self.pagelocked_colors = cuda.pagelocked_empty_like(colors, mem_flags=cuda.host_alloc_flags.DEVICEMAP | cuda.host_alloc_flags.WRITECOMBINED)
+        self.pagelocked_colors[:] = colors
+        self.colors = np.intp(self.pagelocked_colors.base.get_device_pointer())
         self.solid_id_map = ga.to_gpu(geometry.solid_id.astype(np.uint32))
 
         self.gpudata = make_gpu_struct(geometry_struct_size,
                                        [self.vertices, self.triangles,
                                         self.material_codes,
-                                        self.colors, self.lower_bounds,
-                                        self.upper_bounds, self.node_map,
-                                        self.node_map_end,
+                                        self.colors, self.nodes,
                                         self.material_pointer_array,
                                         self.surface_pointer_array,
-                                        np.uint32(geometry.start_node),
-                                        np.uint32(geometry.first_node)])
+                                        self.world_origin,
+                                        np.float32(0.0), # dummy1
+                                        self.world_scale,
+                                        np.uint32(self.branch_degree)])
 
         self.geometry = geometry
 
@@ -137,17 +179,96 @@ class GPUGeometry(object):
             self.print_device_usage()
         logger.info(self.device_usage_str())
 
+    def make_bvh(self, vertices, gpu_vertices, ntriangles, gpu_triangles, branch_degree):
+        assert branch_degree > 1
+        bvh_module = get_cu_module('bvh.cu', options=cuda_options, 
+                                    include_source_directory=True)
+        bvh_funcs = GPUFuncs(bvh_module)
+        
+        world_min = vertices.min(axis=0)
+        # Full scale at 2**16 - 2 in order to ensure there is dynamic range to round
+        # up by one count after quantization
+        world_scale = (vertices.max(axis=0) - world_min) / (2**16 - 2)
+
+        world_origin = ga.vec.make_float3(*world_min)
+        world_scale  = ga.vec.make_float3(*world_scale)
+
+        layer_conf = compute_layer_configuration(ntriangles, branch_degree)
+        layer_offsets = list(np.cumsum([npad for n, npad in layer_conf]))
+
+        # Last entry is number of nodes, trim off and add zero to get offset of each layer
+        n_nodes = int(layer_offsets[-1])
+        layer_offsets = [0] + layer_offsets[:-1]
+
+        leaf_nodes = ga.empty(shape=ntriangles, dtype=ga.vec.uint4)
+        morton_codes = ga.empty(shape=ntriangles, dtype=np.uint64)
+
+        # Step 1: Make leaves
+        nthreads_per_block=256
+        for first_index, elements_this_iter, nblocks_this_iter in \
+                chunk_iterator(ntriangles, nthreads_per_block, max_blocks=10000):
+            bvh_funcs.make_leaves(np.uint32(first_index),
+                                  np.uint32(elements_this_iter),
+                                  gpu_triangles, gpu_vertices, 
+                                  world_origin, world_scale,
+                                  leaf_nodes, morton_codes,
+                                  block=(nthreads_per_block,1,1),
+                                  grid=(nblocks_this_iter,1))
+
+        # argsort on the CPU because I'm too lazy to do it on the GPU
+        argsort = morton_codes.get().argsort().astype(np.uint32)
+        del morton_codes
+        #local_leaf_nodes = leaf_nodes.get()[argsort]
+        #
+        remap_order = ga.to_gpu(argsort)
+        #m = morton_codes.get()
+        #m.sort()
+        #print m
+        #assert False
+        # Step 2: sort leaf nodes into full node list
+        print cuda.mem_get_info(), leaf_nodes.nbytes
+        nodes = ga.zeros(shape=n_nodes, dtype=ga.vec.uint4)
+        #cuda.memcpy_htod(int(nodes.gpudata)+int(layer_offsets[-1]), local_leaf_nodes)
+
+        for first_index, elements_this_iter, nblocks_this_iter in \
+               chunk_iterator(ntriangles, nthreads_per_block, max_blocks=10000):
+           bvh_funcs.reorder_leaves(np.uint32(first_index),
+                                    np.uint32(elements_this_iter),
+                                    leaf_nodes, nodes[layer_offsets[-1]:], remap_order,
+                                    block=(nthreads_per_block,1,1),
+                                    grid=(nblocks_this_iter,1))
+
+        del leaf_nodes
+        del remap_order
+
+        # Step 3: Create parent layers in reverse order
+        layer_parameters = zip(layer_offsets[:-1], layer_offsets[1:], layer_conf)
+        layer_parameters.reverse()
+
+        for parent_offset, child_offset, (nparent, nparent_pad) in layer_parameters:
+            for first_index, elements_this_iter, nblocks_this_iter in \
+                    chunk_iterator(nparent, nthreads_per_block, max_blocks=10000):
+                print parent_offset, first_index, elements_this_iter, nblocks_this_iter
+                bvh_funcs.build_layer(np.uint32(first_index),
+                                      np.uint32(elements_this_iter),
+                                      np.uint32(branch_degree),
+                                      nodes,
+                                      np.uint32(parent_offset),
+                                      np.uint32(child_offset),
+                                      block=(nthreads_per_block,1,1),
+                                      grid=(nblocks_this_iter,1))
+
+        return world_origin, world_scale, nodes
+
+
     def device_usage_str(self):
         '''Returns a formatted string displaying the memory usage.'''
         s = 'device usage:\n'
         s += '-'*10 + '\n'
-        s += format_array('vertices', self.vertices) + '\n'
-        s += format_array('triangles', self.triangles) + '\n'
-        s += format_array('lower_bounds', self.lower_bounds) + '\n'
-        s += format_array('upper_bounds', self.upper_bounds) + '\n'
-        s += format_array('node_map', self.node_map) + '\n'
-        s += format_array('node_map_end', self.node_map_end) + '\n'
-        s += '%-15s %6s %6s' % ('total', '', format_size(self.vertices.nbytes + self.triangles.nbytes + self.lower_bounds.nbytes + self.upper_bounds.nbytes + self.node_map.nbytes + self.node_map_end.nbytes)) + '\n'
+        #s += format_array('vertices', self.vertices) + '\n'
+        #s += format_array('triangles', self.triangles) + '\n'
+        s += format_array('nodes', self.nodes) + '\n'
+        s += '%-15s %6s %6s' % ('total', '', format_size(self.nodes.nbytes)) + '\n'
         s += '-'*10 + '\n'
         free, total = cuda.mem_get_info()
         s += '%-15s %6s %6s' % ('device total', '', format_size(total)) + '\n'
