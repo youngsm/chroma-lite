@@ -15,8 +15,10 @@ def main():
     from chroma import event
     from chroma import itertoolset
     from chroma import Simulation
-    from chroma import root
+    from chroma.io import root
     from chroma.rootimport import ROOT
+    from chroma.tools import enable_debug_on_crash
+
     ROOT.gROOT.SetBatch()
 
     from chroma.generator.vertex import constant_particle_gun
