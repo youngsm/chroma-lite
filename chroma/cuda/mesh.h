@@ -52,21 +52,16 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
     if (!intersect_node(origin, direction, g, root, min_distance))
 	return -1;
 
-    //min_distance = 100.0f;
-    //return 1;
-
     unsigned int child_ptr_stack[STACK_SIZE];
     child_ptr_stack[0] = root.child;
 
-    const unsigned int *head = &child_ptr_stack[0];
-    unsigned int *curr = &child_ptr_stack[0];
-    const unsigned int *tail = &child_ptr_stack[STACK_SIZE-1];
+    int curr = 0;
 
     unsigned int count = 0;
     unsigned int tri_count = 0;
 
-    while (curr >= head) {
-	unsigned int first_child = *curr;
+    while (curr >= 0) {
+	unsigned int first_child = child_ptr_stack[curr];
 	curr--;
 
 	for (unsigned int i=first_child; i < first_child + g->branch_degree; i++) {
@@ -98,11 +93,11 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 
 		} else {
 		    curr++;
-		    *curr = node.child;
+		    child_ptr_stack[curr] = node.child;
 		} // leaf or internal node?
 	    } // hit node?
 	    
-	    if (curr > tail) {
+	    if (curr >= STACK_SIZE) {
 		printf("warning: intersect_mesh() aborted; node > tail\n");
 		break;
 	    }
@@ -110,10 +105,10 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 
     } // while nodes on stack
 
-    if (threadIdx.x == 0) {
-	printf("node count: %d\n", count);
-	printf("triangle count: %d\n", tri_count);
-    }
+    //if (threadIdx.x == 0) {
+    //printf("node count: %d\n", count);
+    //printf("triangle count: %d\n", tri_count);
+    //}
 
     return triangle_index;
 }
