@@ -34,7 +34,7 @@ def compute_layer_configuration(n, branch_degree):
     return layer_conf
 
 class GPUGeometry(object):
-    def __init__(self, geometry, wavelengths=None, print_usage=False, branch_degree=32):
+    def __init__(self, geometry, wavelengths=None, print_usage=False, branch_degree=3):
         if wavelengths is None:
             wavelengths = standard_wavelengths
 
@@ -147,19 +147,14 @@ class GPUGeometry(object):
                                                                         len(geometry.mesh.triangles),
                                                                         self.triangles,
                                                                         self.branch_degree)
-        print 'bvh after'
+        print 'bvh after', cuda.mem_get_info()
 
         material_codes = (((geometry.material1_index & 0xff) << 24) |
                           ((geometry.material2_index & 0xff) << 16) |
                           ((geometry.surface_index & 0xff) << 8)).astype(np.uint32)
-        self.pagelocked_material_codes = cuda.pagelocked_empty_like(material_codes, mem_flags=cuda.host_alloc_flags.DEVICEMAP | cuda.host_alloc_flags.WRITECOMBINED)
-        self.pagelocked_material_codes[:] = material_codes
-        self.material_codes = np.intp(self.pagelocked_material_codes.base.get_device_pointer())
-
+        self.material_codes = ga.to_gpu(material_codes)
         colors = geometry.colors.astype(np.uint32)
-        self.pagelocked_colors = cuda.pagelocked_empty_like(colors, mem_flags=cuda.host_alloc_flags.DEVICEMAP | cuda.host_alloc_flags.WRITECOMBINED)
-        self.pagelocked_colors[:] = colors
-        self.colors = np.intp(self.pagelocked_colors.base.get_device_pointer())
+        self.colors = ga.to_gpu(colors)
         self.solid_id_map = ga.to_gpu(geometry.solid_id.astype(np.uint32))
 
         self.gpudata = make_gpu_struct(geometry_struct_size,
