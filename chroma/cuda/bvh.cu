@@ -2,6 +2,7 @@
 #include <cuda.h>
 
 #include "linalg.h"
+#include "physical_constants.h"
 
 __device__ float3
 fminf(const float3 &a, const float3 &b)
@@ -47,17 +48,79 @@ __device__ unsigned long long spread3_16(unsigned int input)
   return x;
 }
 
+__device__ unsigned long long spread2_16(unsigned int input)
+{
+  unsigned long long x = input;
+  x = (x | (x << 16)) & 0x000000ff00ff00fful;
+  x = (x | (x <<  8)) & 0x00000f0f0f0f0f0ful;
+  x = (x | (x <<  4)) & 0x0000333333333333ul;
+  x = (x | (x <<  2)) & 0x0000555555555555ul;
+  return x;
+}
+
+
 __device__ unsigned int quantize(float v, float world_origin, float world_scale)
 {
   // truncate!
   return (unsigned int) ((v - world_origin) / world_scale);
 }
 
-__device__ uint3 quantize3(float3 v, float3 world_origin, float3 world_scale)
+__device__ uint3 quantize3(float3 v, float3 world_origin, float world_scale)
 {
-  return make_uint3(quantize(v.x, world_origin.x, world_scale.x),
-		    quantize(v.y, world_origin.y, world_scale.y),
-		    quantize(v.z, world_origin.z, world_scale.z));
+  return make_uint3(quantize(v.x, world_origin.x, world_scale),
+		    quantize(v.y, world_origin.y, world_scale),
+		    quantize(v.z, world_origin.z, world_scale));
+}
+
+__device__ uint3 quantize3_cyl(float3 v, float3 world_origin, float world_scale)
+{
+  float3 rescaled_v = (v - world_origin) / world_scale / sqrtf(3.0f); 
+  unsigned int z = rescaled_v.z;
+  rescaled_v.z = 0.0f;
+  unsigned int rho = (unsigned int) norm(rescaled_v);
+  unsigned int phi = (unsigned int) ((atan2f(v.y, v.x)/PI/2.0f + 1.0f) * 65535.0f);
+
+  return make_uint3(rho, phi, z);
+}
+
+__device__ uint3 quantize3_sph(float3 v, float3 world_origin, float world_scale)
+{
+  float3 rescaled_v = (v - world_origin) / world_scale;
+
+  unsigned int r = (unsigned int) (norm(rescaled_v) / sqrt(3.0f));
+
+  unsigned int phi = (unsigned int) ((atan2f(rescaled_v.y, rescaled_v.x)/PI/2.0f + 1.0f) * 65535.0f);
+  
+  unsigned int theta = (unsigned int) (acosf(rescaled_v.z / norm(rescaled_v)) / PI * 65535.0f);
+ 
+  return make_uint3(r, theta, phi);
+}
+
+__device__ uint4 node_union(const uint4 &a, const uint4 &b)
+{
+  uint3 lower = make_uint3(min(a.x & 0xFFFF, b.x & 0xFFFF),
+                           min(a.y & 0xFFFF, b.y & 0xFFFF),
+                           min(a.z & 0xFFFF, b.z & 0xFFFF));
+  uint3 upper = make_uint3(max(a.x >> 16, b.x >> 16),
+                           max(a.y >> 16, b.y >> 16),
+                           max(a.z >> 16, b.z >> 16));
+
+  return make_uint4(upper.x << 16 | lower.x,
+                    upper.y << 16 | lower.y,
+                    upper.z << 16 | lower.z,
+                    0);
+
+}      
+
+
+
+__device__ unsigned int surface_half_area(const uint4 &node)
+{
+  unsigned int x = (node.x >> 16) - (node.x & 0xFFFF);
+  unsigned int y = (node.y >> 16) - (node.y & 0xFFFF);
+  unsigned int z = (node.z >> 16) - (node.z & 0xFFFF);
+
+  return x*y + y*z + z*x;
 }
 
 const unsigned int LEAF_BIT = (1U << 31);
@@ -66,9 +129,25 @@ extern "C"
 {
 
   __global__ void
+  node_area(unsigned int first_node,
+	    unsigned int nnodes_this_round,
+	    uint4 *nodes,
+	    unsigned int *areas)
+  {
+    unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+    if (thread_id >= nnodes_this_round)
+      return;
+    
+    unsigned int node_id = first_node + thread_id;
+    
+    areas[node_id] = surface_half_area(nodes[node_id]);
+  }
+
+
+  __global__ void
   make_leaves(unsigned int first_triangle,
 	      unsigned int ntriangles, uint3 *triangles, float3 *vertices,
-	      float3 world_origin, float3 world_scale,
+	      float3 world_origin, float world_scale,
 	      uint4 *leaf_nodes, unsigned long long *morton_codes)
 
   {
@@ -107,6 +186,17 @@ extern "C"
       spread3_16(q_centroid.x) 
       | (spread3_16(q_centroid.y) << 1)
       | (spread3_16(q_centroid.z) << 2);
+
+    //unsigned long long morton = 
+    //  spread3_16(triangle.x & 0xFFFF) 
+    //  | (spread3_16(triangle.y & 0xFFFF) << 1)
+    //  | (spread3_16(triangle.z & 0xFFFF) << 2);
+
+
+    //unsigned long long morton = 
+    //    ( ((unsigned long long) q_centroid.x) << 32 )
+    //  | ( ((unsigned long long) q_centroid.y) << 16 )
+    //  | ( ((unsigned long long) q_centroid.z) << 0 );
     
     // Write leaf and morton code
     uint4 leaf_node;
@@ -178,6 +268,120 @@ extern "C"
     parent_node.z = upper.z << 16 | lower.z;
 
     nodes[parent_layer_offset + parent_id] = parent_node;
+  }
+
+  __global__ void distance_to_prev(unsigned int first_node, unsigned int threads_this_round,
+                                   uint4 *node, unsigned int *area)
+  {
+    unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+    if (thread_id >= threads_this_round)
+      return;
+
+    unsigned int node_id = first_node + thread_id;
+
+    uint4 a = node[node_id - 1];
+    uint4 b = node[node_id];
+    uint4 u = node_union(a, b);
+
+    area[node_id] = surface_half_area(u);
+  }
+
+  __global__ void distance_to(unsigned int first_node, unsigned int threads_this_round,
+                              unsigned int target_index,
+                              uint4 *node, unsigned int *area)
+  {
+    unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+    if (thread_id >= threads_this_round)
+      return;
+
+    unsigned int node_id = first_node + thread_id;
+
+    if (node_id == target_index) {
+      area[node_id] = 0xFFFFFFFF;
+    } else {
+      uint4 a = node[target_index];
+      uint4 b = node[node_id];
+      uint4 u = node_union(a, b);
+
+      area[node_id] = surface_half_area(u);
+    }
+  }
+
+  __global__ void min_distance_to(unsigned int first_node, unsigned int threads_this_round,
+                                  unsigned int target_index,
+                                  uint4 *node,
+                                  unsigned int block_offset,
+                                  unsigned int *min_area_block,
+                                  unsigned int *min_index_block,
+                                  unsigned int *flag)
+  {
+    __shared__ unsigned int min_area;
+    __shared__ unsigned int adjacent_area;
+
+    target_index += blockIdx.y;
+
+    uint4 a = node[target_index];
+
+    if (threadIdx.x == 0) {
+      min_area = 0xFFFFFFFF;
+      adjacent_area = surface_half_area(node_union(a, node[target_index+1]));
+    }
+
+    __syncthreads();
+
+    unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+
+    unsigned int node_id = first_node + thread_id;
+
+    if (thread_id >= threads_this_round)
+      node_id = target_index;
+
+    unsigned int area;
+
+    if (node_id == target_index) {
+      area = 0xFFFFFFFF;
+    } else {
+      uint4 b = node[node_id];
+
+      if (b.x == 0) {
+	area = 0xFFFFFFFF;
+      } else {
+	uint4 u = node_union(a, b);
+	area = surface_half_area(u);
+      }
+    }
+
+    atomicMin(&min_area, area);
+
+    __syncthreads();
+
+    if (min_area == area) {
+
+      if (blockIdx.y == 0) {
+        if (min_area < adjacent_area) {
+          min_index_block[block_offset + blockIdx.x] = node_id;
+          min_area_block[block_offset + blockIdx.x] = area;
+          flag[0] = 1;
+        } else {
+          min_area_block[block_offset + blockIdx.x] = 0xFFFFFFFF;
+        }
+      } else {
+
+        if (min_area < adjacent_area)
+	  flag[blockIdx.y] = 1;
+      }
+
+    }
+  }
+
+
+
+  __global__ void swap(unsigned int a_index, unsigned int b_index,
+                       uint4 *node)
+  {
+    uint4 temp4 = node[a_index];
+    node[a_index] = node[b_index];
+    node[b_index] = temp4;
   }
 
 } // extern "C"

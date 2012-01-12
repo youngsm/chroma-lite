@@ -33,8 +33,201 @@ def compute_layer_configuration(n, branch_degree):
 
     return layer_conf
 
+def optimize_bvh_layer(layer, bvh_funcs):
+    n = len(layer)
+    areas = ga.empty(shape=n, dtype=np.uint32)
+    union_areas = ga.empty(shape=n, dtype=np.uint32)
+    nthreads_per_block = 128
+    min_areas = ga.empty(shape=int(np.ceil(n/float(nthreads_per_block))), dtype=np.uint32)
+    min_index = ga.empty_like(min_areas)
+
+    update = 50000
+
+    skip_size = 1
+    flag = cuda.pagelocked_empty(shape=skip_size, dtype=np.uint32, mem_flags=cuda.host_alloc_flags.DEVICEMAP)
+    flag_gpu = np.intp(flag.base.get_device_pointer())
+    print 'starting optimization'
+
+    i = 0
+    skips = 0
+    while i < (n/2 - 1):
+        # How are we doing?
+        if i % update == 0:
+            for first_index, elements_this_iter, nblocks_this_iter in \
+                    chunk_iterator(n-1, nthreads_per_block, max_blocks=10000):
+
+                bvh_funcs.distance_to_prev(np.uint32(first_index + 1),
+                                           np.uint32(elements_this_iter),
+                                           layer,
+                                           union_areas,
+                                           block=(nthreads_per_block,1,1),
+                                           grid=(nblocks_this_iter,1))
+
+            union_areas_host = union_areas.get()[1::2]
+            print 'Area of parent layer: %1.12e' % union_areas_host.astype(float).sum()
+            print 'Area of parent layer so far (%d): %1.12e' % (i*2, union_areas_host.astype(float)[:i].\
+sum())
+            print 'Skips:', skips
+
+        test_index = i * 2
+
+        blocks = 0
+        look_forward = min(8192*400, n - test_index - 2)
+        skip_this_round = min(skip_size, n - test_index - 1)
+        flag[:] = 0
+        for first_index, elements_this_iter, nblocks_this_iter in \
+                chunk_iterator(look_forward, nthreads_per_block, max_blocks=10000):
+            bvh_funcs.min_distance_to(np.uint32(first_index + test_index + 2),
+                                      np.uint32(elements_this_iter),
+                                      np.uint32(test_index),
+                                      layer,
+                                      np.uint32(blocks),
+                                      min_areas,
+                                      min_index,
+                                      flag_gpu,
+                                      block=(nthreads_per_block,1,1),
+                                      grid=(nblocks_this_iter, skip_this_round))
+            blocks += nblocks_this_iter
+        cuda.Context.get_current().synchronize()
+
+        if flag[0] == 0:
+            flag_nonzero = flag.nonzero()[0]
+            if len(flag_nonzero) == 0:
+                no_swap_required = skip_size
+            else:
+                no_swap_required = flag_nonzero[0]
+            i += no_swap_required
+            skips += no_swap_required
+            continue
+
+        areas_host = min_areas[:blocks].get()
+        min_index_host = min_index[:blocks].get()
+        best_block = areas_host.argmin()
+        better_i = min_index_host[best_block]
+
+        if i % update == 0:
+            print 'swapping %d and %d' % (test_index + 1, better_i)
+
+        bvh_funcs.swap(np.uint32(test_index+1), np.uint32(better_i),
+                       layer, block=(1,1,1), grid=(1,1))
+        i += 1
+
+    for first_index, elements_this_iter, nblocks_this_iter in \
+            chunk_iterator(n-1, nthreads_per_block, max_blocks=10000):
+
+        bvh_funcs.distance_to_prev(np.uint32(first_index + 1),
+                                   np.uint32(elements_this_iter),
+                                   layer,
+                                   union_areas,
+                                   block=(nthreads_per_block,1,1),
+                                   grid=(nblocks_this_iter,1))
+
+    union_areas_host = union_areas.get()[1::2]
+    print 'Final area of parent layer: %1.12e' % union_areas_host.sum()
+    print 'Skips:', skips
+
+def make_bvh(vertices, gpu_vertices, ntriangles, gpu_triangles, branch_degree):
+    assert branch_degree > 1
+    bvh_module = get_cu_module('bvh.cu', options=cuda_options, 
+                                include_source_directory=True)
+    bvh_funcs = GPUFuncs(bvh_module)
+
+    world_min = vertices.min(axis=0)
+    # Full scale at 2**16 - 2 in order to ensure there is dynamic range to round
+    # up by one count after quantization
+    world_scale = np.max((vertices.max(axis=0) - world_min)) / (2**16 - 2)
+
+    world_origin = ga.vec.make_float3(*world_min)
+    world_scale  = np.float32(world_scale)
+
+    layer_conf = compute_layer_configuration(ntriangles, branch_degree)
+    layer_offsets = list(np.cumsum([npad for n, npad in layer_conf]))
+
+    # Last entry is number of nodes, trim off and add zero to get offset of each layer
+    n_nodes = int(layer_offsets[-1])
+    layer_offsets = [0] + layer_offsets[:-1]
+
+    leaf_nodes = ga.empty(shape=ntriangles, dtype=ga.vec.uint4)
+    morton_codes = ga.empty(shape=ntriangles, dtype=np.uint64)
+
+    # Step 1: Make leaves
+    nthreads_per_block=256
+    for first_index, elements_this_iter, nblocks_this_iter in \
+            chunk_iterator(ntriangles, nthreads_per_block, max_blocks=10000):
+        bvh_funcs.make_leaves(np.uint32(first_index),
+                              np.uint32(elements_this_iter),
+                              gpu_triangles, gpu_vertices, 
+                              world_origin, world_scale,
+                              leaf_nodes, morton_codes,
+                              block=(nthreads_per_block,1,1),
+                              grid=(nblocks_this_iter,1))
+
+    # argsort on the CPU because I'm too lazy to do it on the GPU
+    argsort = morton_codes.get().argsort().astype(np.uint32)
+    del morton_codes
+    local_leaf_nodes = leaf_nodes.get()[argsort]
+    del leaf_nodes
+    #del remap_order
+    #
+    #remap_order = ga.to_gpu(argsort)
+    #m = morton_codes.get()
+    #m.sort()
+    #print m
+    #assert False
+    # Step 2: sort leaf nodes into full node list
+    #print cuda.mem_get_info(), leaf_nodes.nbytes
+    nodes = ga.zeros(shape=n_nodes, dtype=ga.vec.uint4)
+    areas = ga.zeros(shape=n_nodes, dtype=np.uint32)
+    cuda.memcpy_htod(int(nodes.gpudata)+int(layer_offsets[-1]), local_leaf_nodes)
+
+    #for first_index, elements_this_iter, nblocks_this_iter in \
+    #       chunk_iterator(ntriangles, nthreads_per_block, max_blocks=10000):
+    #   bvh_funcs.reorder_leaves(np.uint32(first_index),
+    #                            np.uint32(elements_this_iter),
+    #                            leaf_nodes, nodes[layer_offsets[-1]:], remap_order,
+    #                            block=(nthreads_per_block,1,1),
+    #                            grid=(nblocks_this_iter,1))
+
+
+    # Step 3: Create parent layers in reverse order
+    layer_parameters = zip(layer_offsets[:-1], layer_offsets[1:], layer_conf)
+    layer_parameters.reverse()
+
+    i = len(layer_parameters)
+    for parent_offset, child_offset, (nparent, nparent_pad) in layer_parameters:
+        #if i < 30:
+        #    optimize_bvh_layer(nodes[child_offset:child_offset+nparent*branch_degree],
+        #                  bvh_funcs)
+
+        for first_index, elements_this_iter, nblocks_this_iter in \
+                chunk_iterator(nparent * branch_degree, nthreads_per_block,
+                               max_blocks=10000):
+            bvh_funcs.node_area(np.uint32(first_index+child_offset),
+                                np.uint32(elements_this_iter),
+                                nodes,
+                                areas,
+                                block=(nthreads_per_block,1,1),
+                                grid=(nblocks_this_iter,1))
+
+        print 'area', i, nparent * branch_degree, '%e' % areas[child_offset:child_offset+nparent*branch_degree].get().astype(float).sum()
+
+        for first_index, elements_this_iter, nblocks_this_iter in \
+                chunk_iterator(nparent, nthreads_per_block, max_blocks=10000):
+            bvh_funcs.build_layer(np.uint32(first_index),
+                                  np.uint32(elements_this_iter),
+                                  np.uint32(branch_degree),
+                                  nodes,
+                                  np.uint32(parent_offset),
+                                  np.uint32(child_offset),
+                                  block=(nthreads_per_block,1,1),
+                                  grid=(nblocks_this_iter,1))
+
+        i -= 1
+
+    return world_origin, world_scale, nodes
+
 class GPUGeometry(object):
-    def __init__(self, geometry, wavelengths=None, print_usage=False, branch_degree=3):
+    def __init__(self, geometry, wavelengths=None, print_usage=False, branch_degree=2):
         if wavelengths is None:
             wavelengths = standard_wavelengths
 
@@ -142,11 +335,11 @@ class GPUGeometry(object):
 
         self.branch_degree = branch_degree
         print 'bvh', cuda.mem_get_info()
-        self.world_origin, self.world_scale, self.nodes = self.make_bvh(geometry.mesh.vertices,
-                                                                        self.vertices,
-                                                                        len(geometry.mesh.triangles),
-                                                                        self.triangles,
-                                                                        self.branch_degree)
+        self.world_origin, self.world_scale, self.nodes = make_bvh(geometry.mesh.vertices,
+                                                                   self.vertices,
+                                                                   len(geometry.mesh.triangles),
+                                                                   self.triangles,
+                                                                   self.branch_degree)
         print 'bvh after', cuda.mem_get_info()
 
         material_codes = (((geometry.material1_index & 0xff) << 24) |
@@ -164,7 +357,6 @@ class GPUGeometry(object):
                                         self.material_pointer_array,
                                         self.surface_pointer_array,
                                         self.world_origin,
-                                        np.float32(0.0), # dummy1
                                         self.world_scale,
                                         np.uint32(self.branch_degree)])
 
@@ -173,88 +365,6 @@ class GPUGeometry(object):
         if print_usage:
             self.print_device_usage()
         logger.info(self.device_usage_str())
-
-    def make_bvh(self, vertices, gpu_vertices, ntriangles, gpu_triangles, branch_degree):
-        assert branch_degree > 1
-        bvh_module = get_cu_module('bvh.cu', options=cuda_options, 
-                                    include_source_directory=True)
-        bvh_funcs = GPUFuncs(bvh_module)
-        
-        world_min = vertices.min(axis=0)
-        # Full scale at 2**16 - 2 in order to ensure there is dynamic range to round
-        # up by one count after quantization
-        world_scale = (vertices.max(axis=0) - world_min) / (2**16 - 2)
-
-        world_origin = ga.vec.make_float3(*world_min)
-        world_scale  = ga.vec.make_float3(*world_scale)
-
-        layer_conf = compute_layer_configuration(ntriangles, branch_degree)
-        layer_offsets = list(np.cumsum([npad for n, npad in layer_conf]))
-
-        # Last entry is number of nodes, trim off and add zero to get offset of each layer
-        n_nodes = int(layer_offsets[-1])
-        layer_offsets = [0] + layer_offsets[:-1]
-
-        leaf_nodes = ga.empty(shape=ntriangles, dtype=ga.vec.uint4)
-        morton_codes = ga.empty(shape=ntriangles, dtype=np.uint64)
-
-        # Step 1: Make leaves
-        nthreads_per_block=256
-        for first_index, elements_this_iter, nblocks_this_iter in \
-                chunk_iterator(ntriangles, nthreads_per_block, max_blocks=10000):
-            bvh_funcs.make_leaves(np.uint32(first_index),
-                                  np.uint32(elements_this_iter),
-                                  gpu_triangles, gpu_vertices, 
-                                  world_origin, world_scale,
-                                  leaf_nodes, morton_codes,
-                                  block=(nthreads_per_block,1,1),
-                                  grid=(nblocks_this_iter,1))
-
-        # argsort on the CPU because I'm too lazy to do it on the GPU
-        argsort = morton_codes.get().argsort().astype(np.uint32)
-        del morton_codes
-        #local_leaf_nodes = leaf_nodes.get()[argsort]
-        #
-        remap_order = ga.to_gpu(argsort)
-        #m = morton_codes.get()
-        #m.sort()
-        #print m
-        #assert False
-        # Step 2: sort leaf nodes into full node list
-        print cuda.mem_get_info(), leaf_nodes.nbytes
-        nodes = ga.zeros(shape=n_nodes, dtype=ga.vec.uint4)
-        #cuda.memcpy_htod(int(nodes.gpudata)+int(layer_offsets[-1]), local_leaf_nodes)
-
-        for first_index, elements_this_iter, nblocks_this_iter in \
-               chunk_iterator(ntriangles, nthreads_per_block, max_blocks=10000):
-           bvh_funcs.reorder_leaves(np.uint32(first_index),
-                                    np.uint32(elements_this_iter),
-                                    leaf_nodes, nodes[layer_offsets[-1]:], remap_order,
-                                    block=(nthreads_per_block,1,1),
-                                    grid=(nblocks_this_iter,1))
-
-        del leaf_nodes
-        del remap_order
-
-        # Step 3: Create parent layers in reverse order
-        layer_parameters = zip(layer_offsets[:-1], layer_offsets[1:], layer_conf)
-        layer_parameters.reverse()
-
-        for parent_offset, child_offset, (nparent, nparent_pad) in layer_parameters:
-            for first_index, elements_this_iter, nblocks_this_iter in \
-                    chunk_iterator(nparent, nthreads_per_block, max_blocks=10000):
-                print parent_offset, first_index, elements_this_iter, nblocks_this_iter
-                bvh_funcs.build_layer(np.uint32(first_index),
-                                      np.uint32(elements_this_iter),
-                                      np.uint32(branch_degree),
-                                      nodes,
-                                      np.uint32(parent_offset),
-                                      np.uint32(child_offset),
-                                      block=(nthreads_per_block,1,1),
-                                      grid=(nblocks_this_iter,1))
-
-        return world_origin, world_scale, nodes
-
 
     def device_usage_str(self):
         '''Returns a formatted string displaying the memory usage.'''

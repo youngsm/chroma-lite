@@ -47,8 +47,7 @@ struct Geometry
     Material **materials;
     Surface **surfaces;
     float3 world_origin;
-    float _dummy1; // for alignment
-    float3 world_scale;
+    float world_scale;
     unsigned int branch_degree;
 };
 
