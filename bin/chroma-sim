@@ -11,6 +11,7 @@ def main():
     import inspect
     import numpy as np
     import itertools
+    import time
 
     from chroma import event
     from chroma import itertoolset
@@ -102,6 +103,7 @@ def main():
 
     writer = root.RootWriter(options.output_filename)
 
+    start = time.time()
     for i, ev in \
             enumerate(sim.simulate(itertools.islice(ev_gen, 
                                                     options.nevents),
@@ -116,6 +118,7 @@ def main():
     print
 
     writer.close()
+    print 'Events per second: %1.1f' % (options.nevents / (time.time() - start))
 
 if __name__ == '__main__':
     main()
