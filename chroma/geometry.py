@@ -436,12 +436,14 @@ class Geometry(object):
 
         begin_last_layer = 0
 
+        layer_offsets = [begin_last_layer]
+
         for layer in count(1):
             bit_shifted_zvalues = unique_zvalues >> shift
             unique_zvalues = np.unique(bit_shifted_zvalues)
 
             i0 = begin_last_layer + bit_shifted_zvalues.size
-
+            layer_offsets.append(i0)
             self.node_map.resize(self.node_map.size+unique_zvalues.size)
             self.node_map[i0:] = np.searchsorted(bit_shifted_zvalues, unique_zvalues) + begin_last_layer
             self.node_map_end.resize(self.node_map_end.size+unique_zvalues.size)
@@ -462,6 +464,7 @@ class Geometry(object):
             if unique_zvalues.size == 1:
                 break
 
+        self.layer_offsets = layer_offsets
         self.start_node = self.node_map.size - 1
 
         logger.info('BVH construction completed in %1.1f seconds.' % (time.time() - start_time))
