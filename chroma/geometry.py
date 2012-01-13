@@ -77,6 +77,13 @@ class Mesh(object):
     def __add__(self, other):
         return Mesh(np.concatenate((self.vertices, other.vertices)), np.concatenate((self.triangles, other.triangles + len(self.vertices))))
 
+    def md5(self):
+        '''Return the MD5 hash of the vertices and triangles in this mesh as a 
+        hexidecimal string.'''
+        checksum = md5(self.vertices)
+        checksum.update(self.triangles)
+        return checksum.hexdigest()
+
 def memoize_method_with_dictionary_arg(func):
     def lookup(*args):
         # based on function by Michele Simionato
