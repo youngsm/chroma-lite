@@ -4,7 +4,8 @@ import shutil
 import tempfile
 import binascii
 
-from chroma.cache import verify_or_create_dir, Cache, GeometryNotFoundError
+from chroma.cache import verify_or_create_dir, Cache, GeometryNotFoundError,\
+    BVHNotFoundError
 from chroma.geometry import Geometry, Solid
 from chroma.make import box
 
@@ -165,5 +166,79 @@ class TestCacheGeometry(unittest.TestCase):
         with open(default_symlink_path) as f:
             self.assertEqual(f.read(), 'foo')
 
+    def tearDown(self):
+        remove_path(self.cache_dir)
+
+class TestCacheBVH(unittest.TestCase):
+    def setUp(self):
+        self.cache_dir = random_tempdir('chroma_cache_test')
+        self.cache = Cache(self.cache_dir)
+
+        self.a = Geometry()
+        self.a.add_solid(Solid(box(1,1,1)))
+        self.a.add_solid(Solid(box(1,1,1)), displacement=(10,10,10))
+        self.a.flatten()
+
+        self.b = Geometry()
+        self.b.add_solid(Solid(box(2,2,2)))
+        self.b.add_solid(Solid(box(2,2,2)), displacement=(10,10,10))
+        self.b.add_solid(Solid(box(2,2,2)), displacement=(-10,-10,-10))
+        self.b.flatten()
+
+        # c is not in cache
+        self.c = Geometry()
+        self.c.add_solid(Solid(box(2,2,2)))
+        self.c.flatten()
+
+        self.a_hash = self.a.mesh.md5()
+        self.b_hash = self.b.mesh.md5()
+        self.c_hash = self.c.mesh.md5()
+
+        self.cache.save_geometry('a', self.a)
+        self.cache.save_geometry('b', self.b)
+
+    def test_list_bvh(self):
+        self.assertEqual(len(self.cache.list_bvh(self.a_hash)), 0)
+        self.cache.save_bvh([], self.a_hash)
+        self.assertIn('default', self.cache.list_bvh(self.a_hash))
+        self.cache.save_bvh([], self.a_hash, 'foo')
+        self.assertIn('foo', self.cache.list_bvh(self.a_hash))
+        self.assertEqual(len(self.cache.list_bvh(self.a_hash)), 2)
+
+    def test_exist_bvh(self):
+        self.cache.save_bvh([], self.a_hash)
+        assert self.cache.exist_bvh(self.a_hash)
+        self.cache.save_bvh([], self.a_hash, 'foo')
+        assert self.cache.exist_bvh(self.a_hash, 'foo')
+        
+    def test_load_bvh_not_found(self):
+        with self.assertRaises(BVHNotFoundError):
+            self.cache.load_bvh(self.c_hash)
+
+        with self.assertRaises(BVHNotFoundError):
+            self.cache.load_bvh(self.a_hash, 'foo')
+
+    def test_save_load_new_bvh(self):
+        self.cache.save_bvh([], self.a_hash)
+        self.cache.load_bvh(self.a_hash)
+        self.cache.save_bvh([], self.a_hash, 'foo')
+        self.cache.load_bvh(self.a_hash, 'foo')
+
+    def test_remove_bvh(self):
+        self.cache.remove_bvh(self.a_hash, 'does_not_exist')
+
+        self.cache.save_bvh([], self.a_hash)
+        self.cache.save_bvh([], self.a_hash, 'foo')
+        assert self.cache.exist_bvh(self.a_hash)
+        assert self.cache.exist_bvh(self.a_hash, 'foo')
+
+        self.cache.remove_bvh(self.a_hash)
+        assert not self.cache.exist_bvh(self.a_hash)
+        assert self.cache.exist_bvh(self.a_hash, 'foo')
+
+        self.cache.remove_bvh(self.a_hash, 'foo')
+        assert not self.cache.exist_bvh(self.a_hash)
+        assert not self.cache.exist_bvh(self.a_hash, 'foo')
+        
     def tearDown(self):
         remove_path(self.cache_dir)

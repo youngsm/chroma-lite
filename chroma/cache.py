@@ -18,6 +18,12 @@ class GeometryNotFoundError(Exception):
     def __init__(self, msg):
         Exception.__init__(self, msg)
 
+class BVHNotFoundError(Exception):
+    '''A requested bounding volume hierarchy was not found in the
+    on-disk cache.'''
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+
 def verify_or_create_dir(dirname, exception_msg, logger_msg=None):
     '''Checks if ``dirname`` exists and is a directory.  If it does not exist,
     then it is created.  If it does exist, but is not a directory, an IOError
@@ -39,6 +45,19 @@ class Cache(object):
 
     Use this class to read and write cached geometries or bounding
     volume hierarchies rather than reading and writing disk directly.
+
+    Cached geometries are accessed by a name string.  The name of a
+    geometry should be a legal Python identifier that does not start
+    with an underscore.  (Note that the name string is directly
+    mapped to a filename, so beware of taking Cache names from untrusted
+    sources.  Don't let Little Bobby Tables ruin your day.)
+
+    Bounding volume hierarchies are accessed by MD5 hash of the
+    flattened geometry mesh using the hexadecimal string provided by
+    Mesh.md5().  Multiple BVHs are possible for a given mesh, so the
+    BVH can also be given an optional name (legal Python identifier,
+    no underscore as with geometries).  The version of the BVH
+    with the special name "default" will be the default BVH.
     '''
     
     def __init__(self, cache_dir=os.path.expanduser('~/.chroma/')):
@@ -148,13 +167,70 @@ class Cache(object):
         os.symlink(geo_file, default_geo_file)
 
 
+    def get_bvh_directory(self, mesh_hash):
+        '''Return the full path to the directory corresponding to 
+        ``mesh_hash``.
+        '''
+        return os.path.join(self.bvh_dir, mesh_hash)
+
+    def get_bvh_filename(self, mesh_hash, name='default'):
+        '''Return the full pathname for the BVH file corresponding to 
+        ``name``.
+        '''
+        return os.path.join(self.get_bvh_directory(mesh_hash), name)
+
+
     def list_bvh(self, mesh_hash):
-        pass
+        '''Returns a list the names of all BVHs corresponding to 
+        ``mesh_hash``.
+        '''
+        bvh_dir = self.get_bvh_directory(mesh_hash)
+        if not os.path.isdir(bvh_dir):
+            return []
+        else:
+            return os.listdir(bvh_dir)
 
-    def save_bvh(self, mesh_hash, name=None):
-        pass
+    def exist_bvh(self, mesh_hash, name='default'):
+        '''Returns True if a cached BVH exists corresponding to
+        ``mesh_hash`` with the given ``name``.
+        '''
+        return os.path.isfile(self.get_bvh_filename(mesh_hash, name))
 
-    def load_bvh(self, mesh_hash, name=None):
-        pass
+    def save_bvh(self, bvh, mesh_hash, name='default'):
+        '''Saves the given chroma.bvh.BVH object to the cache, tagged
+        by the given ``mesh_hash`` and ``name``.
+        '''
+        bvh_dir = self.get_bvh_directory(mesh_hash)
+        verify_or_create_dir(bvh_dir, 
+                             exception_msg='Non-directory already exists '
+                             'where BVH directory should go: ' + bvh_dir)
+        bvh_file = self.get_bvh_filename(mesh_hash, name)
 
+        with open(bvh_file, 'wb') as output_file:
+            pickle.dump(bvh, output_file, 
+                        pickle.HIGHEST_PROTOCOL)
 
+    def load_bvh(self, mesh_hash, name='default'):
+        '''Returns the chroma.bvh.BVH object corresponding to ``mesh_hash``
+        and the given ``name``.  
+
+        If no BVH exists, raises ``BVHNotFoundError``.
+        '''
+        bvh_file = self.get_bvh_filename(mesh_hash, name)
+
+        if not os.path.exists(bvh_file):
+            raise BVHNotFoundError(mesh_hash + ':' + name)
+
+        with open(bvh_file, 'rb') as input_file:
+            bvh = pickle.load(input_file)
+            return bvh
+
+    def remove_bvh(self, mesh_hash, name='default'):
+        '''Remove the BVH file associated with ``mesh_hash`` and
+        ``name`` from the cache.
+        
+        If the BVH does not exist, no action is taken.
+        '''
+        bvh_file = self.get_bvh_filename(mesh_hash, name)
+        if os.path.exists(bvh_file):
+            os.remove(bvh_file)
