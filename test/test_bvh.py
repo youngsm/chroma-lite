@@ -1,5 +1,5 @@
 import unittest
-from chroma.bvh import BVH, BVHLayerSlice, WorldCoords, uint4, \
+from chroma.bvh.bvh import BVH, BVHLayerSlice, WorldCoords, uint4, \
     OutOfRangeError, unpack_nodes
 import numpy as np
 from numpy.testing import assert_array_max_ulp, assert_array_equal, \
