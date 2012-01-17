@@ -10,3 +10,4 @@ build/
 Chroma.egg-info/
 distribute*.gz
 distribute*.egg
+.coverage
