@@ -1,14 +1,29 @@
 import pycuda.autoinit
 import unittest
 from chroma.bvh import make_simple_bvh, BVH
+from chroma.bvh.bvh import node_area
 import chroma.models
 
 import numpy as np
 #from numpy.testing import assert_array_max_ulp, assert_array_equal, \
 #    assert_approx_equal
 
-def test_simple_bvh():
+def build_simple_bvh(degree):
     mesh = chroma.models.lionsolid()
-    bvh = make_simple_bvh(mesh, degree=2)
+    bvh = make_simple_bvh(mesh, degree)
+
+    nodes = bvh.nodes
+    layer_bounds = np.append(bvh.layer_offsets, len(nodes))
+    world_coords = bvh.world_coords
+
+    for i, (layer_start, layer_end) in enumerate(zip(layer_bounds[:-1], 
+                                                     layer_bounds[1:])):
+        print i, node_area(nodes[layer_start:layer_end]) * world_coords.world_scale**2
+    
+
     assert isinstance(bvh, BVH)
 
+def test_simple():
+    yield build_simple_bvh, 2
+    yield build_simple_bvh, 3
+    yield build_simple_bvh, 4

@@ -7,9 +7,10 @@ def make_simple_bvh(mesh, degree):
     world_coords, leaf_nodes, morton_codes = \
         create_leaf_nodes(mesh, round_to_multiple=degree)
 
-    # rearrange in morton order
+    # rearrange in morton order. NOTE: morton_codes can be shorter than
+    # leaf_nodes if dummy padding nodes were added at the end!
     argsort = morton_codes.argsort()
-    leaf_nodes = leaf_nodes[argsort]
+    leaf_nodes[:len(argsort)] = leaf_nodes[argsort]
     assert len(leaf_nodes) % degree == 0
 
     # Create parent layers
@@ -23,9 +24,7 @@ def make_simple_bvh(mesh, degree):
     # How many nodes total?
     nodes, layer_bounds = concatenate_layers(layers)
 
-    for i, (layer_start, layer_end) in enumerate(zip(layer_bounds[:-1], 
-                                                     layer_bounds[1:])):
-        print i, node_area(nodes[layer_start:layer_end]) * world_coords.world_scale**2
-    
+    return BVH(degree, world_coords, nodes, layer_bounds[:-1])
+
 
     
