@@ -127,3 +127,29 @@ def offset(points, x):
         offset_points.append((a + j*(b-a)))
 
     return np.array(offset_points)
+
+def memoize_method_with_dictionary_arg(func):
+    def lookup(*args):
+        # based on function by Michele Simionato
+        # http://www.phyast.pitt.edu/~micheles/python/
+        # Modified to work for class method with dictionary argument
+
+        assert len(args) == 2
+        # create hashable arguments by replacing dictionaries with tuples of items
+        dict_items = args[1].items()
+        dict_items.sort()
+        hashable_args = (args[0], tuple(dict_items))
+        try:
+            return func._memoize_dic[hashable_args]
+        except AttributeError:
+            # _memoize_dic doesn't exist yet.
+
+            result = func(*args)
+            func._memoize_dic = {hashable_args: result}
+            return result
+        except KeyError:
+            result = func(*args)
+            func._memoize_dic[hashable_args] = result
+            return result
+    return lookup
+
