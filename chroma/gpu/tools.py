@@ -181,3 +181,36 @@ def format_size(size):
 def format_array(name, array):
     return '%-15s %6s %6s' % \
         (name, format_size(len(array)), format_size(array.nbytes))
+
+def Mapped(array):
+    '''Analog to pycuda.driver.InOut(), but indicates this array
+    is memory mapped to the device space and should not be copied.'''
+    return np.intp(array.base.get_device_pointer())
+
+def mapped_alloc(pagelocked_alloc_func, shape, dtype, write_combined):
+    '''Returns a pagelocked host array mapped into the CUDA device
+    address space, with a gpudata field set so it just works with CUDA 
+    functions.'''
+    flags = cuda.host_alloc_flags.DEVICEMAP
+    if write_combined:
+        flags |= cuda.host_alloc_flags.WRITECOMBINED
+    array = pagelocked_alloc_func(shape=shape, dtype=dtype, mem_flags=flags)
+    return array
+
+def mapped_empty(shape, dtype, write_combined=False):
+    '''See mapped_alloc()'''
+    return mapped_alloc(cuda.pagelocked_empty, shape, dtype, write_combined)
+
+def mapped_empty_like(other, write_combined=False):
+    '''See mapped_alloc()'''
+    return mapped_alloc(cuda.pagelocked_empty, other.shape, other.dtype,
+                        write_combined)
+
+def mapped_zeros(shape, dtype, write_combined=False):
+    '''See mapped_alloc()'''
+    return mapped_alloc(cuda.pagelocked_zeros, shape, dtype, write_combined)
+
+def mapped_zeros_like(other, write_combined=False):
+    '''See mapped_alloc()'''
+    return mapped_alloc(cuda.pagelocked_zeros, other.shape, other.dtype,
+                        write_combined)

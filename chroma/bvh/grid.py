@@ -1,6 +1,7 @@
-from chroma.bvh.bvh import BVH
+from chroma.bvh.bvh import BVH, node_area
+from chroma.gpu.bvh import create_leaf_nodes
 
-def make_recursive_grid_bvh(self, mesh, bits=11):
+def make_recursive_grid_bvh(mesh, bits=11):
     '''Returns a binary tree BVH created using a 'recursive grid' method.
 
     This method is somewhat similar to the original Chroma BVH generator, 
@@ -14,6 +15,14 @@ def make_recursive_grid_bvh(self, mesh, bits=11):
         speed things up.
 
     '''
-    pass
+    world_coords, leaf_nodes, morton_codes = create_leaf_nodes(mesh, bits)
 
+    # rearrange in morton order
+    argsort = morton_codes.argsort()
+    leaf_nodes = leaf_nodes[argsort]
+    morton_codes[argsort]
 
+    
+    print node_area(leaf_nodes) * world_coords.world_scale**2
+
+    

@@ -196,6 +196,19 @@ class BVH(object):
         '''Returns the number of nodes in this BVH'''
         return len(self.nodes)
 
+def node_area(nodes):
+    '''Returns the area of a list of nodes in fixed point units.'''
+    unpacked = unpack_nodes(nodes)
+    delta = np.empty(shape=len(nodes), 
+                     dtype=[('x', float), ('y', float), ('z', float)])
+    for axis in ['x', 'y', 'z']:
+        delta[axis] = unpacked[axis+'hi'] - unpacked[axis+'lo']    
+
+    half_area = delta['x']*delta['y'] + delta['y']*delta['z'] \
+        + delta['z']*delta['x']
+
+    return 2.0 * half_area.sum()
+
 class BVHLayerSlice(object):
     '''A single layer in a bounding volume hierarchy represented as a slice
     in the node array of the parent.  
@@ -219,12 +232,4 @@ class BVHLayerSlice(object):
     def area(self):
         '''Return the surface area of all the nodes in this layer in world
         units.'''
-        unpacked = unpack_nodes(self.nodes)
-        delta = np.empty(shape=len(self.nodes), 
-                         dtype=[('x', float), ('y', float), ('z', float)])
-        for axis in ['x', 'y', 'z']:
-            delta[axis] = unpacked[axis+'hi'] - unpacked[axis+'lo']
-
-        half_area = delta['x']*delta['y'] + delta['y']*delta['z'] \
-            + delta['z']*delta['x']
-        return 2.0 * half_area.sum() * self.world_coords.world_scale**2
+        return node_area(self.nodes) * self.world_coords.world_scale**2

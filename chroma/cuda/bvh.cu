@@ -186,17 +186,6 @@ extern "C"
       spread3_16(q_centroid.x) 
       | (spread3_16(q_centroid.y) << 1)
       | (spread3_16(q_centroid.z) << 2);
-
-    //unsigned long long morton = 
-    //  spread3_16(triangle.x & 0xFFFF) 
-    //  | (spread3_16(triangle.y & 0xFFFF) << 1)
-    //  | (spread3_16(triangle.z & 0xFFFF) << 2);
-
-
-    //unsigned long long morton = 
-    //    ( ((unsigned long long) q_centroid.x) << 32 )
-    //  | ( ((unsigned long long) q_centroid.y) << 16 )
-    //  | ( ((unsigned long long) q_centroid.z) << 0 );
     
     // Write leaf and morton code
     uint4 leaf_node;
@@ -268,6 +257,70 @@ extern "C"
     parent_node.z = upper.z << 16 | lower.z;
 
     nodes[parent_layer_offset + parent_id] = parent_node;
+  }
+
+  __global__ void
+  make_parents(unsigned int first_node,
+	       unsigned int elements_this_launch, 
+	       unsigned int n_children_per_node,
+	       uint4 *parent_nodes,
+	       uint4 *child_nodes,
+	       unsigned int child_id_offset)
+  {
+    unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+    if (thread_id >= elements_this_launch)
+      return;
+
+    unsigned int parent_id = first_node + thread_id;
+    unsigned int first_child = parent_id * n_children_per_node;
+
+    // Load first child
+    uint4 parent_node = child_nodes[first_child];
+    uint3 lower = make_uint3(parent_node.x & 0xFFFF, parent_node.y & 0xFFFF, parent_node.z & 0xFFFF);
+    uint3 upper = make_uint3(parent_node.x >> 16, parent_node.y >> 16, parent_node.z >> 16);
+    
+    // Scan remaining children
+    for (unsigned int i=1; i < n_children_per_node; i++) {
+      uint4 child_node = child_nodes[first_child + i];
+      
+      if (child_node.x == 0)
+	break;  // Hit first padding node in list of children
+
+      uint3 child_lower = make_uint3(child_node.x & 0xFFFF, child_node.y & 0xFFFF, child_node.z & 0xFFFF);
+      uint3 child_upper = make_uint3(child_node.x >> 16, child_node.y >> 16, child_node.z >> 16);
+
+      lower = min(lower, child_lower);
+      upper = max(upper, child_upper);
+    }
+
+    parent_node.w = first_child;
+    parent_node.x = upper.x << 16 | lower.x;
+    parent_node.y = upper.y << 16 | lower.y;
+    parent_node.z = upper.z << 16 | lower.z;
+
+    parent_nodes[parent_id] = parent_node;
+  }
+
+  __global__ void
+  copy_and_offset(unsigned int first_node,
+		  unsigned int elements_this_launch, 
+		  unsigned int child_id_offset,
+		  uint4 *src_nodes,
+		  uint4 *dest_nodes)
+    
+  {
+    unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+    if (thread_id >= elements_this_launch)
+      return;
+
+    unsigned int node_id = first_node + thread_id;
+    uint4 src_node = src_nodes[node_id];
+    
+    unsigned int leaf_flag = src_node.w & 0x80000000;
+    unsigned int child_id = src_node.w &  0x7FFFFFFF;
+    src_node.w = leaf_flag | (child_id + child_id_offset);
+
+    dest_nodes[node_id] = src_node;    
   }
 
   __global__ void distance_to_prev(unsigned int first_node, unsigned int threads_this_round,
