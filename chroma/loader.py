@@ -5,7 +5,7 @@ import time
 from chroma.log import logger
 from chroma.cache import Cache
 from chroma.bvh import make_simple_bvh
-from chroma.geometry import Geometry, Solid, Mesh
+from chroma.geometry import Geometry, Solid, Mesh, vacuum
 from chroma.detector import Detector
 from chroma.stl import mesh_from_stl
 from chroma.gpu import create_cuda_context
@@ -91,19 +91,25 @@ def load_geometry_from_string(geometry_str,
         # Load from function
         function_path = geometry_id[1:]
 
-        module_name, function_name = function_path.rsplit('.', 1)
+        module_name, obj_name = function_path.rsplit('.', 1)
         orig_sys_path = list(sys.path)
         try:
             sys.path.append('.')
-            module = __import__(module_name, fromlist=[function_name])
+            module = __import__(module_name, fromlist=[obj_name])
             sys.path = orig_sys_path
         except ImportError:
             sys.path = orig_sys_path
             raise
 
-        function = getattr(module, function_name)
-        geometry = function()
-        geometry.flatten()
+        obj = getattr(module, obj_name)
+
+        geometry = create_geometry_from_obj(obj, bvh_name=bvh_name,
+                                            auto_build_bvh=auto_build_bvh, 
+                                            read_bvh_cache=read_bvh_cache,
+                                            update_bvh_cache=update_bvh_cache,
+                                            cache_dir=cache_dir,
+                                            cuda_device=cuda_device)
+        return geometry # RETURN EARLY HERE!  ALREADY GOT BVH
 
     else:
         # Load from cache
@@ -112,7 +118,6 @@ def load_geometry_from_string(geometry_str,
         else:
             geometry = cache.load_geometry(geometry_id)
         # Cached geometries are flattened already
-
 
     geometry.bvh = load_bvh(geometry, auto_build_bvh=auto_build_bvh,
                             read_bvh_cache=read_bvh_cache,
