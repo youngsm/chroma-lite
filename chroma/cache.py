@@ -99,11 +99,17 @@ class Cache(object):
     def save_geometry(self, name, geometry):
         '''Save ``geometry`` in the cache with the name ``name``.'''
         geo_file = self.get_geometry_filename(name)
-        with open(geo_file, 'wb') as output_file:
-            pickle.dump(geometry.mesh.md5(), output_file, 
-                        pickle.HIGHEST_PROTOCOL)
-            pickle.dump(geometry, output_file, 
-                        pickle.HIGHEST_PROTOCOL)
+        # exclude saving the BVH
+        bvh = geometry.bvh
+        try:
+            geometry.bvh = None
+            with open(geo_file, 'wb') as output_file:
+                pickle.dump(geometry.mesh.md5(), output_file, 
+                            pickle.HIGHEST_PROTOCOL)
+                pickle.dump(geometry, output_file, 
+                            pickle.HIGHEST_PROTOCOL)
+        finally:
+            geometry.bvh = bvh
 
     def load_geometry(self, name):
         '''Returns the chroma.geometry.Geometry object associated with
