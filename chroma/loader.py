@@ -5,7 +5,8 @@ import time
 from chroma.log import logger
 from chroma.cache import Cache
 from chroma.bvh import make_simple_bvh
-from chroma.geometry import Geometry, Solid
+from chroma.geometry import Geometry, Solid, Mesh
+from chroma.detector import Detector
 from chroma.stl import mesh_from_stl
 from chroma.gpu import create_cuda_context
 
@@ -112,7 +113,24 @@ def load_geometry_from_string(geometry_str,
             geometry = cache.load_geometry(geometry_id)
         # Cached geometries are flattened already
 
-    # Figure out the BVH situation
+
+    geometry.bvh = load_bvh(geometry, auto_build_bvh=auto_build_bvh,
+                            read_bvh_cache=read_bvh_cache,
+                            update_bvh_cache=update_bvh_cache,
+                            cache_dir=cache_dir,
+                            cuda_device=cuda_device)
+
+    return geometry
+
+def load_bvh(geometry,  bvh_name="default", 
+             auto_build_bvh=True, read_bvh_cache=True,
+             update_bvh_cache=True, cache_dir=None,
+             cuda_device=None):
+    if cache_dir is None:
+        cache = Cache()
+    else:
+        cache = Cache(cache_dir)
+
     mesh_hash = geometry.mesh.md5()
     bvh = None
     if read_bvh_cache and cache.exist_bvh(mesh_hash, bvh_name):
@@ -133,5 +151,34 @@ def load_geometry_from_string(geometry_str,
             logger.info('Saving BVH (%s:%s) to cache.' % (mesh_hash, bvh_name))
             cache.save_bvh(bvh, mesh_hash, bvh_name)
 
-    geometry.bvh = bvh
+    return bvh
+
+def create_geometry_from_obj(obj, bvh_name="default", 
+                             auto_build_bvh=True, read_bvh_cache=True,
+                             update_bvh_cache=True, cache_dir=None,
+                             cuda_device=None):
+    if callable(obj):
+        obj = obj()
+
+    if isinstance(obj, Detector):
+        geometry = obj
+    if isinstance(obj, Geometry):
+        geometry = obj
+    elif isinstance(obj, Solid):
+        geometry = Geometry()
+        geometry.add_solid(obj)
+    elif isinstance(obj, Mesh):
+        geometry = Geometry()
+        geometry.add_solid(Solid(obj, vacuum, vacuum, color=0x33ffffff))
+    else:
+        raise TypeError('cannot build type %s' % type(obj))
+
+    geometry.flatten()
+
+    geometry.bvh = load_bvh(geometry, auto_build_bvh=auto_build_bvh,
+                            read_bvh_cache=read_bvh_cache,
+                            update_bvh_cache=update_bvh_cache,
+                            cache_dir=cache_dir,
+                            cuda_device=cuda_device)
+
     return geometry

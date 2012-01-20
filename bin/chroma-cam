@@ -6,9 +6,10 @@ if __name__ == '__main__':
     import sys
     import os
 
-    from chroma import view, build, EventViewer
+    from chroma import view, EventViewer
     from chroma import mesh_from_stl
     from chroma.tools import enable_debug_on_crash
+    import chroma.loader
     from chroma.log import logger, logging
     logger.setLevel(logging.INFO)
 
@@ -28,24 +29,10 @@ if __name__ == '__main__':
 
     size = [int(s) for s in options.resolution.split(',')]
 
-    if os.path.exists(args[0]) and args[0].lower().endswith(('.stl', '.bz2')):
-        obj = mesh_from_stl(args[0])
-    else:
-        module_name, function_name = args[0].rsplit('.', 1)
-        orig_sys_path = list(sys.path)
-        try:
-            sys.path.append('.')
-            module = __import__(module_name, fromlist=[function_name])
-            sys.path = orig_sys_path
-        except ImportError:
-            sys.path = orig_sys_path
-            raise
-
-        obj = getattr(module, function_name)
+    geometry = chroma.loader.load_geometry_from_string(args[0])
 
     if options.io_file is None:
-        view(obj, size)
+        view(geometry, size)
     else:
-        geometry = build(obj)
         viewer = EventViewer(geometry, options.io_file, size=size)
         viewer.start()
