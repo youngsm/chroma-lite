@@ -19,6 +19,7 @@ def main():
     from chroma.io import root
     from chroma.rootimport import ROOT
     from chroma.tools import enable_debug_on_crash
+    import chroma.loader
 
     ROOT.gROOT.SetBatch()
 
@@ -78,17 +79,7 @@ def main():
     if options.debug:
         enable_debug_on_crash()
 
-    module_name, function_name = args[0].rsplit('.', 1)
-
-    try:
-        module = __import__(module_name, fromlist=[function_name])
-    except ImportError:
-        raise
-
-    detector = getattr(module, function_name)
-
-    if inspect.isfunction(detector):
-        detector = detector()
+    detector = chroma.loader.load_geometry_from_string(args[0])
 
     pos = np.array([float(s) for s in options.pos.split(',')], dtype=float)
     dir = np.array([float(s) for s in options.dir.split(',')], dtype=float)

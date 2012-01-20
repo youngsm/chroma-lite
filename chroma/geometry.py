@@ -7,7 +7,8 @@ import numpy as np
 import time
 
 from chroma.itertoolset import *
-from chroma.tools import timeit, profile_if_possible, filled_array
+from chroma.tools import timeit, profile_if_possible, filled_array, \
+    memoize_method_with_dictionary_arg
 from chroma.log import logger
 
 # all material/surface properties are interpolated at these
@@ -83,31 +84,6 @@ class Mesh(object):
         checksum = md5(self.vertices)
         checksum.update(self.triangles)
         return checksum.hexdigest()
-
-def memoize_method_with_dictionary_arg(func):
-    def lookup(*args):
-        # based on function by Michele Simionato
-        # http://www.phyast.pitt.edu/~micheles/python/
-        # Modified to work for class method with dictionary argument
-
-        assert len(args) == 2
-        # create hashable arguments by replacing dictionaries with tuples of items
-        dict_items = args[1].items()
-        dict_items.sort()
-        hashable_args = (args[0], tuple(dict_items))
-        try:
-            return func._memoize_dic[hashable_args]
-        except AttributeError:
-            # _memoize_dic doesn't exist yet.
-
-            result = func(*args)
-            func._memoize_dic = {hashable_args: result}
-            return result
-        except KeyError:
-            result = func(*args)
-            func._memoize_dic[hashable_args] = result
-            return result
-    return lookup
 
 class Solid(object):
     """Solid object attaches materials, surfaces, and colors to each triangle
@@ -214,44 +190,6 @@ class Surface(object):
     def __repr__(self):
         return '<Surface %s>' % self.name
         
-def interleave(arr, bits):
-    """
-    Interleave the bits of quantized three-dimensional points in space.
-
-    Example
-        >>> interleave(np.identity(3, dtype=np.int))
-        array([4, 2, 1], dtype=uint64)
-    """
-    if len(arr.shape) != 2 or arr.shape[1] != 3:
-        raise Exception('shape mismatch')
-
-    z = np.zeros(arr.shape[0], dtype=np.uint64)
-    for i in range(bits):
-        z |= (arr[:,2] & 1 << i) << (2*i) | \
-             (arr[:,1] & 1 << i) << (2*i+1) | \
-             (arr[:,0] & 1 << i) << (2*i+2)
-    return z
-
-def morton_order(mesh, bits):
-    """
-    Return a list of zvalues for triangles in `mesh` by interleaving the
-    bits of the quantized center coordinates of each triangle. Each coordinate
-    axis is quantized into 2**bits bins.
-    """
-    lower_bound, upper_bound = mesh.get_bounds()
-
-    if bits <= 0 or bits > 21:
-        raise Exception('number of bits must be in the range (0,21].')
-
-    max_value = 2**bits - 1
-
-    def quantize(x):
-        return np.uint64((x-lower_bound)*max_value/(upper_bound-lower_bound))
-
-    mean_positions = quantize(np.mean(mesh.assemble(), axis=1))
-
-    return interleave(mean_positions, bits)
-
 class Geometry(object):
     "Geometry object."
     def __init__(self, detector_material=None):
@@ -259,6 +197,7 @@ class Geometry(object):
         self.solids = []
         self.solid_rotations = []
         self.solid_displacements = []
+        self.bvh = None
 
     def add_solid(self, solid, rotation=None, displacement=None):
         """
@@ -341,151 +280,3 @@ class Geometry(object):
             self.surface_index[self.surface_index == surface_lookup[None]] = -1
         except KeyError:
             pass
-        
-
-
-    @profile_if_possible
-    def build(self, bits=11, shift=3, use_cache=True):
-        """
-        Build the bounding volume hierarchy, material/surface code arrays, and
-        color array for this geometry. If the bounding volume hierarchy is
-        cached, load the cache instead of rebuilding, else build and cache it.
-
-        Args:
-            - bits: int, *optional*
-                The number of bits to quantize each linear dimension with when
-                morton ordering the triangle centers for building the bounding
-                volume hierarchy. Defaults to 8.
-            - shift: int, *optional*
-                The number of bits to shift the zvalue of each node when
-                building the next layer of the bounding volume hierarchy.
-                Defaults to 3.
-            - use_cache: bool, *optional*
-                If true, the on-disk cache in ~/.chroma/ will be checked for
-                a previously built version of this geometry, otherwise the
-                BVH will be computed and saved to the cache.  If false,
-                the cache is ignored and also not updated.
-        """
-        self.flatten()
-
-        checksum = md5(str(bits))
-        checksum.update(str(shift))
-        checksum.update(self.mesh.vertices)
-        checksum.update(self.mesh.triangles)
-
-        cache_dir = os.path.expanduser('~/.chroma')
-        cache_file = checksum.hexdigest()+'.npz'
-        cache_path = os.path.join(cache_dir, cache_file)
-
-        if use_cache:
-            try:
-                npz_file = np.load(cache_path)
-            except IOError:
-                pass
-            else:
-                logger.info('Loading BVH from cache.')
-                data = dict(npz_file)
-
-                # take() is faster than fancy indexing by 5x!
-                # tip from http://wesmckinney.com/blog/?p=215
-                reorder = data.pop('reorder')
-                self.mesh.triangles = self.mesh.triangles.take(reorder, axis=0)
-                self.material1_index = self.material1_index.take(reorder, axis=0)
-                self.material2_index = self.material2_index.take(reorder, axis=0)
-                self.surface_index = self.surface_index.take(reorder, axis=0)
-                self.colors = self.colors.take(reorder, axis=0)
-                self.solid_id = self.solid_id.take(reorder, axis=0)
-
-                for key, value in data.iteritems():
-                    setattr(self, key, value)
-
-                logger.info('  nodes: %d' % len(self.upper_bounds))
-                return
-
-        logger.info('Constructing new BVH from mesh.  This may take several minutes.')
-
-        start_time = time.time()
-
-        zvalues_mesh = morton_order(self.mesh, bits)
-        reorder = np.argsort(zvalues_mesh)
-        zvalues_mesh = zvalues_mesh[reorder]
-
-        if (np.diff(zvalues_mesh) < 0).any():
-            raise Exception('zvalues_mesh out of order.')
-
-        self.mesh.triangles = self.mesh.triangles[reorder]
-
-        self.material1_index = self.material1_index[reorder]
-        self.material2_index = self.material2_index[reorder]
-        self.surface_index = self.surface_index[reorder]
-        self.colors = self.colors[reorder]
-        self.solid_id = self.solid_id[reorder]
-
-        unique_zvalues = np.unique(zvalues_mesh)
-
-        while unique_zvalues.size > zvalues_mesh.size/np.e:
-            zvalues_mesh = zvalues_mesh >> shift
-            unique_zvalues = np.unique(zvalues_mesh)
-
-        self.lower_bounds = np.empty((unique_zvalues.size,3), dtype=np.float32)
-        self.upper_bounds = np.empty((unique_zvalues.size,3), dtype=np.float32)
-
-        assembled_mesh = self.mesh.assemble(group=False)
-        self.node_map = np.searchsorted(zvalues_mesh, unique_zvalues)
-        self.node_map_end = np.searchsorted(zvalues_mesh, unique_zvalues, side='right')
-
-        for i, (zi1, zi2) in enumerate(izip(self.node_map, self.node_map_end)):
-            self.lower_bounds[i] = assembled_mesh[zi1*3:zi2*3].min(axis=0)
-            self.upper_bounds[i] = assembled_mesh[zi1*3:zi2*3].max(axis=0)
-
-        self.layers = np.zeros(unique_zvalues.size, dtype=np.uint32)
-        self.first_node = unique_zvalues.size
-
-        begin_last_layer = 0
-
-        layer_offsets = [begin_last_layer]
-
-        for layer in count(1):
-            bit_shifted_zvalues = unique_zvalues >> shift
-            unique_zvalues = np.unique(bit_shifted_zvalues)
-
-            i0 = begin_last_layer + bit_shifted_zvalues.size
-            layer_offsets.append(i0)
-            self.node_map.resize(self.node_map.size+unique_zvalues.size)
-            self.node_map[i0:] = np.searchsorted(bit_shifted_zvalues, unique_zvalues) + begin_last_layer
-            self.node_map_end.resize(self.node_map_end.size+unique_zvalues.size)
-            self.node_map_end[i0:] = np.searchsorted(bit_shifted_zvalues, unique_zvalues, side='right') + begin_last_layer
-
-            self.layers.resize(self.layers.size+unique_zvalues.size)
-            self.layers[i0:] = layer
-
-            self.lower_bounds.resize((self.lower_bounds.shape[0]+unique_zvalues.size,3))
-            self.upper_bounds.resize((self.upper_bounds.shape[0]+unique_zvalues.size,3))
-
-            for i, zi1, zi2 in izip(count(i0), self.node_map[i0:], self.node_map_end[i0:]):
-                self.lower_bounds[i] = self.lower_bounds[zi1:zi2].min(axis=0)
-                self.upper_bounds[i] = self.upper_bounds[zi1:zi2].max(axis=0)
-
-            begin_last_layer += bit_shifted_zvalues.size
-
-            if unique_zvalues.size == 1:
-                break
-
-        self.layer_offsets = layer_offsets
-        self.start_node = self.node_map.size - 1
-
-        logger.info('BVH construction completed in %1.1f seconds.' % (time.time() - start_time))
-        logger.info('  nodes: %d' % len(self.upper_bounds))
-
-        if use_cache:
-            logger.info('Writing BVH to ~/.chroma cache directory...')
-            sys.stdout.flush()
-
-            if not os.path.exists(cache_dir):
-                os.makedirs(cache_dir)
-
-            data = {}
-            for key in ['lower_bounds', 'upper_bounds', 'node_map', 'node_map_end', 'layers', 'first_node', 'start_node']:
-                data[key] = getattr(self, key)
-            data['reorder'] = reorder
-            np.savez_compressed(cache_path, **data)
