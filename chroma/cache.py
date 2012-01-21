@@ -10,6 +10,7 @@ process is present.
 
 import os
 import cPickle as pickle
+import copy
 
 from chroma.log import logger
 
@@ -100,16 +101,17 @@ class Cache(object):
         '''Save ``geometry`` in the cache with the name ``name``.'''
         geo_file = self.get_geometry_filename(name)
         # exclude saving the BVH
-        bvh = geometry.bvh
-        try:
-            geometry.bvh = None
-            with open(geo_file, 'wb') as output_file:
-                pickle.dump(geometry.mesh.md5(), output_file, 
-                            pickle.HIGHEST_PROTOCOL)
-                pickle.dump(geometry, output_file, 
-                            pickle.HIGHEST_PROTOCOL)
-        finally:
-            geometry.bvh = bvh
+        reduced_geometry = copy.copy(geometry)
+        reduced_geometry.bvh = None
+        reduced_geometry.solids = []
+        reduced_geometry.solid_rotations = []
+        reduced_geometry.solid_displacements = []
+
+        with open(geo_file, 'wb') as output_file:
+            pickle.dump(geometry.mesh.md5(), output_file, 
+                        pickle.HIGHEST_PROTOCOL)
+            pickle.dump(reduced_geometry, output_file, 
+                        pickle.HIGHEST_PROTOCOL)
 
     def load_geometry(self, name):
         '''Returns the chroma.geometry.Geometry object associated with
