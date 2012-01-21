@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+#--*-python-*-
+import optparse
+import sys
+import time
+
+from chroma.cache import Cache
+from chroma.loader import load_geometry_from_string
+from chroma.log import logger, logging
+
+def parse_bvh_id(id_str):
+    '''Parse a BVH identifier given on the command line into
+    a name of geometry and an optional BVH name, assuming the form:
+
+          "geo_name:bvh_name"
+          
+    If no bvh_name is given, it is assumed to be "default."
+    '''
+    bvh_name = 'default'
+    parts = id_str.split(':')
+    if len(parts) > 1 and len(parts[1]) > 0:
+        bvh_name = parts[1]
+    geo_name = parts[0]
+    return geo_name, bvh_name
+        
+
+def node_swap(cache, args):
+    geo_name, bvh_name = parse_bvh_id(args[0])
+    mesh_hash = cache.get_geometry_hash(geo_name)
+    bvh = cache.load_bvh(mesh_hash, bvh_name)
+
+def stat_cmd(cache, args):
+    geo_name, bvh_name = parse_bvh_id(args[0])
+    mesh_hash = cache.get_geometry_hash(geo_name)
+    bvh = cache.load_bvh(mesh_hash, bvh_name)
+    print_stat(geo_name, bvh_name, mesh_hash, bvh)
+
+def print_stat(geo_name, bvh_name, mesh_hash, bvh):
+    num_layers = bvh.layer_count()
+    print '[BVH] %s:%s (MD5=%s)' % (geo_name, bvh_name, mesh_hash)
+    print '-' * 72
+    print 'World origin: (%f,%f,%f)' % tuple(bvh.world_coords.world_origin)
+    print 'World scale factor: %f' % bvh.world_coords.world_scale
+    print 'Tree degree: %d' % bvh.degree
+    print 'Nodes: %d' % len(bvh)
+    print 'Layers:'
+
+    for i in xrange(num_layers):
+        layer = bvh.get_layer(i)
+        if len(layer) == 1:
+            node_str = 'node, '
+        else:
+            node_str = 'nodes,'
+        print '  % 3d) % 10s %s    area = % 9e' % \
+            (i, len(layer), node_str, layer.area())
+
+commands = { 'node_swap' : node_swap,
+             'stat' : stat_cmd,
+             }
+             
+
+def main():
+    logger.setLevel(logging.INFO)
+
+    parser = optparse.OptionParser('%prog <cmd> <options>')
+    parser.add_option('-c', '--cache', dest='cache', 
+                      default=None, help='Chroma cache directory')
+    options, args = parser.parse_args()
+
+    if len(args) < 1:
+        sys.exit(parser.format_help())
+
+    if options.cache is None:
+        cache = Cache()
+    else:
+        cache = Cache(options.cache)
+
+    cmd = args[0]
+    cmd_args = args[1:]
+
+    if cmd in commands:
+        commands[cmd](cache, cmd_args)
+    else:
+        print 'error: unknown cmd %s' % cmd
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
+

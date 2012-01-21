@@ -25,7 +25,8 @@ setup(
     packages = find_packages(),
     include_package_data=True,
 
-    scripts = ['bin/chroma-sim', 'bin/chroma-cam', 'bin/chroma-geo'],
+    scripts = ['bin/chroma-sim', 'bin/chroma-cam',
+               'bin/chroma-geo', 'bin/chroma-bvh'],
     ext_modules = [
         Extension('chroma.generator._g4chroma',
                   ['src/G4chroma.cc'],
