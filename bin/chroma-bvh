@@ -28,8 +28,29 @@ def node_swap(cache, args):
     geo_name, bvh_name = parse_bvh_id(args[0])
     mesh_hash = cache.get_geometry_hash(geo_name)
     bvh = cache.load_bvh(mesh_hash, bvh_name)
+    
 
-def stat_cmd(cache, args):
+def list_cmd(cache, args):
+    geo_name = args[0]
+    mesh_hash = cache.get_geometry_hash(geo_name)
+    bvh_list = cache.list_bvh(mesh_hash)
+    print 'BVHs for %s (MD5=%s):' % (geo_name, mesh_hash)
+    print '\n'.join(bvh_list)
+
+def copy(cache, args):
+    geo_name, bvh_name = parse_bvh_id(args[0])
+    target_bvh_name = args[1]
+    mesh_hash = cache.get_geometry_hash(geo_name)
+    bvh = cache.load_bvh(mesh_hash, bvh_name)
+
+    cache.save_bvh(bvh, mesh_hash, target_bvh_name)
+
+def remove(cache, args):
+    geo_name, bvh_name = parse_bvh_id(args[0])
+    mesh_hash = cache.get_geometry_hash(geo_name)
+    cache.remove_bvh(mesh_hash, bvh_name)
+
+def stat(cache, args):
     geo_name, bvh_name = parse_bvh_id(args[0])
     mesh_hash = cache.get_geometry_hash(geo_name)
     bvh = cache.load_bvh(mesh_hash, bvh_name)
@@ -54,9 +75,12 @@ def print_stat(geo_name, bvh_name, mesh_hash, bvh):
         print '  % 3d) % 10s %s    area = % 9e' % \
             (i, len(layer), node_str, layer.area())
 
-commands = { 'node_swap' : node_swap,
-             'stat' : stat_cmd,
-             }
+commands = {
+    'stat' : stat,
+    'list' : list_cmd,
+    'copy' : copy,
+    'remove' : remove,
+    }
              
 
 def main():
