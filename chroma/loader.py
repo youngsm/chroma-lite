@@ -69,7 +69,7 @@ def load_geometry_from_string(geometry_str,
     # Find BVH id if given
     bvh_name = 'default'
     if ':' in geometry_str:
-        geometry_id, bvh_name = geometry_id.split(':')
+        geometry_id, bvh_name = geometry_str.split(':')
     else:
         geometry_id = geometry_str
 
@@ -119,7 +119,8 @@ def load_geometry_from_string(geometry_str,
             geometry = cache.load_geometry(geometry_id)
         # Cached geometries are flattened already
 
-    geometry.bvh = load_bvh(geometry, auto_build_bvh=auto_build_bvh,
+    geometry.bvh = load_bvh(geometry, bvh_name=bvh_name,
+                            auto_build_bvh=auto_build_bvh,
                             read_bvh_cache=read_bvh_cache,
                             update_bvh_cache=update_bvh_cache,
                             cache_dir=cache_dir,
@@ -139,7 +140,7 @@ def load_bvh(geometry,  bvh_name="default",
     mesh_hash = geometry.mesh.md5()
     bvh = None
     if read_bvh_cache and cache.exist_bvh(mesh_hash, bvh_name):
-        logger.info('Loading BVH for geometry from cache.')
+        logger.info('Loading BVH "%s" for geometry from cache.' % bvh_name)
         bvh = cache.load_bvh(mesh_hash, bvh_name)
     elif auto_build_bvh:
         logger.info('Building new BVH using simple algorithm.')
