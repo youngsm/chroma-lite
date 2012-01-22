@@ -4,9 +4,14 @@ import optparse
 import sys
 import time
 
+import numpy as np
+
 from chroma.cache import Cache
 from chroma.loader import load_geometry_from_string
 from chroma.log import logger, logging
+from chroma.bvh import make_simple_bvh
+from chroma.gpu import create_cuda_context
+from chroma.gpu.bvh import rebuild_tree, optimize_layer
 
 def parse_bvh_id(id_str):
     '''Parse a BVH identifier given on the command line into
@@ -26,9 +31,50 @@ def parse_bvh_id(id_str):
 
 def node_swap(cache, args):
     geo_name, bvh_name = parse_bvh_id(args[0])
+    opt_layer_index = int(args[1])
     mesh_hash = cache.get_geometry_hash(geo_name)
     bvh = cache.load_bvh(mesh_hash, bvh_name)
-    
+
+    if opt_layer_index < 1 or opt_layer_index > bvh.layer_count() - 1:
+        print 'Can only optimize node order in this tree for layers 1 through %d' % (bvh.layer_count() - 1)
+        return
+
+    original_parent_area = bvh.get_layer(opt_layer_index-1).area()
+    context = create_cuda_context()
+
+    print 'Optimizing layer %d through node swaps' % opt_layer_index
+    opt_layer = bvh.get_layer(opt_layer_index)
+    new_layer_nodes = optimize_layer(bvh.get_layer(opt_layer_index).nodes)
+    bvh.nodes[bvh.layer_bounds[opt_layer_index]:bvh.layer_bounds[opt_layer_index+1]] = new_layer_nodes
+
+    print 'Rebuilding tree...'
+    new_nodes = rebuild_tree(bvh, opt_layer_index)
+    bvh.nodes = new_nodes
+
+    print 'Original parent area: %e' % original_parent_area
+    print 'New parent area:      %e' % bvh.get_layer(opt_layer_index-1).area()
+
+    print 'Saving new BVH...'
+    context.pop()
+    print_stat(geo_name, bvh_name, mesh_hash, bvh)
+    cache.save_bvh(bvh, mesh_hash, bvh_name)
+
+def create(cache, args):
+    geo_name, bvh_name = parse_bvh_id(args[0])
+    degree = int(args[1])
+    mesh_hash = cache.get_geometry_hash(geo_name)
+    print 'Loading geometry (MD5=%s): %s' % (mesh_hash, geo_name)
+    geometry = cache.load_geometry(geo_name)
+
+    print 'Creating degree %d BVH...' % degree
+
+    start = time.time()
+    context = create_cuda_context()
+    bvh = make_simple_bvh(geometry.mesh, degree=degree)
+    context.pop()
+    logger.info('BVH generated in %1.1f seconds.' % (time.time() - start))
+
+    cache.save_bvh(bvh, mesh_hash, bvh_name)
 
 def list_cmd(cache, args):
     geo_name = args[0]
@@ -66,20 +112,26 @@ def print_stat(geo_name, bvh_name, mesh_hash, bvh):
     print 'Nodes: %d' % len(bvh)
     print 'Layers:'
 
+    areas = []
     for i in xrange(num_layers):
         layer = bvh.get_layer(i)
         if len(layer) == 1:
             node_str = 'node, '
         else:
             node_str = 'nodes,'
+        area = layer.area()
+        areas.append(area)
         print '  % 3d) % 10s %s    area = % 9e' % \
-            (i, len(layer), node_str, layer.area())
+            (i, len(layer), node_str, area)
+    print 'Log sum area: %f' % np.log(areas).sum()
 
 commands = {
     'stat' : stat,
+    'create': create,
     'list' : list_cmd,
     'copy' : copy,
     'remove' : remove,
+    'node_swap' : node_swap,
     }
              
 

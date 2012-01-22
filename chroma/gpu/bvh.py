@@ -102,6 +102,7 @@ def merge_nodes(nodes, degree):
                                parent_nodes,
                                cuda.In(nodes),
                                np.uint32(0),
+                               np.uint32(len(nodes)),
                                block=(nthreads_per_block,1,1),
                                grid=(nblocks_this_iter,1))
 
@@ -137,3 +138,138 @@ def concatenate_layers(layers):
                                       grid=(nblocks_this_iter,1))
         
     return nodes.get(), layer_bounds
+
+def rebuild_tree(bvh, start_layer):
+    bvh_module = get_cu_module('bvh.cu', options=cuda_options,
+                               include_source_directory=True)
+    bvh_funcs = GPUFuncs(bvh_module)
+
+    layer_bounds = bvh.layer_bounds
+    layer_ranges = zip(layer_bounds[:start_layer], 
+                       layer_bounds[1:start_layer+1],
+                       layer_bounds[2:start_layer+2])
+    layer_ranges.reverse()
+
+    gpu_nodes = ga.to_gpu(bvh.nodes)
+    nthreads_per_block = 256
+
+    for parent_start, parent_end, child_end in layer_ranges:
+        nparent = parent_end - parent_start
+        child_start = parent_end
+        nchild = child_end - child_start
+        parent_nodes = gpu_nodes[parent_start:]
+        child_nodes = gpu_nodes[child_start:]
+
+        for first_index, elements_this_iter, nblocks_this_iter in \
+            chunk_iterator(nparent, nthreads_per_block, max_blocks=10000):
+            bvh_funcs.make_parents(np.uint32(first_index),
+                                   np.uint32(elements_this_iter),
+                                   np.uint32(bvh.degree),
+                                   parent_nodes,
+                                   child_nodes,
+                                   np.uint32(child_start),
+                                   np.uint32(nchild),
+                                   block=(nthreads_per_block,1,1),
+                                   grid=(nblocks_this_iter,1))
+        
+    return gpu_nodes.get()
+
+def optimize_layer(orig_nodes):
+    bvh_module = get_cu_module('bvh.cu', options=cuda_options,
+                               include_source_directory=True)
+    bvh_funcs = GPUFuncs(bvh_module)
+
+    nodes = ga.to_gpu(orig_nodes)
+    n = len(nodes)
+    areas = ga.empty(shape=n/2, dtype=np.uint64)
+    nthreads_per_block = 128
+
+    min_areas = ga.empty(shape=int(np.ceil(n/float(nthreads_per_block))), dtype=np.uint64)
+    min_index = ga.empty(shape=min_areas.shape, dtype=np.uint32)
+
+    update = 10000
+
+    skip_size = 1
+    flag = mapped_empty(shape=skip_size, dtype=np.uint32)
+
+    i = 0
+    skips = 0
+    swaps = 0
+    while i < n/2 - 1:
+        # How are we doing?
+        if i % update == 0:
+            for first_index, elements_this_iter, nblocks_this_iter in \
+                    chunk_iterator(n/2, nthreads_per_block, max_blocks=10000):
+
+                bvh_funcs.pair_area(np.uint32(first_index),
+                                    np.uint32(elements_this_iter),
+                                    nodes,
+                                    areas,
+                                    block=(nthreads_per_block,1,1),
+                                    grid=(nblocks_this_iter,1))
+                
+            areas_host = areas.get()
+            #print nodes.get(), areas_host.astype(float)
+            print 'Area of parent layer so far (%d): %1.12e' % (i*2, areas_host.astype(float).sum())
+            print 'Skips: %d, Swaps: %d' % (skips, swaps)
+
+        test_index = i * 2
+
+        blocks = 0
+        look_forward = min(8192, n - test_index - 2)
+        skip_this_round = min(skip_size, n - test_index - 1)
+        flag[:] = 0
+        for first_index, elements_this_iter, nblocks_this_iter in \
+                chunk_iterator(look_forward, nthreads_per_block, max_blocks=10000):
+            bvh_funcs.min_distance_to(np.uint32(first_index + test_index + 2),
+                                      np.uint32(elements_this_iter),
+                                      np.uint32(test_index),
+                                      nodes,
+                                      np.uint32(blocks),
+                                      min_areas,
+                                      min_index,
+                                      Mapped(flag),
+                                      block=(nthreads_per_block,1,1),
+                                      grid=(nblocks_this_iter, skip_this_round))
+            blocks += nblocks_this_iter
+            #print i, first_index, nblocks_this_iter, look_forward
+        cuda.Context.get_current().synchronize()
+
+        if flag[0] == 0:
+            flag_nonzero = flag.nonzero()[0]
+            if len(flag_nonzero) == 0:
+                no_swap_required = skip_size
+            else:
+                no_swap_required = flag_nonzero[0]
+            i += no_swap_required
+            skips += no_swap_required
+            continue
+
+        min_areas_host = min_areas[:blocks].get()
+        min_index_host = min_index[:blocks].get()
+        best_block = min_areas_host.argmin()
+        better_i = min_index_host[best_block]
+
+        swaps += 1
+        #print 'swap', test_index+1, better_i
+        bvh_funcs.swap(np.uint32(test_index+1), np.uint32(better_i),
+                       nodes, block=(1,1,1), grid=(1,1))
+        cuda.Context.get_current().synchronize()
+        i += 1
+
+    for first_index, elements_this_iter, nblocks_this_iter in \
+            chunk_iterator(n/2, nthreads_per_block, max_blocks=10000):
+
+        bvh_funcs.pair_area(np.uint32(first_index),
+                            np.uint32(elements_this_iter),
+                            nodes,
+                            areas,
+                            block=(nthreads_per_block,1,1),
+                            grid=(nblocks_this_iter,1))
+        
+    areas_host = areas.get()
+
+    print 'Final area of parent layer: %1.12e' % areas_host.sum()
+    print 'Skips: %d, Swaps: %d' % (skips, swaps)
+
+    return nodes.get()

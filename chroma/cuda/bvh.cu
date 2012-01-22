@@ -114,11 +114,11 @@ __device__ uint4 node_union(const uint4 &a, const uint4 &b)
 
 
 
-__device__ unsigned int surface_half_area(const uint4 &node)
+__device__ unsigned long long surface_half_area(const uint4 &node)
 {
-  unsigned int x = (node.x >> 16) - (node.x & 0xFFFF);
-  unsigned int y = (node.y >> 16) - (node.y & 0xFFFF);
-  unsigned int z = (node.z >> 16) - (node.z & 0xFFFF);
+  unsigned long long x = (node.x >> 16) - (node.x & 0xFFFF);
+  unsigned long long y = (node.y >> 16) - (node.y & 0xFFFF);
+  unsigned long long z = (node.z >> 16) - (node.z & 0xFFFF);
 
   return x*y + y*z + z*x;
 }
@@ -265,7 +265,8 @@ extern "C"
 	       unsigned int n_children_per_node,
 	       uint4 *parent_nodes,
 	       uint4 *child_nodes,
-	       unsigned int child_id_offset)
+	       unsigned int child_id_offset,
+	       unsigned int num_children)
   {
     unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
     if (thread_id >= elements_this_launch)
@@ -273,6 +274,9 @@ extern "C"
 
     unsigned int parent_id = first_node + thread_id;
     unsigned int first_child = parent_id * n_children_per_node;
+
+    if (first_child >= num_children)
+      return;
 
     // Load first child
     uint4 parent_node = child_nodes[first_child];
@@ -293,7 +297,7 @@ extern "C"
       upper = max(upper, child_upper);
     }
 
-    parent_node.w = first_child;
+    parent_node.w = first_child + child_id_offset;
     parent_node.x = upper.x << 16 | lower.x;
     parent_node.y = upper.y << 16 | lower.y;
     parent_node.z = upper.z << 16 | lower.z;
@@ -339,7 +343,29 @@ extern "C"
     area[node_id] = surface_half_area(u);
   }
 
-  __global__ void distance_to(unsigned int first_node, unsigned int threads_this_round,
+  __global__ void pair_area(unsigned int first_node,
+			    unsigned int threads_this_round,
+			    uint4 *node, unsigned long long *area)
+  {
+    unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+    if (thread_id >= threads_this_round)
+      return;
+
+    unsigned int node_id = first_node + thread_id;
+    unsigned int child_id = node_id * 2;
+
+    uint4 a = node[child_id];
+    uint4 b = node[child_id+1];
+    if (b.x == 0)
+      b = a;
+
+    uint4 u = node_union(a, b);
+
+    area[node_id] = 2*surface_half_area(u);
+  }
+
+  __global__ void distance_to(unsigned int first_node, 
+			      unsigned int threads_this_round,
                               unsigned int target_index,
                               uint4 *node, unsigned int *area)
   {
@@ -364,19 +390,18 @@ extern "C"
                                   unsigned int target_index,
                                   uint4 *node,
                                   unsigned int block_offset,
-                                  unsigned int *min_area_block,
+                                  unsigned long long *min_area_block,
                                   unsigned int *min_index_block,
                                   unsigned int *flag)
   {
-    __shared__ unsigned int min_area;
-    __shared__ unsigned int adjacent_area;
+    __shared__ unsigned long long min_area[128];
+    __shared__ unsigned long long adjacent_area;
 
     target_index += blockIdx.y;
 
     uint4 a = node[target_index];
 
     if (threadIdx.x == 0) {
-      min_area = 0xFFFFFFFF;
       adjacent_area = surface_half_area(node_union(a, node[target_index+1]));
     }
 
@@ -389,38 +414,47 @@ extern "C"
     if (thread_id >= threads_this_round)
       node_id = target_index;
 
-    unsigned int area;
+    unsigned long long area;
 
     if (node_id == target_index) {
-      area = 0xFFFFFFFF;
+      area = 0xFFFFFFFFFFFFFFFF;
     } else {
       uint4 b = node[node_id];
 
       if (b.x == 0) {
-	area = 0xFFFFFFFF;
+	area = 0xFFFFFFFFFFFFFFFF;
       } else {
 	uint4 u = node_union(a, b);
 	area = surface_half_area(u);
       }
     }
 
-    atomicMin(&min_area, area);
+    min_area[threadIdx.x] = area;
 
     __syncthreads();
 
-    if (min_area == area) {
+    // Too lazy to code parallel reduction right now
+    if (threadIdx.x == 0) {
+      for (int i=1; i < blockDim.x; i++)
+	min_area[0] = min(min_area[0], min_area[i]);
+    }
+
+    __syncthreads();
+
+    if (min_area[0] == area) {
 
       if (blockIdx.y == 0) {
-        if (min_area < adjacent_area) {
+        if (min_area[0] < adjacent_area) {
           min_index_block[block_offset + blockIdx.x] = node_id;
           min_area_block[block_offset + blockIdx.x] = area;
           flag[0] = 1;
         } else {
-          min_area_block[block_offset + blockIdx.x] = 0xFFFFFFFF;
+          min_area_block[block_offset + blockIdx.x] = 0xFFFFFFFFFFFFFFFF;
+	  min_index_block[block_offset + blockIdx.x] = target_index + 1;
         }
       } else {
 
-        if (min_area < adjacent_area)
+        if (min_area[0] < adjacent_area)
 	  flag[blockIdx.y] = 1;
       }
 
