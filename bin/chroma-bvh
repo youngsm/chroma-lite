@@ -31,7 +31,14 @@ def parse_bvh_id(id_str):
 
 def node_swap(cache, args):
     geo_name, bvh_name = parse_bvh_id(args[0])
-    opt_layer_index = int(args[1])
+
+    if args[1].endswith('-'):
+        redo_all_above = True
+        opt_layer_index = int(args[1][:-1])
+    else:
+        redo_all_above = False
+        opt_layer_index = int(args[1])
+
     mesh_hash = cache.get_geometry_hash(geo_name)
     bvh = cache.load_bvh(mesh_hash, bvh_name)
 
@@ -39,20 +46,27 @@ def node_swap(cache, args):
         print 'Can only optimize node order in this tree for layers 1 through %d' % (bvh.layer_count() - 1)
         return
 
-    original_parent_area = bvh.get_layer(opt_layer_index-1).area()
+    if redo_all_above:
+        opt_range = range(2, opt_layer_index+1)
+        opt_range.reverse()
+    else:
+        opt_range = [opt_layer_index]
+
     context = create_cuda_context()
+    for opt_layer_index in opt_range:
+        original_parent_area = bvh.get_layer(opt_layer_index-1).area()
 
-    print 'Optimizing layer %d through node swaps' % opt_layer_index
-    opt_layer = bvh.get_layer(opt_layer_index)
-    new_layer_nodes = optimize_layer(bvh.get_layer(opt_layer_index).nodes)
-    bvh.nodes[bvh.layer_bounds[opt_layer_index]:bvh.layer_bounds[opt_layer_index+1]] = new_layer_nodes
+        print 'Optimizing layer %d through node swaps' % opt_layer_index
+        opt_layer = bvh.get_layer(opt_layer_index)
+        new_layer_nodes = optimize_layer(bvh.get_layer(opt_layer_index).nodes)
+        bvh.nodes[bvh.layer_bounds[opt_layer_index]:bvh.layer_bounds[opt_layer_index+1]] = new_layer_nodes
 
-    print 'Rebuilding tree...'
-    new_nodes = rebuild_tree(bvh, opt_layer_index)
-    bvh.nodes = new_nodes
+        print 'Rebuilding tree...'
+        new_nodes = rebuild_tree(bvh, opt_layer_index)
+        bvh.nodes = new_nodes
 
-    print 'Original parent area: %e' % original_parent_area
-    print 'New parent area:      %e' % bvh.get_layer(opt_layer_index-1).area()
+        print 'Original parent area (layer %d): %e' % (opt_layer_index, original_parent_area)
+        print 'New parent area (layer %d):      %e' % (opt_layer_index, bvh.get_layer(opt_layer_index-1).area())
 
     print 'Saving new BVH...'
     context.pop()
