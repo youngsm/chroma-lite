@@ -216,7 +216,7 @@ def optimize_layer(orig_nodes):
         test_index = i * 2
 
         blocks = 0
-        look_forward = min(8192, n - test_index - 2)
+        look_forward = min(8192*50, n - test_index - 2)
         skip_this_round = min(skip_size, n - test_index - 1)
         flag[:] = 0
         for first_index, elements_this_iter, nblocks_this_iter in \
