@@ -54,7 +54,7 @@ def node_swap(cache, args):
 
     context = create_cuda_context()
     for opt_layer_index in opt_range:
-        original_parent_area = bvh.get_layer(opt_layer_index-1).area()
+        original_parent_area = bvh.get_layer(opt_layer_index-1).area_fixed()
 
         print 'Optimizing layer %d through node swaps' % opt_layer_index
         opt_layer = bvh.get_layer(opt_layer_index)
@@ -66,7 +66,7 @@ def node_swap(cache, args):
         bvh.nodes = new_nodes
 
         print 'Original parent area (layer %d): %e' % (opt_layer_index, original_parent_area)
-        print 'New parent area (layer %d):      %e' % (opt_layer_index, bvh.get_layer(opt_layer_index-1).area())
+        print 'New parent area (layer %d):      %e' % (opt_layer_index, bvh.get_layer(opt_layer_index-1).area_fixed())
 
     print 'Saving new BVH...'
     context.pop()
@@ -133,7 +133,7 @@ def print_stat(geo_name, bvh_name, mesh_hash, bvh):
             node_str = 'node, '
         else:
             node_str = 'nodes,'
-        area = layer.area()
+        area = layer.area_fixed()
         areas.append(area)
         print '  % 3d) % 10s %s    area = % 9e' % \
             (i, len(layer), node_str, area)
