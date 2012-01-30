@@ -13,12 +13,12 @@
    is less than zero or the distance from `origin` to the intersection is
    less than `min_distance`, return true, else return false. */
 __device__ bool
-intersect_node(const float3 &origin, const float3 &direction,
+intersect_node(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
 	       Geometry *g, const Node &node, const float min_distance=-1.0f)
 {
     float distance_to_box;
 
-    if (intersect_box(origin, direction, node.lower, node.upper,
+    if (intersect_box(neg_origin_inv_dir, inv_dir, node.lower, node.upper,
 		      distance_to_box)) {
 	if (min_distance < 0.0f)
 	    return true;
@@ -49,7 +49,10 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 
     Node root = get_node(g, 0);
 
-    if (!intersect_node(origin, direction, g, root, min_distance))
+    float3 neg_origin_inv_dir = -origin / direction;
+    float3 inv_dir = 1.0f / direction;
+
+    if (!intersect_node(neg_origin_inv_dir, inv_dir, g, root, min_distance))
 	return -1;
 
     unsigned int child_ptr_stack[STACK_SIZE];
@@ -71,7 +74,7 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 	    if (node.kind == PADDING_NODE)
 	      break; // this node and rest of children are padding
 
-	    if (intersect_node(origin, direction, g, node, min_distance)) {
+	    if (intersect_node(neg_origin_inv_dir, inv_dir, g, node, min_distance)) {
 
 		if (node.kind == LEAF_NODE) {
 		    // This node wraps a triangle
@@ -98,8 +101,8 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 	    } // hit node?
 	    
 	    if (curr >= STACK_SIZE) {
-		printf("warning: intersect_mesh() aborted; node > tail\n");
-		break;
+	    	printf("warning: intersect_mesh() aborted; node > tail\n");
+	    	break;
 	    }
 	} // loop over children, starting with first_child
 
