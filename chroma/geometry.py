@@ -238,6 +238,11 @@ class Geometry(object):
         This does not build the BVH!  If you want to use the geometry
         for rendering or simulation, you should call build() instead.
         """
+
+        # Don't run this function twice!
+        if hasattr(self, 'mesh'):
+            return
+
         nv = np.cumsum([0] + [len(solid.mesh.vertices) for solid in self.solids])
         nt = np.cumsum([0] + [len(solid.mesh.triangles) for solid in self.solids])
 
