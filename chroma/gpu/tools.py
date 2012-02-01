@@ -1,4 +1,5 @@
 import numpy as np
+import pytools
 import pycuda.tools
 from pycuda import characterize
 import pycuda.driver as cuda
@@ -32,7 +33,7 @@ def get_cu_module(name, options=None, include_source_directory=True):
     return pycuda.compiler.SourceModule(source, options=options,
                                         no_extern_c=True)
 
-@pycuda.tools.memoize
+@pytools.memoize
 def get_cu_source(name):
     """Get the source code for a CUDA source file located in the chroma cuda
     directory at src/[name]."""
