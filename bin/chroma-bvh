@@ -13,6 +13,7 @@ from chroma.bvh import make_simple_bvh
 from chroma.gpu import create_cuda_context
 from chroma.gpu.bvh import rebuild_tree, optimize_layer
 
+
 def parse_bvh_id(id_str):
     '''Parse a BVH identifier given on the command line into
     a name of geometry and an optional BVH name, assuming the form:
@@ -116,6 +117,40 @@ def stat(cache, args):
     bvh = cache.load_bvh(mesh_hash, bvh_name)
     print_stat(geo_name, bvh_name, mesh_hash, bvh)
 
+def area_hist(cache, args):
+    geo_name, bvh_name = parse_bvh_id(args[0])
+    mesh_hash = cache.get_geometry_hash(geo_name)
+    bvh = cache.load_bvh(mesh_hash, bvh_name)
+
+    print 'BVH %s:%s' % (geo_name, bvh_name)
+    print
+
+    if (args[1] == 'all'):
+        layer_ids = range(bvh.layer_count())
+    else:
+        layer_ids = [int(args[1])]
+    
+    for layer_id in layer_ids:
+        layer = bvh.get_layer(layer_id)
+        areas = layer.areas_fixed()
+        areas = areas[areas > 0] # Cull dummy nodes
+        min_area = areas.min()
+        max_area = areas.max()
+        mean = areas.mean()
+        stddev = areas.std()
+        print 'Layer %d (%d nodes, %1.2e area):' % (layer_id, len(areas), areas.sum())
+        print '    min|max|avg|stddev: %1.2e|%1.2e|%1.2e|%1.2e' \
+            % (min_area, max_area, mean, stddev)
+        print '    stddev/avg:         %4.2f' % (stddev/mean)
+
+        from chroma.rootimport import ROOT
+        h = ROOT.TH1D('layer%d'%layer_id, ';Area', 100, min_area, max_area+1)
+        for a in areas:
+            h.Fill(a)
+        h.Draw()
+        ROOT.gPad.Update()
+        raw_input('Hit enter to continue.')
+
 def print_stat(geo_name, bvh_name, mesh_hash, bvh):
     num_layers = bvh.layer_count()
     print '[BVH] %s:%s (MD5=%s)' % (geo_name, bvh_name, mesh_hash)
@@ -146,6 +181,7 @@ commands = {
     'copy' : copy,
     'remove' : remove,
     'node_swap' : node_swap,
+    'hist' : area_hist,
     }
              
 
