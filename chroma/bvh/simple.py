@@ -1,4 +1,4 @@
-from chroma.bvh.bvh import BVH, node_area
+from chroma.bvh.bvh import BVH
 from chroma.gpu.bvh import create_leaf_nodes, merge_nodes, concatenate_layers
 
 def make_simple_bvh(mesh, degree):

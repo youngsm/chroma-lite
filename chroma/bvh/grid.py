@@ -1,4 +1,4 @@
-from chroma.bvh.bvh import BVH, node_area
+from chroma.bvh.bvh import BVH, node_areas
 from chroma.gpu.bvh import create_leaf_nodes
 
 def make_recursive_grid_bvh(mesh, bits=11):
@@ -23,6 +23,6 @@ def make_recursive_grid_bvh(mesh, bits=11):
     morton_codes[argsort]
 
     
-    print node_area(leaf_nodes) * world_coords.world_scale**2
+    print node_areas(leaf_nodes).sum() * world_coords.world_scale**2
 
     
