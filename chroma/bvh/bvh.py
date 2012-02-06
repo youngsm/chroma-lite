@@ -232,7 +232,7 @@ class BVHLayerSlice(object):
     def area_fixed(self):
         '''Return the surface area of all the nodes in this layer in
         fixed point units.'''
-        node_area(self.nodes)
+        return node_area(self.nodes)
 
     def area(self):
         '''Return the surface area of all the nodes in this layer in world
