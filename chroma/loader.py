@@ -141,7 +141,6 @@ def load_bvh(geometry,  bvh_name="default",
     bvh = None
     if read_bvh_cache and cache.exist_bvh(mesh_hash, bvh_name):
         logger.info('Loading BVH "%s" for geometry from cache.' % bvh_name)
-        import pdb; pdb.set_trace()
         bvh = cache.load_bvh(mesh_hash, bvh_name)
     elif auto_build_bvh:
         logger.info('Building new BVH using simple algorithm.')
