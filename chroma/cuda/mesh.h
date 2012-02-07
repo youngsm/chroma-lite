@@ -56,7 +56,9 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 	return -1;
 
     unsigned int child_ptr_stack[STACK_SIZE];
+    unsigned int nchild_ptr_stack[STACK_SIZE];
     child_ptr_stack[0] = root.child;
+    nchild_ptr_stack[0] = root.nchild;
 
     int curr = 0;
 
@@ -65,9 +67,10 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 
     while (curr >= 0) {
 	unsigned int first_child = child_ptr_stack[curr];
+	unsigned int nchild = nchild_ptr_stack[curr];
 	curr--;
 
-	for (unsigned int i=first_child; i < first_child + g->branch_degree; i++) {
+	for (unsigned int i=first_child; i < first_child + nchild; i++) {
 	    Node node = get_node(g, i);
 	    count++;
 
@@ -97,6 +100,7 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 		} else {
 		    curr++;
 		    child_ptr_stack[curr] = node.child;
+		    nchild_ptr_stack[curr] = node.nchild;
 		} // leaf or internal node?
 	    } // hit node?
 	    

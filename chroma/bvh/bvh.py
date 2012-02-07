@@ -5,6 +5,9 @@ from pycuda.gpuarray import vec
 
 uint4 = vec.uint4 # pylint: disable-msg=C0103,E1101
 
+CHILD_BITS = 26
+NCHILD_MASK = np.uint32(0xFFFF << 26)
+
 def unpack_nodes(nodes):
     '''Creates a numpy record array with the contents of nodes
     array unpacked into separate fields.
@@ -15,19 +18,19 @@ def unpack_nodes(nodes):
     Returns ndarray(shape=n, dtype=[('xlo', np.uint16), ('xhi', np.uint16),
                                     ('ylo', np.uint16), ('yhi', np.uint16),
                                     ('zlo', np.uint16), ('zhi', np.uint16),
-                                    ('child', np.uint32), ('leaf', np.bool)])
+                                    ('child', np.uint32), ('nchild', np.uint16)])
     '''
     unpacked_dtype = np.dtype([('xlo', np.uint16), ('xhi', np.uint16),
                                ('ylo', np.uint16), ('yhi', np.uint16),
                                ('zlo', np.uint16), ('zhi', np.uint16),
-                               ('child', np.uint32), ('leaf', np.bool)])
+                               ('child', np.uint32), ('nchild', np.uint16)])
     unpacked = np.empty(shape=len(nodes), dtype=unpacked_dtype)
     
     for axis in ['x', 'y', 'z']:
         unpacked[axis+'lo'] = nodes[axis] & 0xFFFF
         unpacked[axis+'hi'] = nodes[axis] >> 16
-    unpacked['child'] = nodes['w'] & 0x7FFFFFFF
-    unpacked['leaf']  = nodes['w'] & 0x80000000 > 0
+    unpacked['child'] = nodes['w'] & ~NCHILD_MASK
+    unpacked['nchild']  = nodes['w'] >> CHILD_BITS
 
     return unpacked
 
@@ -148,12 +151,9 @@ class BVH(object):
     to manipulate the contents of the BVH node array directly.
     '''
 
-    def __init__(self, degree, world_coords, nodes, layer_offsets):
+    def __init__(self, world_coords, nodes, layer_offsets):
         '''Create a BVH object with the given properties.
 
-          ``degree``: int
-              Number of child nodes per parent
-              
            ``world_coords``: chroma.bvh.WorldCoords
               Transformation from fixed point to world coordinates.
               
@@ -170,7 +170,6 @@ class BVH(object):
               second entry must be 1, for the first child of the root node,
               unless the root node is also a leaf node.
         '''
-        self.degree = degree
         self.world_coords = world_coords
         self.nodes = nodes
         self.layer_offsets = layer_offsets
@@ -184,8 +183,7 @@ class BVH(object):
         '''
         layer_slice = slice(self.layer_bounds[layer_number],
                             self.layer_bounds[layer_number+1])
-        return BVHLayerSlice(degree=self.degree,
-                             world_coords=self.world_coords,
+        return BVHLayerSlice(world_coords=self.world_coords,
                              nodes=self.nodes[layer_slice])
 
     def layer_count(self):
@@ -224,8 +222,7 @@ class BVHLayerSlice(object):
     except no ``layer_offsets`` list.
     '''
 
-    def __init__(self, degree, world_coords, nodes):
-        self.degree = degree
+    def __init__(self, world_coords, nodes):
         self.world_coords = world_coords
         self.nodes = nodes
 

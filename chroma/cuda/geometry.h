@@ -4,9 +4,6 @@
 #include "geometry_types.h"
 #include "linalg.h"
 
-const unsigned int LEAF_BIT = (1U << 31);
-
-
 __device__ float3 
 to_float3(const uint3 &a)
 {
@@ -39,8 +36,9 @@ get_node(Geometry *geometry, const unsigned int &i)
 
     node_struct.lower = geometry->world_origin + to_float3(lower_int) * geometry->world_scale;
     node_struct.upper = geometry->world_origin + to_float3(upper_int) * geometry->world_scale;
-    node_struct.child = node.w & ~LEAF_BIT; // Mask off leaf bit
-    node_struct.kind = node.w & LEAF_BIT ? LEAF_NODE : INTERNAL_NODE;
+    node_struct.child = node.w & ~NCHILD_MASK;
+    node_struct.nchild = node.w >> CHILD_BITS;
+    node_struct.kind = node_struct.nchild == 0 ? LEAF_NODE : INTERNAL_NODE;
     
     return node_struct;
 }

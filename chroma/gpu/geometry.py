@@ -134,8 +134,7 @@ class GPUGeometry(object):
                                         self.material_pointer_array,
                                         self.surface_pointer_array,
                                         self.world_origin,
-                                        self.world_scale,
-                                        np.uint32(geometry.bvh.degree)])
+                                        self.world_scale])
 
         self.geometry = geometry
 

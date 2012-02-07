@@ -24,7 +24,7 @@ def make_simple_bvh(mesh, degree):
     # How many nodes total?
     nodes, layer_bounds = concatenate_layers(layers)
 
-    return BVH(degree, world_coords, nodes, layer_bounds[:-1])
+    return BVH(world_coords, nodes, layer_bounds[:-1])
 
 
     

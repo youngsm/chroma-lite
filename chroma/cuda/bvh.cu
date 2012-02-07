@@ -1,6 +1,7 @@
 //-*-c++-*-
 #include <cuda.h>
 
+#include "geometry_types.h"
 #include "linalg.h"
 #include "physical_constants.h"
 
@@ -123,8 +124,6 @@ __device__ unsigned long long surface_half_area(const uint4 &node)
   return x*y + y*z + z*x;
 }
 
-const unsigned int LEAF_BIT = (1U << 31);
-
 extern "C"
 {
 
@@ -192,7 +191,7 @@ extern "C"
     leaf_node.x = q_lower.x | (q_upper.x << 16);
     leaf_node.y = q_lower.y | (q_upper.y << 16);
     leaf_node.z = q_lower.z | (q_upper.z << 16);
-    leaf_node.w = triangle_id | LEAF_BIT;
+    leaf_node.w = triangle_id;
 
     leaf_nodes[triangle_id] = leaf_node;
     morton_codes[triangle_id] = morton;
@@ -238,11 +237,14 @@ extern "C"
     
 
     // Scan remaining children
+    unsigned int real_children = 1;
     for (unsigned int i=1; i < n_children_per_node; i++) {
       uint4 child_node = nodes[first_child + i];
       
       if (child_node.x == 0)
 	break;  // Hit first padding node in list of children
+
+      real_children++;
 
       uint3 child_lower = make_uint3(child_node.x & 0xFFFF, child_node.y & 0xFFFF, child_node.z & 0xFFFF);
       uint3 child_upper = make_uint3(child_node.x >> 16, child_node.y >> 16, child_node.z >> 16);
@@ -251,7 +253,7 @@ extern "C"
       upper = max(upper, child_upper);
     }
 
-    parent_node.w = first_child;
+    parent_node.w = (real_children << CHILD_BITS) | first_child;
     parent_node.x = upper.x << 16 | lower.x;
     parent_node.y = upper.y << 16 | lower.y;
     parent_node.z = upper.z << 16 | lower.z;
@@ -284,11 +286,14 @@ extern "C"
     uint3 upper = make_uint3(parent_node.x >> 16, parent_node.y >> 16, parent_node.z >> 16);
     
     // Scan remaining children
+    unsigned int real_children = 1;
     for (unsigned int i=1; i < n_children_per_node; i++) {
       uint4 child_node = child_nodes[first_child + i];
       
       if (child_node.x == 0)
 	break;  // Hit first padding node in list of children
+
+      real_children++;
 
       uint3 child_lower = make_uint3(child_node.x & 0xFFFF, child_node.y & 0xFFFF, child_node.z & 0xFFFF);
       uint3 child_upper = make_uint3(child_node.x >> 16, child_node.y >> 16, child_node.z >> 16);
@@ -297,7 +302,8 @@ extern "C"
       upper = max(upper, child_upper);
     }
 
-    parent_node.w = first_child + child_id_offset;
+    parent_node.w = (real_children << CHILD_BITS)
+      | (first_child + child_id_offset);
     parent_node.x = upper.x << 16 | lower.x;
     parent_node.y = upper.y << 16 | lower.y;
     parent_node.z = upper.z << 16 | lower.z;
@@ -320,9 +326,9 @@ extern "C"
     unsigned int node_id = first_node + thread_id;
     uint4 src_node = src_nodes[node_id];
     
-    unsigned int leaf_flag = src_node.w & 0x80000000;
-    unsigned int child_id = src_node.w &  0x7FFFFFFF;
-    src_node.w = leaf_flag | (child_id + child_id_offset);
+    unsigned int nchild = src_node.w >> CHILD_BITS;
+    unsigned int child_id = src_node.w &  ~NCHILD_MASK;
+    src_node.w = (nchild << CHILD_BITS) | (child_id + child_id_offset);
 
     dest_nodes[node_id] = src_node;    
   }

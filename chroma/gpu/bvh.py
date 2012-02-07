@@ -139,41 +139,6 @@ def concatenate_layers(layers):
         
     return nodes.get(), layer_bounds
 
-def rebuild_tree(bvh, start_layer):
-    bvh_module = get_cu_module('bvh.cu', options=cuda_options,
-                               include_source_directory=True)
-    bvh_funcs = GPUFuncs(bvh_module)
-
-    layer_bounds = bvh.layer_bounds
-    layer_ranges = zip(layer_bounds[:start_layer], 
-                       layer_bounds[1:start_layer+1],
-                       layer_bounds[2:start_layer+2])
-    layer_ranges.reverse()
-
-    gpu_nodes = ga.to_gpu(bvh.nodes)
-    nthreads_per_block = 256
-
-    for parent_start, parent_end, child_end in layer_ranges:
-        nparent = parent_end - parent_start
-        child_start = parent_end
-        nchild = child_end - child_start
-        parent_nodes = gpu_nodes[parent_start:]
-        child_nodes = gpu_nodes[child_start:]
-
-        for first_index, elements_this_iter, nblocks_this_iter in \
-            chunk_iterator(nparent, nthreads_per_block, max_blocks=10000):
-            bvh_funcs.make_parents(np.uint32(first_index),
-                                   np.uint32(elements_this_iter),
-                                   np.uint32(bvh.degree),
-                                   parent_nodes,
-                                   child_nodes,
-                                   np.uint32(child_start),
-                                   np.uint32(nchild),
-                                   block=(nthreads_per_block,1,1),
-                                   grid=(nblocks_this_iter,1))
-        
-    return gpu_nodes.get()
-
 def optimize_layer(orig_nodes):
     bvh_module = get_cu_module('bvh.cu', options=cuda_options,
                                include_source_directory=True)

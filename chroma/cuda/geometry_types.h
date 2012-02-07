@@ -28,12 +28,15 @@ struct Triangle
 };
 
 enum { INTERNAL_NODE, LEAF_NODE, PADDING_NODE };
+const unsigned int CHILD_BITS = 26;
+const unsigned int NCHILD_MASK = (0xFFFFu << CHILD_BITS);
 
 struct Node
 {
     float3 lower;
     float3 upper;
     unsigned int child;
+    unsigned int nchild;
     unsigned int kind;
 };
 
@@ -48,7 +51,6 @@ struct Geometry
     Surface **surfaces;
     float3 world_origin;
     float world_scale;
-    unsigned int branch_degree;
 };
 
 #endif

@@ -70,7 +70,9 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
     }
 
     unsigned int child_ptr_stack[STACK_SIZE];
+    unsigned int nchild_ptr_stack[STACK_SIZE];
     child_ptr_stack[0] = root.child;
+    nchild_ptr_stack[0] = root.nchild;
 
     int curr = 0;
 
@@ -82,9 +84,10 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
 
     while (curr >= 0) {
 	unsigned int first_child = child_ptr_stack[curr];
+	unsigned int nchild = child_ptr_stack[curr];
 	curr--;
 
-	for (unsigned int i=first_child; i < first_child + g->branch_degree; i++) {
+	for (unsigned int i=first_child; i < first_child + nchild; i++) {
 	    Node node = get_node(g, i);
 	    count++;
 
@@ -128,6 +131,7 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
 	      } else {
 		curr++;
 		child_ptr_stack[curr] = node.child;
+		nchild_ptr_stack[curr] = node.nchild;
 	      } // leaf or internal node?
 	    } // hit node?
 	    

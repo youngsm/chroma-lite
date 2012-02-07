@@ -83,7 +83,7 @@ def create_bvh():
     nodes['w'][layer] = [ 0x00000001 ]
     
     layer_offsets = list(layer_bounds[:-1]) # trim last entry
-    bvh = BVH(degree=degree, world_coords=world_coords,
+    bvh = BVH(world_coords=world_coords,
               nodes=nodes, layer_offsets=layer_offsets)
 
     return bvh

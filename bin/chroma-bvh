@@ -11,7 +11,7 @@ from chroma.loader import load_geometry_from_string
 from chroma.log import logger, logging
 from chroma.bvh import make_simple_bvh
 from chroma.gpu import create_cuda_context
-from chroma.gpu.bvh import rebuild_tree, optimize_layer
+from chroma.gpu.bvh import optimize_layer
 
 
 def parse_bvh_id(id_str):
@@ -157,7 +157,6 @@ def print_stat(geo_name, bvh_name, mesh_hash, bvh):
     print '-' * 72
     print 'World origin: (%f,%f,%f)' % tuple(bvh.world_coords.world_origin)
     print 'World scale factor: %f' % bvh.world_coords.world_scale
-    print 'Tree degree: %d' % bvh.degree
     print 'Nodes: %d' % len(bvh)
     print 'Layers:'
 
