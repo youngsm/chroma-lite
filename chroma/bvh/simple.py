@@ -1,5 +1,6 @@
 from chroma.bvh.bvh import BVH
-from chroma.gpu.bvh import create_leaf_nodes, merge_nodes, concatenate_layers
+from chroma.gpu.bvh import create_leaf_nodes, merge_nodes, concatenate_layers, optimize_layer
+import numpy as np
 
 def make_simple_bvh(mesh, degree):
     '''Returns a BVH tree created by simple grouping of Morton ordered nodes.
@@ -16,10 +17,10 @@ def make_simple_bvh(mesh, degree):
     # Create parent layers
     layers = [leaf_nodes]
     while len(layers[0]) > 1:
-        parent = merge_nodes(layers[0], degree=degree)
-        if len(parent) > 1:
-            assert len(parent) % degree == 0
-        layers = [parent] + layers
+        #top = optimize_layer(layers[0])
+        top = layers[0]
+        parent = merge_nodes(top, degree=degree, max_ratio=2)
+        layers = [parent, top] + layers[1:]
 
     # How many nodes total?
     nodes, layer_bounds = concatenate_layers(layers)

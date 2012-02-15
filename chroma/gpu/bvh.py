@@ -6,7 +6,7 @@ from pycuda import characterize
 from chroma.gpu.tools import get_cu_module, cuda_options, \
     chunk_iterator, to_uint3, to_float3, GPUFuncs, mapped_empty, Mapped
 
-from chroma.bvh.bvh import WorldCoords
+from chroma.bvh.bvh import WorldCoords, node_areas, NCHILD_MASK, CHILD_BITS
 
 def round_up_to_multiple(x, multiple):
     remainder = x % multiple
@@ -57,7 +57,7 @@ def create_leaf_nodes(mesh, morton_bits=16, round_to_multiple=1):
     
     # Call GPU to compute nodes
     nodes = ga.zeros(shape=round_up_to_multiple(len(triangles), 
-                                                round_to_multiple),
+                                                1),#round_to_multiple),
                      dtype=ga.vec.uint4)
     morton_codes = ga.empty(shape=len(triangles), dtype=np.uint64)
 
@@ -81,17 +81,20 @@ def create_leaf_nodes(mesh, morton_bits=16, round_to_multiple=1):
     return world_coords, nodes.get(), morton_codes_host
 
 
-def merge_nodes(nodes, degree):
+def merge_nodes(nodes, degree, max_ratio=None):
     bvh_module = get_cu_module('bvh.cu', options=cuda_options,
                                include_source_directory=True)
     bvh_funcs = GPUFuncs(bvh_module)
     
     nparent = len(nodes) / degree
+    if len(nodes) % degree != 0:
+        nparent += 1
+
     if nparent == 1:
         nparent_pad = nparent
     else:
-        nparent_pad = round_up_to_multiple(nparent, degree)
-    parent_nodes = ga.zeros(shape=nparent_pad, dtype=ga.vec.uint4)
+        nparent_pad = round_up_to_multiple(nparent, 1)#degree)
+    gpu_parent_nodes = ga.zeros(shape=nparent_pad, dtype=ga.vec.uint4)
 
     nthreads_per_block = 256
     for first_index, elements_this_iter, nblocks_this_iter in \
@@ -99,14 +102,71 @@ def merge_nodes(nodes, degree):
         bvh_funcs.make_parents(np.uint32(first_index),
                                np.uint32(elements_this_iter),
                                np.uint32(degree),
-                               parent_nodes,
+                               gpu_parent_nodes,
                                cuda.In(nodes),
                                np.uint32(0),
                                np.uint32(len(nodes)),
                                block=(nthreads_per_block,1,1),
                                grid=(nblocks_this_iter,1))
 
-    return parent_nodes.get()
+    parent_nodes = gpu_parent_nodes.get()
+
+    if max_ratio is not None:
+        areas = node_areas(parent_nodes)
+        child_areas = node_areas(nodes)
+
+        excessive_area = np.zeros(shape=len(areas), dtype=bool)
+        for i, parent_area in enumerate(areas):
+            nchild = parent_nodes['w'][i] >> CHILD_BITS
+            child_index = parent_nodes['w'][i] & ~NCHILD_MASK
+            child_area = child_areas[child_index:child_index+nchild].sum()
+            #if parent_area > 1e9:
+            #    print i, 'Children: %e, Parent: %e' % (child_area, parent_area)
+            if child_area/parent_area < 0.3:
+                excessive_area[i] = True
+                #print i, 'Children: %e, Parent: %e' % (child_area, parent_area)
+
+        extra_slots = round_up_to_multiple((degree - 1) * np.count_nonzero(excessive_area), 1)
+        print 'Extra slots:', extra_slots
+        new_parent_nodes = np.zeros(shape=len(parent_nodes) + extra_slots,
+                                    dtype=parent_nodes.dtype)
+        new_parent_nodes[:len(parent_nodes)] = parent_nodes
+
+        offset = 0
+        for count, index in enumerate(np.argwhere(excessive_area)):
+            index = index[0] + offset
+            nchild = new_parent_nodes['w'][index] >> CHILD_BITS
+            child_index = new_parent_nodes['w'][index] & ~NCHILD_MASK
+            new_parent_nodes[index] = nodes[child_index]
+            #new_parent_nodes['w'][index] = 1 << CHILD_BITS | child_index
+            tmp_nchild = new_parent_nodes['w'][index] >> CHILD_BITS
+            tmp_child_index = new_parent_nodes['w'][index] & ~NCHILD_MASK
+            new_parent_nodes['w'][index] = tmp_nchild << CHILD_BITS | (tmp_child_index + len(nodes))
+
+            if nchild == 1:
+                continue
+
+            # slide everyone over
+            #print index, nchild, len(new_parent_nodes)
+            new_parent_nodes[index+nchild:] = new_parent_nodes[index+1:-nchild+1]
+            offset += nchild - 1
+            for sibling in xrange(nchild - 1):
+                new_parent_index = index + 1 + sibling
+                new_parent_nodes[new_parent_index] = nodes[child_index + sibling + 1]
+                if new_parent_nodes['x'][new_parent_index] != 0:
+                    tmp_nchild = new_parent_nodes['w'][new_parent_index] >> CHILD_BITS
+                    tmp_child_index = new_parent_nodes['w'][new_parent_index] & ~NCHILD_MASK
+                    new_parent_nodes['w'][new_parent_index] = tmp_nchild << CHILD_BITS | (tmp_child_index + len(nodes))
+
+                    #new_parent_nodes['w'][new_parent_index] = 1 << CHILD_BITS | (child_index + sibling + 1)
+
+
+            #print 'intermediate: %e' % node_areas(new_parent_nodes).max()
+        print 'old: %e' % node_areas(parent_nodes).max()
+        print 'new: %e' % node_areas(new_parent_nodes).max()
+        parent_nodes = new_parent_nodes
+
+    return parent_nodes
 
 def concatenate_layers(layers):
     bvh_module = get_cu_module('bvh.cu', options=cuda_options,
@@ -136,7 +196,6 @@ def concatenate_layers(layers):
                                       nodes[layer_start:],
                                       block=(nthreads_per_block,1,1),
                                       grid=(nblocks_this_iter,1))
-        
     return nodes.get(), layer_bounds
 
 def optimize_layer(orig_nodes):
@@ -217,6 +276,8 @@ def optimize_layer(orig_nodes):
 
         swaps += 1
         #print 'swap', test_index+1, better_i
+        assert 0 < better_i < len(nodes)
+        assert 0 < test_index + 1 < len(nodes)
         bvh_funcs.swap(np.uint32(test_index+1), np.uint32(better_i),
                        nodes, block=(1,1,1), grid=(1,1))
         cuda.Context.get_current().synchronize()
