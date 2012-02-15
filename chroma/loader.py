@@ -148,7 +148,7 @@ def load_bvh(geometry,  bvh_name="default",
         start = time.time()
 
         context = create_cuda_context(cuda_device)
-        bvh = make_simple_bvh(geometry.mesh, degree=3)
+        bvh = make_simple_bvh(geometry.mesh, degree=2)
         context.pop()
 
         logger.info('BVH generated in %1.1f seconds.' % (time.time() - start))
