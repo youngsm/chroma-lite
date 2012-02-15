@@ -5,8 +5,8 @@ from pycuda.gpuarray import vec
 
 uint4 = vec.uint4 # pylint: disable-msg=C0103,E1101
 
-CHILD_BITS = 26
-NCHILD_MASK = np.uint32(0xFFFF << 26)
+CHILD_BITS = 28
+NCHILD_MASK = np.uint32(0xFFFF << CHILD_BITS)
 
 def unpack_nodes(nodes):
     '''Creates a numpy record array with the contents of nodes

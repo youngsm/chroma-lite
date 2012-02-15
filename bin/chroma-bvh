@@ -9,7 +9,7 @@ import numpy as np
 from chroma.cache import Cache
 from chroma.loader import load_geometry_from_string
 from chroma.log import logger, logging
-from chroma.bvh import make_simple_bvh
+from chroma.bvh import make_recursive_grid_bvh
 from chroma.gpu import create_cuda_context
 from chroma.gpu.bvh import optimize_layer
 
@@ -85,7 +85,7 @@ def create(cache, args):
 
     start = time.time()
     context = create_cuda_context()
-    bvh = make_simple_bvh(geometry.mesh, degree=degree)
+    bvh = make_recursive_grid_bvh(geometry.mesh, target_degree=degree)
     context.pop()
     logger.info('BVH generated in %1.1f seconds.' % (time.time() - start))
 

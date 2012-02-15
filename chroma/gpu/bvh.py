@@ -81,6 +81,36 @@ def create_leaf_nodes(mesh, morton_bits=16, round_to_multiple=1):
     return world_coords, nodes.get(), morton_codes_host
 
 
+def merge_nodes_detailed(nodes, first_child, nchild):
+    '''Merges nodes into len(first_child) parent nodes, using
+    the provided arrays to determine the index of the first
+    child of each parent, and how many children there are.'''
+    bvh_module = get_cu_module('bvh.cu', options=cuda_options,
+                               include_source_directory=True)
+    bvh_funcs = GPUFuncs(bvh_module)
+
+    gpu_nodes = ga.to_gpu(nodes)
+    gpu_first_child = ga.to_gpu(first_child.astype(np.int32))
+    gpu_nchild = ga.to_gpu(nchild.astype(np.int32))
+
+    nparent = len(first_child)
+    gpu_parent_nodes = ga.empty(shape=nparent, dtype=ga.vec.uint4)
+
+    nthreads_per_block = 256
+    for first_index, elements_this_iter, nblocks_this_iter in \
+            chunk_iterator(nparent, nthreads_per_block, max_blocks=10000):
+
+        bvh_funcs.make_parents_detailed(np.uint32(first_index),
+                                        np.uint32(elements_this_iter),
+                                        gpu_nodes,
+                                        gpu_parent_nodes,
+                                        gpu_first_child,
+                                        gpu_nchild,
+                                        block=(nthreads_per_block,1,1),
+                                        grid=(nblocks_this_iter,1))
+
+    return gpu_parent_nodes.get()
+
 def merge_nodes(nodes, degree, max_ratio=None):
     bvh_module = get_cu_module('bvh.cu', options=cuda_options,
                                include_source_directory=True)

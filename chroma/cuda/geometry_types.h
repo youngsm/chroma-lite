@@ -28,7 +28,7 @@ struct Triangle
 };
 
 enum { INTERNAL_NODE, LEAF_NODE, PADDING_NODE };
-const unsigned int CHILD_BITS = 26;
+const unsigned int CHILD_BITS = 28;
 const unsigned int NCHILD_MASK = (0xFFFFu << CHILD_BITS);
 
 struct Node

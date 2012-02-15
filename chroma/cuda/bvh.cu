@@ -262,6 +262,48 @@ extern "C"
   }
 
   __global__ void
+  make_parents_detailed(unsigned int first_node,
+			unsigned int elements_this_launch, 
+			uint4 *child_nodes,
+			uint4 *parent_nodes,
+			int *first_children,
+			int *nchildren)
+  {
+    unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+    if (thread_id >= elements_this_launch)
+      return;
+
+    unsigned int parent_id = first_node + thread_id;
+    unsigned int first_child = first_children[parent_id];
+    unsigned int nchild = nchildren[parent_id];
+
+    // Load first child
+    uint4 parent_node = child_nodes[first_child];
+    uint3 lower = make_uint3(parent_node.x & 0xFFFF, parent_node.y & 0xFFFF, parent_node.z & 0xFFFF);
+    uint3 upper = make_uint3(parent_node.x >> 16, parent_node.y >> 16, parent_node.z >> 16);
+    
+    // Scan remaining children
+    for (unsigned int i=1; i < nchild; i++) {
+      uint4 child_node = child_nodes[first_child + i];
+      
+      uint3 child_lower = make_uint3(child_node.x & 0xFFFF, child_node.y & 0xFFFF, child_node.z & 0xFFFF);
+      uint3 child_upper = make_uint3(child_node.x >> 16, child_node.y >> 16, child_node.z >> 16);
+
+      lower = min(lower, child_lower);
+      upper = max(upper, child_upper);
+    }
+
+    parent_node.w = (nchild << CHILD_BITS)
+      | first_child;
+    parent_node.x = upper.x << 16 | lower.x;
+    parent_node.y = upper.y << 16 | lower.y;
+    parent_node.z = upper.z << 16 | lower.z;
+
+    parent_nodes[parent_id] = parent_node;
+  }
+
+
+  __global__ void
   make_parents(unsigned int first_node,
 	       unsigned int elements_this_launch, 
 	       unsigned int n_children_per_node,

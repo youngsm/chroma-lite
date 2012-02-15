@@ -4,7 +4,7 @@ import time
 
 from chroma.log import logger
 from chroma.cache import Cache
-from chroma.bvh import make_simple_bvh
+from chroma.bvh import make_simple_bvh, make_recursive_grid_bvh
 from chroma.geometry import Geometry, Solid, Mesh, vacuum
 from chroma.detector import Detector
 from chroma.stl import mesh_from_stl
@@ -148,7 +148,7 @@ def load_bvh(geometry,  bvh_name="default",
         start = time.time()
 
         context = create_cuda_context(cuda_device)
-        bvh = make_simple_bvh(geometry.mesh, degree=2)
+        bvh = make_recursive_grid_bvh(geometry.mesh, target_degree=2)
         context.pop()
 
         logger.info('BVH generated in %1.1f seconds.' % (time.time() - start))
