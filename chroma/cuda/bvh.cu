@@ -288,6 +288,9 @@ extern "C"
     // Scan remaining children
     unsigned int real_children = 1;
     for (unsigned int i=1; i < n_children_per_node; i++) {
+      if (first_child + i >= num_children)
+	break;
+
       uint4 child_node = child_nodes[first_child + i];
       
       if (child_node.x == 0)
@@ -330,7 +333,7 @@ extern "C"
     unsigned int child_id = src_node.w &  ~NCHILD_MASK;
     src_node.w = (nchild << CHILD_BITS) | (child_id + child_id_offset);
 
-    dest_nodes[node_id] = src_node;    
+    dest_nodes[node_id] = src_node;
   }
 
   __global__ void distance_to_prev(unsigned int first_node, unsigned int threads_this_round,

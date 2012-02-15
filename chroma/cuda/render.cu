@@ -84,7 +84,7 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
 
     while (curr >= 0) {
 	unsigned int first_child = child_ptr_stack[curr];
-	unsigned int nchild = child_ptr_stack[curr];
+	unsigned int nchild = nchild_ptr_stack[curr];
 	curr--;
 
 	for (unsigned int i=first_child; i < first_child + nchild; i++) {
