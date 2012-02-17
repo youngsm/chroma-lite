@@ -22,7 +22,7 @@ __device__ uint4 read_skip_l1(uint4 *ptr)
 __device__ Node
 get_node(Geometry *geometry, const unsigned int &i)
 {
-    uint4 node = read_skip_l1(geometry->nodes + i);
+    uint4 node = geometry->nodes[i];
     Node node_struct;
 
     if (node.x == 0) {

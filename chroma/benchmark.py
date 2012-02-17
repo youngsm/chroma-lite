@@ -14,6 +14,7 @@ from chroma import generator
 from chroma import tools
 from chroma.transform import normalize
 from chroma.demo.optics import water
+from chroma.loader import create_geometry_from_obj
 
 # Generator processes need to fork BEFORE the GPU context is setup
 g4generator = generator.photon.G4ParallelGenerator(4, water)
@@ -29,7 +30,9 @@ def intersect(gpu_geometry, number=100, nphotons=500000, nthreads_per_block=64,
     run_times = []
     for i in tools.progress(range(number)):
         pos = ga.zeros(nphotons, dtype=ga.vec.float3)
-        dir = ga.to_gpu(gpu.to_float3(sample.uniform_sphere(nphotons)))
+        dir = sample.uniform_sphere(nphotons)
+        reorder = tools.argsort_direction(dir)
+        dir = ga.to_gpu(gpu.to_float3(dir[reorder]))
 
         t0 = time.time()
         gpu_funcs.distance_to_mesh(np.int32(pos.size), pos, dir, gpu_geometry.gpudata, distances_gpu, block=(nthreads_per_block,1,1), grid=(pos.size//nthreads_per_block+1,1))
@@ -73,6 +76,8 @@ def propagate(gpu_detector, number=10, nphotons=500000, nthreads_per_block=64,
     for i in tools.progress(range(number)):
         pos = np.zeros((nphotons,3))
         dir = sample.uniform_sphere(nphotons)
+        reorder = tools.argsort_direction(dir)
+        dir = dir[reorder]
         pol = normalize(np.cross(sample.uniform_sphere(nphotons), dir))
         wavelengths = np.random.uniform(400,800,size=nphotons)
         photons = event.Photons(pos, dir, pol, wavelengths)
@@ -132,8 +137,10 @@ def pdf(gpu_detector, npdfs=10, nevents=100, nreps=16, ndaq=1,
                                   nthreads_per_block, max_blocks)
             for gpu_photon_slice in gpu_photons.iterate_copies():
                 for idaq in xrange(ndaq):
-                    gpu_channels = gpu_daq.acquire(gpu_photon_slice, rng_states,
-                                                   nthreads_per_block, max_blocks)
+                    gpu_daq.begin_acquire()
+                    gpu_daq.acquire(gpu_photon_slice, rng_states,
+                                    nthreads_per_block, max_blocks)
+                    gpu_channels = gpu_daq.end_acquire()
                     gpu_pdf.add_hits_to_pdf(gpu_channels, nthreads_per_block)
 
         hitcount, pdf = gpu_pdf.get_pdfs()
@@ -177,7 +184,9 @@ def pdf_eval(gpu_detector, npdfs=10, nevents=25, nreps=16, ndaq=128,
     gpu_photons.propagate(gpu_detector, rng_states,
                           nthreads_per_block, max_blocks)
     gpu_daq = gpu.GPUDaq(gpu_detector)
-    data_ev_channels = gpu_daq.acquire(gpu_photons, rng_states, nthreads_per_block, max_blocks).get()
+    gpu_daq.begin_acquire()
+    gpu_daq.acquire(gpu_photons, rng_states, nthreads_per_block, max_blocks).get()
+    data_ev_channels = gpu_daq.end_acquire()
     
     # Setup PDF evaluation
     gpu_daq = gpu.GPUDaq(gpu_detector, ndaq=ndaq)
@@ -207,9 +216,11 @@ def pdf_eval(gpu_detector, npdfs=10, nevents=25, nreps=16, ndaq=128,
             gpu_photons.propagate(gpu_detector, rng_states,
                                   nthreads_per_block, max_blocks)
             for gpu_photon_slice in gpu_photons.iterate_copies():
+                gpu_daq.begin_acquire()
                 gpu_photon_slice = gpu_photon_slice.select(event.SURFACE_DETECT)
-                gpu_channels = gpu_daq.acquire(gpu_photon_slice, rng_states,
-                                               nthreads_per_block, max_blocks)
+                gpu_daq.acquire(gpu_photon_slice, rng_states,
+                                nthreads_per_block, max_blocks)
+                gpu_channels = gpu_daq.end_acquire()
                 gpu_pdf.accumulate_pdf_eval(gpu_channels, nthreads_per_block)
 
         cuda.Context.get_current().synchronize()        
@@ -233,8 +244,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         tests = sys.argv[1:] # unless test names given on command line
 
-    detector = demo.detector()
-    detector.build(bits=11)
+    detector = create_geometry_from_obj(demo.detector())
 
     context = gpu.create_cuda_context()
     gpu_detector = gpu.GPUDetector(detector)

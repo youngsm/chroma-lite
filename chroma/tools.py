@@ -153,3 +153,40 @@ def memoize_method_with_dictionary_arg(func):
             return result
     return lookup
 
+def interleave3d(arr, bits):
+    """
+    Interleave the bits of quantized three-dimensional points in space.
+
+    Example
+        >>> interleave(np.identity(3, dtype=np.int))
+        array([4, 2, 1], dtype=uint64)
+    """
+    if len(arr.shape) != 2 or arr.shape[1] != 3:
+        raise Exception('shape mismatch')
+
+    z = np.zeros(arr.shape[0], dtype=np.uint64)
+    for i in range(bits):
+        z |= (arr[:,2] & 1 << i) << (2*i) | \
+             (arr[:,1] & 1 << i) << (2*i+1) | \
+             (arr[:,0] & 1 << i) << (2*i+2)
+    return z
+
+def argsort_direction(dir):
+    '''Return the indicies required to resort the ndarray(shape=(n,3))
+    array of direction vectors based on a morton ordering of the
+    spherical coordinates.
+
+    This is used to organize photons in such a way that they enhance
+    the cache benefits of the GPU.
+    '''
+
+    bits = 16
+    MAXINT = 2**bits - 1
+    theta = (np.arccos(dir[:,2]) / np.pi * MAXINT).astype(np.uint32)
+    phi = ((np.arctan2(dir[:,1], dir[:,0]) / np.pi / 2.0 + 0.5) * MAXINT).astype(np.uint32)
+    
+    morton = np.zeros(len(dir), dtype=np.uint32)
+    for i in xrange(bits):
+        morton |= (theta & 1 << i) << (i) | \
+                  (phi & 1 << i) << (i+1)
+    return np.argsort(morton)

@@ -3,6 +3,7 @@ from chroma.generator.mute import *
 import pyublas
 import numpy as np
 from chroma.event import Photons, Vertex
+from chroma.tools import argsort_direction
 
 g4mute()
 from Geant4 import *
@@ -75,7 +76,7 @@ class G4Generator(object):
         g4material.SetMaterialPropertiesTable(prop_table)
         return g4material
 
-    def _extract_photons_from_tracking_action(self):
+    def _extract_photons_from_tracking_action(self, sort=True):
         n = self.tracking_action.GetNumPhotons()        
         pos = np.zeros(shape=(n,3), dtype=np.float32)
         pos[:,0] = self.tracking_action.GetX()
@@ -95,6 +96,14 @@ class G4Generator(object):
         wavelengths = self.tracking_action.GetWavelength().astype(np.float32)
 
         t0 = self.tracking_action.GetT0().astype(np.float32)
+
+        if sort:
+            reorder = argsort_direction(dir)
+            pos = pos[reorder]
+            dir = dir[reorder]
+            pol = pol[reorder]
+            wavelengths = wavelengths[reorder]
+            t0 = t0[reorder]
 
         return Photons(pos, dir, pol, wavelengths, t0)
 
