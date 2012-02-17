@@ -81,13 +81,17 @@ class G4ParallelGenerator(object):
         self.photon_socket = self.zmq_context.socket(zmq.PULL)
         self.photon_socket.bind(self.photon_address)
 
-        # Verify everyone is running and connected to avoid
-        # sending all the events to one client.
-        for i in xrange(nprocesses):
-            msg = self.photon_socket.recv()
-            assert msg == 'READY'
-
+        self.processes_initialized = False
+        
     def generate_events(self, vertex_iterator):
+        if not self.processes_initialized:
+            # Verify everyone is running and connected to avoid
+            # sending all the events to one client.
+            for i in xrange(len(self.processes)):
+                msg = self.photon_socket.recv()
+                assert msg == 'READY'
+            self.processes_initialized = True
+
         # Doing this to avoid a deadlock caused by putting to one queue
         # while getting from another.
         vertex_list = list(vertex_iterator)
