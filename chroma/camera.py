@@ -17,32 +17,11 @@ from chroma.geometry import Mesh, Solid, Geometry, vacuum
 from chroma.transform import rotate, make_rotation_matrix
 from chroma.sample import uniform_sphere
 from chroma.project import from_film
-from chroma.io.root import RootReader
 from chroma import make
 from chroma import gpu
-
+from chroma.loader import create_geometry_from_obj
 import pygame
 from pygame.locals import *
-
-def build(obj):
-    """Construct and build a geometry from `obj`."""
-    if callable(obj):
-        obj = obj()
-
-    if isinstance(obj, Geometry):
-        geometry = obj
-    elif isinstance(obj, Solid):
-        geometry = Geometry()
-        geometry.add_solid(obj)
-    elif isinstance(obj, Mesh):
-        geometry = Geometry()
-        geometry.add_solid(Solid(obj, vacuum, vacuum, color=0x33ffffff))
-    else:
-        raise TypeError('cannot build type %s' % type(obj))
-
-    geometry.build()
-
-    return geometry
 
 def bvh_mesh(geometry, layer):
     lower_bounds = geometry.lower_bounds[geometry.layers == layer]
@@ -85,7 +64,7 @@ class Camera(multiprocessing.Process):
         self.device_id = device_id
         self.size = size
 
-        self.unique_bvh_layers = np.unique(self.geometry.layers)
+        self.bvh_layer_count = len(self.geometry.bvh.layer_offsets)
         self.currentlayer = None
         self.bvh_layers = {}
 
@@ -438,7 +417,7 @@ class Camera(multiprocessing.Process):
             try:
                 gpu_geometry = self.bvh_layers[layer]
             except KeyError:
-                geometry = build(bvh_mesh(self.geometry, layer))
+                geometry = create_geometry_from_obj(bvh_mesh(self.geometry, layer))
                 gpu_geometry = gpu.GPUGeometry(geometry, print_usage=False)
                 self.bvh_layers[layer] = gpu_geometry
 
@@ -529,9 +508,9 @@ class Camera(multiprocessing.Process):
 
             elif event.key == K_PAGEDOWN:
                 if self.currentlayer is None:
-                    self.currentlayer = self.unique_bvh_layers[-1]
+                    self.currentlayer = self.bvh_layer_count - 1
                 else:
-                    if self.currentlayer > np.min(self.unique_bvh_layers):
+                    if self.currentlayer > 0:
                         self.currentlayer -= 1
                     else:
                         self.currentlayer = None
@@ -540,9 +519,9 @@ class Camera(multiprocessing.Process):
 
             elif event.key == K_PAGEUP:
                 if self.currentlayer is None:
-                    self.currentlayer = self.unique_bvh_layers[0]
+                    self.currentlayer = 0
                 else:
-                    if self.currentlayer < np.max(self.unique_bvh_layers):
+                    if self.currentlayer < self.bvh_layer_count:
                         self.currentlayer += 1
                     else:
                         self.currentlayer = None
@@ -686,6 +665,9 @@ class EventViewer(Camera):
 
     def __init__(self, geometry, filename, **kwargs):
         Camera.__init__(self, geometry, **kwargs)
+        # This is really slow, so we do it here in the constructor to 
+        # avoid slowing down the import of this module
+        from chroma.io.root import RootReader
         self.rr = RootReader(filename)
         self.display_mode = EventViewer.CHARGE
         self.sum_mode = False
@@ -701,7 +683,7 @@ class EventViewer(Camera):
         for pos in self.ev.photons_beg.pos[::100]:
             geometry.add_solid(marker, displacement=pos, rotation=make_rotation_matrix(np.random.uniform(0,2*np.pi), uniform_sphere()))
 
-        geometry.build(bits=11)
+        geometry = create_geometry_from_obj(geometry)
         gpu_geometry = gpu.GPUGeometry(geometry)
 
         self.gpu_geometries = [self.gpu_geometry, gpu_geometry]
@@ -817,6 +799,6 @@ class EventViewer(Camera):
         Camera.process_event(self, event)
 
 def view(obj, size=(800,600), **camera_kwargs):
-    geometry = build(obj)
+    geometry = create_geometry_from_obj(obj)
     camera = Camera(geometry, size, **camera_kwargs)
     camera.start()

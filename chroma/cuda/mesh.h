@@ -6,23 +6,19 @@
 
 #include "stdio.h"
 
-#define STACK_SIZE 100
+#define STACK_SIZE 1000
 
 /* Tests the intersection between a ray and a node in the bounding volume
    hierarchy. If the ray intersects the bounding volume and `min_distance`
    is less than zero or the distance from `origin` to the intersection is
    less than `min_distance`, return true, else return false. */
 __device__ bool
-intersect_node(const float3 &origin, const float3 &direction,
-	       Geometry *g, int i, float min_distance=-1.0f)
+intersect_node(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
+	       Geometry *g, const Node &node, const float min_distance=-1.0f)
 {
-    /* assigning these to local variables is faster for some reason */
-    float3 lower_bound = g->lower_bounds[i];
-    float3 upper_bound = g->upper_bounds[i];
-
     float distance_to_box;
 
-    if (intersect_box(origin, direction, lower_bound, upper_bound,
+    if (intersect_box(neg_origin_inv_dir, inv_dir, node.lower, node.upper,
 		      distance_to_box)) {
 	if (min_distance < 0.0f)
 	    return true;
@@ -35,7 +31,6 @@ intersect_node(const float3 &origin, const float3 &direction,
     else {
 	return false;
     }
-
 }
 
 /* Finds the intersection between a ray and `geometry`. If the ray does
@@ -52,73 +47,76 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
     float distance;
     min_distance = -1.0f;
 
-    if (!intersect_node(origin, direction, g, g->start_node, min_distance))
+    Node root = get_node(g, 0);
+
+    float3 neg_origin_inv_dir = -origin / direction;
+    float3 inv_dir = 1.0f / direction;
+
+    if (!intersect_node(neg_origin_inv_dir, inv_dir, g, root, min_distance))
 	return -1;
 
-    unsigned int stack[STACK_SIZE];
+    unsigned int child_ptr_stack[STACK_SIZE];
+    unsigned int nchild_ptr_stack[STACK_SIZE];
+    child_ptr_stack[0] = root.child;
+    nchild_ptr_stack[0] = root.nchild;
 
-    unsigned int *head = &stack[0];
-    unsigned int *node = &stack[1];
-    unsigned int *tail = &stack[STACK_SIZE-1];
-    *node = g->start_node;
+    int curr = 0;
 
-    unsigned int i;
+    unsigned int count = 0;
+    unsigned int tri_count = 0;
 
-    do
-    {
-	unsigned int first_child = g->node_map[*node];
-	unsigned int stop = g->node_map_end[*node];
+    while (curr >= 0) {
+	unsigned int first_child = child_ptr_stack[curr];
+	unsigned int nchild = nchild_ptr_stack[curr];
+	curr--;
 
-	while (*node >= g->first_node && stop == first_child+1) {
-	    *node = first_child;
-	    first_child = g->node_map[*node];
-	    stop = g->node_map_end[*node];
-	}
-		
-	if (*node >= g->first_node) {
-	    for (i=first_child; i < stop; i++) {
-		if (intersect_node(origin, direction, g, i, min_distance)) {
-		    *node = i;
-		    node++;
-		}
-	    }
+	for (unsigned int i=first_child; i < first_child + nchild; i++) {
+	    Node node = get_node(g, i);
+	    count++;
+
+	    if (node.kind == PADDING_NODE)
+	      break; // this node and rest of children are padding
+
+	    if (intersect_node(neg_origin_inv_dir, inv_dir, g, node, min_distance)) {
+
+		if (node.kind == LEAF_NODE) {
+		    // This node wraps a triangle
+
+		    if (node.child != last_hit_triangle) {
+			// Can't hit same triangle twice in a row
+			tri_count++;
+			Triangle t = get_triangle(g, node.child);			
+			if (intersect_triangle(origin, direction, t, distance)) {
+
+			    if (triangle_index == -1 || distance < min_distance) {
+				triangle_index = node.child;
+				min_distance = distance;
+			    } // if hit triangle is closer than previous hits
+
+			} // if hit triangle
+			
+		    } // if not hitting same triangle as last step
+
+		} else {
+		    curr++;
+		    child_ptr_stack[curr] = node.child;
+		    nchild_ptr_stack[curr] = node.nchild;
+		} // leaf or internal node?
+	    } // hit node?
 	    
-	    node--;
-	}
-	else {
-	    // node is a leaf
-	    for (i=first_child; i < stop; i++) {
-		if (last_hit_triangle == i)
-		    continue;
+	    if (curr >= STACK_SIZE) {
+	    	printf("warning: intersect_mesh() aborted; node > tail\n");
+	    	break;
+	    }
+	} // loop over children, starting with first_child
 
-		Triangle t = get_triangle(g, i);
+    } // while nodes on stack
 
-		if (intersect_triangle(origin, direction, t, distance)) {
-		    if (triangle_index == -1) {
-			triangle_index = i;
-			min_distance = distance;
-			continue;
-		    }
+    //if (blockIdx.x == 0 && threadIdx.x == 0) {
+    //  printf("node count: %d\n", count);
+    //  printf("triangle count: %d\n", tri_count);
+    //}
 
-		    if (distance < min_distance) {
-			triangle_index = i;
-			min_distance = distance;
-		    }
-		}
-	    } // triangle loop
-
-	    node--;
-
-	} // node is a leaf
-
-	if (node > tail) {
-	    printf("warning: intersect_mesh() aborted; node > tail\n");
-	    break;
-	}
-
-    } // while loop
-    while (node != head);
-    
     return triangle_index;
 }
 

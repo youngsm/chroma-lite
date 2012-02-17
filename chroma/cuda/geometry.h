@@ -1,47 +1,47 @@
 #ifndef __GEOMETRY_H__
 #define __GEOMETRY_H__
 
-struct Material
-{
-    float *refractive_index;
-    float *absorption_length;
-    float *scattering_length;
-    unsigned int n;
-    float step;
-    float wavelength0;
-};
+#include "geometry_types.h"
+#include "linalg.h"
 
-struct Surface
+__device__ float3 
+to_float3(const uint3 &a)
 {
-    float *detect;
-    float *absorb;
-    float *reflect_diffuse;
-    float *reflect_specular;
-    unsigned int n;
-    float step;
-    float wavelength0;
-};
+  return make_float3(a.x, a.y, a.z);
+}
 
-struct Triangle
+__device__ uint4 read_skip_l1(uint4 *ptr)
 {
-    float3 v0, v1, v2;
-};
+  uint4 val;
+  asm(" ld.cg.v4.u32 {%0, %1, %2, %3}, [%4];"
+      : "=r"(val.x), "=r"(val.y), "=r"(val.z), "=r"(val.w) 
+      : "l"(ptr) : "memory");
+  return val;
+}
 
-struct Geometry
+__device__ Node
+get_node(Geometry *geometry, const unsigned int &i)
 {
-    float3 *vertices;
-    uint3 *triangles;
-    unsigned int *material_codes;
-    unsigned int *colors;
-    float3 *lower_bounds;
-    float3 *upper_bounds;
-    unsigned int *node_map;
-    unsigned int *node_map_end;
-    Material **materials;
-    Surface **surfaces;
-    unsigned int start_node;
-    unsigned int first_node;
-};
+    uint4 node = read_skip_l1(geometry->nodes + i);
+    Node node_struct;
+
+    if (node.x == 0) {
+      node_struct.kind = PADDING_NODE;
+      return node_struct;
+    }
+
+    uint3 lower_int = make_uint3(node.x & 0xFFFF, node.y & 0xFFFF, node.z & 0xFFFF);
+    uint3 upper_int = make_uint3(node.x >> 16, node.y >> 16, node.z >> 16);
+
+
+    node_struct.lower = geometry->world_origin + to_float3(lower_int) * geometry->world_scale;
+    node_struct.upper = geometry->world_origin + to_float3(upper_int) * geometry->world_scale;
+    node_struct.child = node.w & ~NCHILD_MASK;
+    node_struct.nchild = node.w >> CHILD_BITS;
+    node_struct.kind = node_struct.nchild == 0 ? LEAF_NODE : INTERNAL_NODE;
+    
+    return node_struct;
+}
 
 __device__ Triangle
 get_triangle(Geometry *geometry, const unsigned int &i)

@@ -59,82 +59,90 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
 
     float distance;
 
-    if (n < 1 && !intersect_node(origin, direction, g, g->start_node)) {
+    Node root = get_node(g, 0);
+
+    float3 neg_origin_inv_dir = -origin / direction;
+    float3 inv_dir = 1.0f / direction;
+
+    if (n < 1 && !intersect_node(neg_origin_inv_dir, inv_dir, g, root)) {
 	pixels[id] = 0;
 	return;
     }
 
-    unsigned int stack[STACK_SIZE];
+    unsigned int child_ptr_stack[STACK_SIZE];
+    unsigned int nchild_ptr_stack[STACK_SIZE];
+    child_ptr_stack[0] = root.child;
+    nchild_ptr_stack[0] = root.nchild;
 
-    unsigned int *head = &stack[0];
-    unsigned int *node = &stack[1];
-    unsigned int *tail = &stack[STACK_SIZE-1];
-    *node = g->start_node;
+    int curr = 0;
+
+    unsigned int count = 0;
+    unsigned int tri_count = 0;
 
     float *dx = _dx + id*alpha_depth;
     float4 *color_a = _color + id*alpha_depth;
 
-    unsigned int i;
+    while (curr >= 0) {
+	unsigned int first_child = child_ptr_stack[curr];
+	unsigned int nchild = nchild_ptr_stack[curr];
+	curr--;
 
-    do {
-	unsigned int first_child = g->node_map[*node];
-	unsigned int stop = g->node_map_end[*node];
-	
-	while (*node >= g->first_node && stop == first_child+1) {
-	    *node = first_child;
-	    first_child = g->node_map[*node];
-	    stop = g->node_map_end[*node];
-	}
-		
-	if (*node >= g->first_node) {
-	    for (i=first_child; i < stop; i++) {
-		if (intersect_node(origin, direction, g, i)) {
-		    *node = i;
-		    node++;
-		}
-	    }
+	for (unsigned int i=first_child; i < first_child + nchild; i++) {
+	    Node node = get_node(g, i);
+	    count++;
 
-	    node--;
-	}
-	else {
-	    // node is a leaf
-	    for (i=first_child; i < stop; i++) {
-		Triangle t = get_triangle(g, i);
-		
+	    if (node.kind == PADDING_NODE)
+	      break; // this node and rest of children are padding
+
+	    if (intersect_node(neg_origin_inv_dir, inv_dir, g, node)) {
+
+	      if (node.kind == LEAF_NODE) {
+
+		// This node wraps a triangle
+		tri_count++;
+		Triangle t = get_triangle(g, node.child);
 		if (intersect_triangle(origin, direction, t, distance)) {
-		    if (n < 1) {
-			dx[0] = distance;
-			    
-			unsigned int rgba = g->colors[i];
-			float4 color = get_color(direction, t, rgba);
-
-			color_a[0] = color;
+		  if (n < 1) {
+		    dx[0] = distance;
+		    
+		    unsigned int rgba = g->colors[node.child];
+		    float4 color = get_color(direction, t, rgba);
+		    
+		    color_a[0] = color;
+		  }
+		  else {
+		    unsigned long j = searchsorted(n, dx, distance);
+		    
+		    if (j <= alpha_depth-1) {
+		      insert(alpha_depth, dx, j, distance);
+		      
+		      unsigned int rgba = g->colors[node.child];
+		      float4 color = get_color(direction, t, rgba);
+		      
+		      insert(alpha_depth, color_a, j, color);
 		    }
-		    else {
-			unsigned long j = searchsorted(n, dx, distance);
-
-			if (j <= alpha_depth-1) {
-			    insert(alpha_depth, dx, j, distance);
-
-			    unsigned int rgba = g->colors[i];
-			    float4 color = get_color(direction, t, rgba);
-
-			    insert(alpha_depth, color_a, j, color);
-			}
-		    }
-					
-		    if (n < alpha_depth)
-			n++;
-		}
-				
-	    } // triangle loop
+		  }
+		  
+		  if (n < alpha_depth)
+		    n++;
+		  
+		} // if hit triangle
+		
+	      } else {
+		curr++;
+		child_ptr_stack[curr] = node.child;
+		nchild_ptr_stack[curr] = node.nchild;
+	      } // leaf or internal node?
+	    } // hit node?
 	    
-	    node--;
-	    
-	} // node is a leaf
+	    //if (curr >= STACK_SIZE) {
+	    //	printf("warning: intersect_mesh() aborted; node > tail\n");
+	    //	break;
+	    //}
+	} // loop over children, starting with first_child
 	
-    } // while loop
-    while (node != head);
+    } // while nodes on stack
+    
 
     if (n < 1) {
 	pixels[id] = 0;
@@ -147,9 +155,9 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
     float fr = 0.0f;
     float fg = 0.0f;
     float fb = 0.0f;
-    for (i=0; i < n; i++) {
+    for (int i=0; i < n; i++) {
 	float alpha = color_a[i].w;
-
+	
 	fr += scale*color_a[i].x*alpha;
 	fg += scale*color_a[i].y*alpha;
 	fb += scale*color_a[i].z*alpha;
@@ -161,6 +169,7 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
 	a = floorf(255*(1.0f-scale));
     else
     	a = 255;
+
     unsigned int red = floorf(fr/(1.0f-scale));
     unsigned int green = floorf(fg/(1.0f-scale));
     unsigned int blue = floorf(fb/(1.0f-scale));

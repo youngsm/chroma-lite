@@ -11,12 +11,16 @@ def main():
     import inspect
     import numpy as np
     import itertools
+    import time
 
     from chroma import event
     from chroma import itertoolset
     from chroma import Simulation
-    from chroma import root
+    from chroma.io import root
     from chroma.rootimport import ROOT
+    from chroma.tools import enable_debug_on_crash
+    import chroma.loader
+
     ROOT.gROOT.SetBatch()
 
     from chroma.generator.vertex import constant_particle_gun
@@ -75,17 +79,7 @@ def main():
     if options.debug:
         enable_debug_on_crash()
 
-    module_name, function_name = args[0].rsplit('.', 1)
-
-    try:
-        module = __import__(module_name, fromlist=[function_name])
-    except ImportError:
-        raise
-
-    detector = getattr(module, function_name)
-
-    if inspect.isfunction(detector):
-        detector = detector()
+    detector = chroma.loader.load_geometry_from_string(args[0])
 
     pos = np.array([float(s) for s in options.pos.split(',')], dtype=float)
     dir = np.array([float(s) for s in options.dir.split(',')], dtype=float)
@@ -100,6 +94,7 @@ def main():
 
     writer = root.RootWriter(options.output_filename)
 
+    start = time.time()
     for i, ev in \
             enumerate(sim.simulate(itertools.islice(ev_gen, 
                                                     options.nevents),
@@ -114,6 +109,7 @@ def main():
     print
 
     writer.close()
+    print 'Events per second: %1.1f' % (options.nevents / (time.time() - start))
 
 if __name__ == '__main__':
     main()

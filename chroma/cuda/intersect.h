@@ -61,79 +61,42 @@ intersect_triangle(const float3 &origin, const float3 &direction,
    `distance_to_box` to the distance from `origin` to the intersection and
    return true, else return false. `direction` must be normalized to one.
 
-   Source: "An Efficient and Robust Ray-Box Intersection Algorithm."
-   by Williams, et. al. */
+    Source: Optimizing ray tracing for CUDA by Hannu Saransaari
+    https://wiki.aalto.fi/download/attachments/40023967/gpgpu.pdf
+*/
 __device__ bool
-intersect_box(const float3 &origin, const float3 &direction,
+intersect_box(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
 	      const float3 &lower_bound, const float3 &upper_bound,
 	      float& distance_to_box)
 {
-	float kmin, kmax, kymin, kymax, kzmin, kzmax;
+	float tmin = 0.0f, tmax = 1e30f;
+	float t0, t1;
 
-	float divx = 1.0f/direction.x;
-	if (divx >= 0.0f)
-	{
-		kmin = (lower_bound.x - origin.x)*divx;
-		kmax = (upper_bound.x - origin.x)*divx;
-	}
-	else
-	{
-		kmin = (upper_bound.x - origin.x)*divx;
-		kmax = (lower_bound.x - origin.x)*divx;
-	}
+	// X
+	t0 = lower_bound.x * inv_dir.x + neg_origin_inv_dir.x;
+	t1 = upper_bound.x * inv_dir.x + neg_origin_inv_dir.x;
+	
+	tmin = max(tmin, min(t0, t1));
+	tmax = min(tmax, max(t0, t1));
+	
+	// Y
+	t0 = lower_bound.y * inv_dir.y + neg_origin_inv_dir.y;
+	t1 = upper_bound.y * inv_dir.y + neg_origin_inv_dir.y;
+	
+	tmin = max(tmin, min(t0, t1));
+	tmax = min(tmax, max(t0, t1));
 
-	if (kmax < 0.0f)
+	// Z
+	t0 = lower_bound.z * inv_dir.z + neg_origin_inv_dir.z;
+	t1 = upper_bound.z * inv_dir.z + neg_origin_inv_dir.z;
+	
+	tmin = max(tmin, min(t0, t1));
+	tmax = min(tmax, max(t0, t1));
+
+	if (tmin > tmax)
 		return false;
 
-	float divy = 1.0f/direction.y;
-	if (divy >= 0.0f)
-	{
-		kymin = (lower_bound.y - origin.y)*divy;
-		kymax = (upper_bound.y - origin.y)*divy;
-	}
-	else
-	{
-		kymin = (upper_bound.y - origin.y)*divy;
-		kymax = (lower_bound.y - origin.y)*divy;
-	}
-
-	if (kymax < 0.0f)
-		return false;
-
-	if (kymin > kmin)
-		kmin = kymin;
-
-	if (kymax < kmax)
-		kmax = kymax;
-
-	if (kmin > kmax)
-		return false;
-
-	float divz = 1.0f/direction.z;
-	if (divz >= 0.0f)
-	{
-		kzmin = (lower_bound.z - origin.z)*divz;
-		kzmax = (upper_bound.z - origin.z)*divz;
-	}
-	else
-	{
-		kzmin = (upper_bound.z - origin.z)*divz;
-		kzmax = (lower_bound.z - origin.z)*divz;
-	}
-
-	if (kzmax < 0.0f)
-		return false;
-
-	if (kzmin > kmin)
-		kmin = kzmin;
-
-	if (kzmax < kmax)
-		kmax = kzmax;
-
-	if (kmin > kmax)
-		return false;
-
-	distance_to_box = kmin;
+	distance_to_box = tmin;
 
 	return true;
 }
