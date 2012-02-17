@@ -179,6 +179,9 @@ extern "C"
 
     // Quantize bounding corners and centroid
     uint3 q_lower = quantize3(lower, world_origin, world_scale);
+    if (q_lower.x > 0) q_lower.x--;
+    if (q_lower.y > 0) q_lower.y--;
+    if (q_lower.z > 0) q_lower.z--;
     uint3 q_upper = quantize3(upper, world_origin, world_scale) + 1;
     uint3 q_centroid = quantize3(centroid, world_origin, world_scale);
 
