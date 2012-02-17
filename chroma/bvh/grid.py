@@ -26,7 +26,7 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
     argsort = morton_codes.argsort()
     leaf_nodes = leaf_nodes[argsort]
     morton_codes = morton_codes[argsort]
-    morton_codes >>= 12
+
     # Create parent layers
     layers = [leaf_nodes]
     while len(layers[0]) > 1:        
@@ -36,19 +36,17 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
         # degree
         nnodes = len(top_layer)
         
-        #nunique = count_unique_in_sorted(morton_codes)
-        #while nnodes / float(nunique) < target_degree and nunique > 1:
-        #    morton_codes >>= 1
-        #    nunique = count_unique_in_sorted(morton_codes)
-        morton_codes >>= 3
         nunique = count_unique_in_sorted(morton_codes)
+        while nnodes / float(nunique) < target_degree and nunique > 1:
+            morton_codes >>= 1
+            nunique = count_unique_in_sorted(morton_codes)
 
         # Determine the grouping of child nodes into parents
-        parent_morton_codes, first_child = np.unique(morton_codes, return_index=True)
-        #assert (np.sort(parent_morton_codes) == parent_morton_codes).all()
-        first_child = first_child.astype(np.int32)
-        nchild = np.ediff1d(first_child, to_end=nnodes - first_child[-1])
-
+        morton_delta = np.ediff1d(morton_codes, to_begin=1).astype(np.uint64)
+        parent_morton_codes = morton_codes[morton_delta > 0]
+        first_child = np.argwhere(morton_delta > 0).flatten().astype(np.uint32)
+        nchild = np.ediff1d(first_child, to_end=nnodes - first_child[-1]).astype(np.uint32)
+        
         # Expand groups that have too many children
         excess_children = np.argwhere(nchild > MAX_CHILD)
         if len(excess_children) > 0:
@@ -65,15 +63,15 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
                                                             nchild_parts[1:]):
                 extra_first = np.arange(first_part[0], 
                                         first_part[0]+nchild_part[0], 
-                                        MAX_CHILD)
+                                        MAX_CHILD).astype(first_part.dtype)
                 new_first_child_parts.extend([extra_first, first_part[1:]])
-                new_parent_morton_parts.extend([np.repeat(parent_morton_codes[0], 
+                new_parent_morton_parts.extend([np.repeat(morton_part[0], 
                                                           len(extra_first)), morton_part[1:]])
 
             parent_morton_codes = np.concatenate(new_parent_morton_parts)
             first_child = np.concatenate(new_first_child_parts)
-            nchild = np.ediff1d(first_child, to_end=nnodes - first_child[-1])
-
+            nchild = np.ediff1d(first_child, to_end=nnodes - first_child[-1]).astype(np.uint32)
+              
         if nunique > 1: # Yes, I'm pedantic
             plural = 's'
         else:
@@ -81,10 +79,8 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
         print 'Merging %d nodes to %d parent%s' % (nnodes, nunique, plural)
 
         assert (nchild > 0).all()
-        assert (nchild < 31).all()
+        assert (nchild <= MAX_CHILD).all()
         
-        #print 'Max|Avg children: %d|%d' % (nchild.max(), nchild.mean())
-
         # Merge children
         parents = merge_nodes_detailed(top_layer, first_child, nchild)
         layers = [parents] + layers
