@@ -74,12 +74,9 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 	    Node node = get_node(g, i);
 	    count++;
 
-	    if (node.kind == PADDING_NODE)
-	      break; // this node and rest of children are padding
-
 	    if (intersect_node(neg_origin_inv_dir, inv_dir, g, node, min_distance)) {
 
-		if (node.kind == LEAF_NODE) {
+		if (node.nchild == 0) { /* leaf node */
 		    // This node wraps a triangle
 
 		    if (node.child != last_hit_triangle) {

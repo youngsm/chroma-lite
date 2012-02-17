@@ -25,11 +25,6 @@ get_node(Geometry *geometry, const unsigned int &i)
     uint4 node = geometry->nodes[i];
     Node node_struct;
 
-    if (node.x == 0) {
-      node_struct.kind = PADDING_NODE;
-      return node_struct;
-    }
-
     uint3 lower_int = make_uint3(node.x & 0xFFFF, node.y & 0xFFFF, node.z & 0xFFFF);
     uint3 upper_int = make_uint3(node.x >> 16, node.y >> 16, node.z >> 16);
 
@@ -38,7 +33,6 @@ get_node(Geometry *geometry, const unsigned int &i)
     node_struct.upper = geometry->world_origin + to_float3(upper_int) * geometry->world_scale;
     node_struct.child = node.w & ~NCHILD_MASK;
     node_struct.nchild = node.w >> CHILD_BITS;
-    node_struct.kind = node_struct.nchild == 0 ? LEAF_NODE : INTERNAL_NODE;
     
     return node_struct;
 }

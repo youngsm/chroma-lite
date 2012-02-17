@@ -37,7 +37,6 @@ struct Node
     float3 upper;
     unsigned int child;
     unsigned int nchild;
-    unsigned int kind;
 };
 
 struct Geometry
