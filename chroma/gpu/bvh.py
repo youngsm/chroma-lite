@@ -111,6 +111,25 @@ def merge_nodes_detailed(nodes, first_child, nchild):
 
     return gpu_parent_nodes.get()
 
+def collapse_chains(nodes, layer_bounds):
+    bvh_module = get_cu_module('bvh.cu', options=cuda_options,
+                               include_source_directory=True)
+    bvh_funcs = GPUFuncs(bvh_module)
+    
+    gpu_nodes = ga.to_gpu(nodes)
+
+    bounds = zip(layer_bounds[:-1], layer_bounds[1:])[:-1]
+    bounds.reverse()
+    nthreads_per_block = 256
+    for start, end in bounds:
+        bvh_funcs.collapse_child(np.uint32(start),
+                                 np.uint32(end),
+                                 gpu_nodes,
+                                 block=(nthreads_per_block,1,1),
+                                 grid=(120,1))
+    return gpu_nodes.get()
+
+
 def merge_nodes(nodes, degree, max_ratio=None):
     bvh_module = get_cu_module('bvh.cu', options=cuda_options,
                                include_source_directory=True)

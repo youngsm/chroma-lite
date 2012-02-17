@@ -522,4 +522,19 @@ extern "C"
     node[b_index] = temp4;
   }
 
+  __global__ void collapse_child(unsigned int start, unsigned int end,
+				 uint4 *node)
+  {
+     unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+     unsigned int stride = gridDim.x * blockDim.x;
+
+     for (unsigned int i=start+thread_id; i < end; i += stride) {
+       uint4 this_node = node[i];
+       unsigned int nchild = this_node.w >> CHILD_BITS;
+       unsigned int child_id = this_node.w &  ~NCHILD_MASK;
+       if (nchild == 1)
+	 node[i] = node[child_id];
+     }
+  }
+
 } // extern "C"

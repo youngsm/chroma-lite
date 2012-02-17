@@ -1,7 +1,7 @@
 import numpy as np
 
 from chroma.bvh.bvh import BVH, CHILD_BITS
-from chroma.gpu.bvh import create_leaf_nodes, merge_nodes_detailed, concatenate_layers
+from chroma.gpu.bvh import create_leaf_nodes, merge_nodes_detailed, concatenate_layers, collapse_chains
 
 MAX_CHILD = 2**(32 - CHILD_BITS) - 1
 
@@ -87,4 +87,5 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
         morton_codes = parent_morton_codes
 
     nodes, layer_bounds = concatenate_layers(layers)
+    nodes = collapse_chains(nodes, layer_bounds)
     return BVH(world_coords, nodes, layer_bounds[:-1])
