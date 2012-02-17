@@ -143,12 +143,12 @@ def load_bvh(geometry,  bvh_name="default",
         logger.info('Loading BVH "%s" for geometry from cache.' % bvh_name)
         bvh = cache.load_bvh(mesh_hash, bvh_name)
     elif auto_build_bvh:
-        logger.info('Building new BVH using simple algorithm.')
+        logger.info('Building new BVH using recursive grid algorithm.')
 
         start = time.time()
 
         context = create_cuda_context(cuda_device)
-        bvh = make_recursive_grid_bvh(geometry.mesh, target_degree=2)
+        bvh = make_recursive_grid_bvh(geometry.mesh, target_degree=3)
         context.pop()
 
         logger.info('BVH generated in %1.1f seconds.' % (time.time() - start))
