@@ -112,9 +112,9 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 
     } // while nodes on stack
 
-    //if (threadIdx.x == 0) {
-    //printf("node count: %d\n", count);
-    //printf("triangle count: %d\n", tri_count);
+    //if (blockIdx.x == 0 && threadIdx.x == 0) {
+    //  printf("node count: %d\n", count);
+    //  printf("triangle count: %d\n", tri_count);
     //}
 
     return triangle_index;

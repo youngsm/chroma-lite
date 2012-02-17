@@ -129,6 +129,22 @@ def collapse_chains(nodes, layer_bounds):
                                  grid=(120,1))
     return gpu_nodes.get()
 
+def area_sort_nodes(gpu_geometry, layer_bounds):
+    bvh_module = get_cu_module('bvh.cu', options=cuda_options,
+                               include_source_directory=True)
+    bvh_funcs = GPUFuncs(bvh_module)
+
+    bounds = zip(layer_bounds[:-1], layer_bounds[1:])[:-1]
+    bounds.reverse()
+    nthreads_per_block = 256
+    for start, end in bounds:
+        bvh_funcs.area_sort_child(np.uint32(start),
+                                  np.uint32(end),
+                                  gpu_geometry,
+                                  block=(nthreads_per_block,1,1),
+                                  grid=(120,1))
+    return gpu_geometry.nodes.get()
+
 
 def merge_nodes(nodes, degree, max_ratio=None):
     bvh_module = get_cu_module('bvh.cu', options=cuda_options,

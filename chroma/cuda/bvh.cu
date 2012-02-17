@@ -2,8 +2,10 @@
 #include <cuda.h>
 
 #include "geometry_types.h"
+#include "geometry.h"
 #include "linalg.h"
 #include "physical_constants.h"
+#include "sorting.h"
 
 __device__ float3
 fminf(const float3 &a, const float3 &b)
@@ -536,5 +538,40 @@ extern "C"
 	 node[i] = node[child_id];
      }
   }
+
+  __global__ void area_sort_child(unsigned int start, unsigned int end,
+				  Geometry *geometry)
+  {
+     unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+     unsigned int stride = gridDim.x * blockDim.x;
+
+     uint4 *node = geometry->nodes;
+
+     const int MAX_CHILD = 1 << (32 - CHILD_BITS);
+     float distance[MAX_CHILD];
+     uint4 children[MAX_CHILD];
+
+     for (unsigned int i=start+thread_id; i < end; i += stride) {
+       uint4 this_node = node[i];
+       unsigned int nchild = this_node.w >> CHILD_BITS;
+       unsigned int child_id = this_node.w &  ~NCHILD_MASK;
+
+       if (nchild <= 1)
+	 continue;
+
+       for (unsigned int i=0; i < nchild; i++) {
+	 children[i] = node[child_id + i];
+	 Node unpacked = get_node(geometry, child_id+i);
+	 float3 delta = unpacked.upper - unpacked.lower;
+	 distance[i] = -(delta.x * delta.y + delta.y * delta.z + delta.z * delta.x);
+       }
+
+       piksrt2(nchild, distance, children);
+
+       for (unsigned int i=0; i < nchild; i++)
+	 node[child_id + i] = children[i];
+     }
+  }
+
 
 } // extern "C"

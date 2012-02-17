@@ -11,7 +11,8 @@ from chroma.loader import load_geometry_from_string
 from chroma.log import logger, logging
 from chroma.bvh import make_recursive_grid_bvh
 from chroma.gpu import create_cuda_context
-from chroma.gpu.bvh import optimize_layer
+from chroma.gpu.geometry import GPUGeometry
+from chroma.gpu.bvh import optimize_layer, area_sort_nodes
 
 
 def parse_bvh_id(id_str):
@@ -28,6 +29,23 @@ def parse_bvh_id(id_str):
         bvh_name = parts[1]
     geo_name = parts[0]
     return geo_name, bvh_name
+
+
+def sort_node(cache, args):
+    geo_name, bvh_name = parse_bvh_id(args[0])
+    mesh_hash = cache.get_geometry_hash(geo_name)
+    geometry = cache.load_geometry(geo_name)
+    geometry.bvh = cache.load_bvh(mesh_hash, bvh_name)
+
+    print 'Sorting BVH nodes by area...'
+
+    context = create_cuda_context()
+    gpu_geometry = GPUGeometry(geometry)
+    geometry.bvh.nodes = area_sort_nodes(gpu_geometry, geometry.bvh.layer_bounds)
+
+    print 'Saving new BVH...'
+    context.pop()
+    cache.save_bvh(geometry.bvh, mesh_hash, bvh_name)
         
 
 def node_swap(cache, args):
@@ -181,6 +199,7 @@ commands = {
     'remove' : remove,
     'node_swap' : node_swap,
     'hist' : area_hist,
+    'sort' : sort_node,
     }
              
 
