@@ -6,8 +6,8 @@ if __name__ == '__main__':
     import sys
     import os
 
-    from chroma import view, EventViewer
-    from chroma import mesh_from_stl
+    from chroma.camera import view, EventViewer
+    from chroma.stl import mesh_from_stl
     from chroma.tools import enable_debug_on_crash
     import chroma.loader
     from chroma.log import logger, logging
