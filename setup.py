@@ -2,6 +2,7 @@ import distribute_setup
 distribute_setup.use_setuptools()
 from setuptools import setup, find_packages, Extension
 import subprocess
+import os
 
 def check_output(*popenargs, **kwargs):
     if 'stdout' in kwargs:
@@ -19,6 +20,10 @@ def check_output(*popenargs, **kwargs):
 geant4_cflags = check_output(['geant4-config','--cflags']).split()
 geant4_libs = check_output(['geant4-config','--libs']).split()
 
+include_dirs=['src']
+if 'VIRTUAL_ENV' in os.environ:
+    include_dirs.append(os.path.join(os.environ['VIRTUAL_ENV'], 'include'))
+
 setup(
     name = 'Chroma',
     version = '0.5',
@@ -30,13 +35,14 @@ setup(
     ext_modules = [
         Extension('chroma.generator._g4chroma',
                   ['src/G4chroma.cc'],
-                  include_dirs=['src'],
+                  include_dirs=include_dirs,
                   extra_compile_args=geant4_cflags,
                   extra_link_args=geant4_libs,
                   libraries=['boost_python'],
                   ),
         Extension('chroma.generator.mute',
                   ['src/mute.cc'],
+                  include_dirs=include_dirs,
                   extra_compile_args=geant4_cflags,
                   extra_link_args=geant4_libs,
                   libraries=['boost_python']),
