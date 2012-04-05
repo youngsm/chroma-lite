@@ -25,8 +25,6 @@ CHROMA_URL="hg+http://bitbucket.org/chroma/chroma#egg=Chroma"
 
 ### you should not need to edit below this line ###
 
-SETUP_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
 ## handle command-line options
 ncpus=1
 envname="chroma_env"
@@ -66,7 +64,7 @@ else
   VIRTUALENV_FLAGS=""
 fi
 
-if virtualenv $VIRTUALENV_FLAGS $SETUP_ROOT/$envname
+if virtualenv $VIRTUALENV_FLAGS $envname
 then echo "OK"
 else
   echo "failed to setup virtualenv"
@@ -74,21 +72,23 @@ else
 fi
 
 # symlinks
-printf "setting up compiler symlinks... "
-cd $SETUP_ROOT/$envname/bin/
-for l in gcc g++ cpp gcov gfortran
-do
-  ln -s /usr/bin/$l-$GCC_VERSION $l
-  if [ ! -h $l ]
-    then echo "error creating symbolic link $l"
-    exit 1
-  fi
-done
-echo "OK"
+if [ -n "$gcc_suffix" ]
+then
+  printf "setting up compiler symlinks... "
+  for l in gcc g++ cpp gcov gfortran
+  do
+    ln -s /usr/bin/$l-$GCC_VERSION $envname/bin/$l
+    if [ ! -h $l ]
+      then echo "error creating symbolic link $l"
+      exit 1
+    fi
+  done
+  echo "OK"
+fi
 
 # paths in activate
 printf "setting paths in bin/activate... "
-if ( echo -e "\nexport PATH=$CUDA_PATH:\$PATH\nexport LD_LIBRARY_PATH=$CUDA_LIB:\$VIRTUAL_ENV/lib:\$LD_LIBRARY_PATH\n" >> activate )
+if ( echo -e "\nexport PATH=$CUDA_PATH:\$PATH\nexport LD_LIBRARY_PATH=$CUDA_LIB:\$VIRTUAL_ENV/lib:\$LD_LIBRARY_PATH\n" >> $envname/bin/activate )
 then echo "OK"
 else
   echo "error in write"
@@ -96,7 +96,7 @@ else
 fi
 
 # source it!
-source activate
+source $envname/bin/activate
 mkdir $VIRTUAL_ENV/src/
 
 ## step 4: root
