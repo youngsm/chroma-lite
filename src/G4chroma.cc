@@ -1,6 +1,6 @@
 #include "G4chroma.hh"
-#include <geant4/G4OpticalPhysics.hh>
-#include <geant4/G4EmPenelopePhysics.hh>
+#include <G4OpticalPhysics.hh>
+#include <G4EmPenelopePhysics.hh>
 
 ChromaPhysicsList::ChromaPhysicsList():  G4VModularPhysicsList()
 {
@@ -12,7 +12,6 @@ ChromaPhysicsList::ChromaPhysicsList():  G4VModularPhysicsList()
   // Optical Physics
   G4OpticalPhysics* opticalPhysics = new G4OpticalPhysics();
   RegisterPhysics( opticalPhysics );
-  opticalPhysics->SetTrackSecondariesFirst(false);
 }
 
 ChromaPhysicsList::~ChromaPhysicsList()

@@ -1,4 +1,4 @@
-#include <geant4/G4ios.hh>
+#include <G4ios.hh>
 
 class discard_streambuf : public std::streambuf {
 public:

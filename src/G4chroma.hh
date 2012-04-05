@@ -1,7 +1,7 @@
 #ifndef __G4chroma_hh__
 #define __G4chroma_hh__
 
-#include <geant4/G4VModularPhysicsList.hh>
+#include <G4VModularPhysicsList.hh>
 class ChromaPhysicsList: public G4VModularPhysicsList
 {
 public:
@@ -10,9 +10,9 @@ public:
   virtual void SetCuts();
 };
 
-#include <geant4/G4UserTrackingAction.hh>
+#include <G4UserTrackingAction.hh>
 #include <vector>
-#include <geant4/G4ThreeVector.hh>
+#include <G4ThreeVector.hh>
 
 class PhotonTrackingAction : public G4UserTrackingAction
 {
