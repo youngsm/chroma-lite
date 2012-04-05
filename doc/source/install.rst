@@ -119,7 +119,7 @@ it should be executed as one line::
   sudo apt-get install build-essential xorg-dev python-dev \
        python-virtualenv python-numpy python-pygame libglu1-mesa-dev \
        glutg3-dev cmake uuid-dev liblapack-dev mercurial git subversion \
-       libboost-all-dev libatlas-base-dev
+       python-matplotlib libboost-all-dev libatlas-base-dev
 
 To be able to generate the documentation, we also need these tools::
 
@@ -132,9 +132,17 @@ Step 2: CUDA Toolkit and Driver
 
 CUDA requires the use of the official NVIDIA graphics driver, rather
 than the open source Nouveau driver that is included with Ubuntu.  The
-NVIDIA driver can be installed by
+NVIDIA driver can be installed by going to the `CUDA 4.1 Download Page
+<http://developer.nvidia.com/cuda-toolkit-41>`_ and downloading the 64-bit Linux
+developer drivers.  (Newer drivers than those listed on this page will
+also work.)  To install the NVIDIA drivers, you will need to switch to a text console (Ctrl-Alt-F1) and shut down the X server::
 
-.. warning:: FIGURE THIS OUT WITH FRESH UBUNTU INSTALL
+  # This next will kill everything running on your graphical desktop!
+  sudo service gdm stop
+  chmod +x NVIDIA-Linux-x86_64-285.05.33.run
+  sudo ./NVIDIA-Linux-x86_64-285.05.33.run
+  # Accept the license and pick the default option for the other questions
+  sudo service gdm start
 
 After the driver is installed, you need to download the CUDA 4.1
 toolkit for Ubuntu Linux 11.04 (probably 64-bit) on `this page
