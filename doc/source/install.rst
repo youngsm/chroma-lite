@@ -41,7 +41,7 @@ Software Prerequisites
 Chroma depends on several software packages:
 
 * Python 2.6 or later
-* The CUDA 4.0 Toolkit and NVIDIA driver. (You may use drivers newer than the developer driver listed on the CUDA 4.0 website.)
+* The CUDA 4.1 Toolkit and NVIDIA driver. (You may use drivers newer than the developer driver listed on the CUDA 4.1 website.)
 * Boost::Python
 * Numpy 1.6 or later
 * Pygame
@@ -50,9 +50,9 @@ Chroma depends on several software packages:
 * PyCUDA 2011.2 or later
 * PyUblas
 * ZeroMQ
-* GEANT4.9.4 or later
-* g4py
-* ROOT 5.30 or later
+* GEANT4.9.5 or later
+* `Patched version of g4py <http://bitbucket.org/seibert/g4py/>`_
+* ROOT 5.32 or later
 
 Optional Space Navigator support requires:
 
@@ -71,6 +71,27 @@ For development, we also recommend:
 
 We will explain how to install all of these packages in the following section.
 
+.. _ubuntu11.04_quick:
+
+Quick Installation: Ubuntu 11.04
+--------------------------------
+
+Andy Mastbaum has provided a shell script that downloads and compiles
+all of the Chroma prerequisites.  It has been tested to work with
+Ubuntu 11.04.  To use this script, first go perform
+:ref:`ubuntu_11.04_step1` and :ref:`ubuntu_11.04_step2` in the
+Step-by-Step Installation guide.  Then download
+:download:`chroma-setup.sh` and run the following::
+
+  chmod +x chroma-setup.sh
+  ./chroma-setup -j4 -n ~/chroma_env
+
+This will download and compile (with 4 CPU cores; increase the ``-j``
+option if you have more cores) all the source code required to create
+a self-contained Chroma environment in ``$HOME/chroma_env``.  To setup
+your environment to use Chroma, just run ``source
+$HOME/chroma_env/bin/activate``.
+
 Step-by-Step Installation: Ubuntu 11.04
 ---------------------------------------
 
@@ -85,6 +106,8 @@ intervention.
 
 .. warning:: There is very little support for CUDA inside virtual machines, so you cannot use VirtualBox/VMWare/Parallels to setup your Chroma environment.  Amazon EC2 is able to virtualize Tesla devices with Xen, but setting that up for yourself is beyond the scope of this document.
 
+.. _ubuntu_11.04_step1:
+
 Step 1: ``apt-get`` packages from Ubuntu package manager
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -93,8 +116,8 @@ GEANT4 and ROOT.  Fortunately, they can be installed with one very
 long ``apt-get`` line.  Although this line may wrap in your browser,
 it should be executed as one line::
 
-  sudo apt-get install build-essential xorg-dev python-dev gcc-4.4 gfortran-4.4 \
-       g++-4.4 python-virtualenv python-numpy python-pygame libglu1-mesa-dev \
+  sudo apt-get install build-essential xorg-dev python-dev \
+       python-virtualenv python-numpy python-pygame libglu1-mesa-dev \
        glutg3-dev cmake uuid-dev liblapack-dev mercurial git subversion \
        libboost-all-dev libatlas-base-dev
 
@@ -102,9 +125,7 @@ To be able to generate the documentation, we also need these tools::
 
   sudo apt-get install texlive dvipng
 
-We have installed GCC 4.4 because CUDA 4.0 does not support GCC 4.5,
-the default compiler in Ubuntu.  We will modify the environment in
-Step 3 to make gcc 4.4 the default compiler while using Chroma.
+.. _ubuntu_11.04_step2:
 
 Step 2: CUDA Toolkit and Driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -115,14 +136,14 @@ NVIDIA driver can be installed by
 
 .. warning:: FIGURE THIS OUT WITH FRESH UBUNTU INSTALL
 
-After the driver is installed, you need to download the CUDA 4.0
-toolkit for Ubuntu Linux 10.10 (probably 64-bit) on `this page
-<http://developer.nvidia.com/cuda-toolkit-40>`_.  Once this file has
+After the driver is installed, you need to download the CUDA 4.1
+toolkit for Ubuntu Linux 11.04 (probably 64-bit) on `this page
+<http://developer.nvidia.com/cuda-toolkit-41>`_.  Once this file has
 been downloaded, run the following commands in the download
 directory::
 
-  chmod +x cudatoolkit_4.0.17_linux_64_ubuntu10.10.run
-  sudo ./cudatoolkit_4.0.17_linux_64_ubuntu10.10.run
+  chmod +x cudatoolkit_4.1.28_linux_64_ubuntu11.04.run
+  sudo ./cudatoolkit_4.1.28_linux_64_ubuntu11.04.run
 
 Accept the default installation location ``/usr/local/cuda``.  We will
 add the CUDA ``bin`` and ``lib`` directories to the path in a few
@@ -132,6 +153,8 @@ steps.
 Step 3: virtualenv
 ^^^^^^^^^^^^^^^^^^
 
+.. tip:: All the remaining installation steps can be performed using a shell script.  See :ref:`ubuntu11.04_quick`.
+
 The excellent `virtualenv <http://www.virtualenv.org/>`_ tool
 allows you to create an isolated Python environment, independent from
 your system environment. We will keep all of the python modules for
@@ -140,11 +163,6 @@ inside of a virtualenv in your ``$HOME`` directory::
 
   virtualenv $HOME/chroma_env
   cd $HOME/chroma_env/bin/
-  ln -s /usr/bin/gcc-4.4 gcc
-  ln -s /usr/bin/g++-4.4 g++
-  ln -s /usr/bin/cpp-4.4 cpp
-  ln -s /usr/bin/gcov-4.4 gcov
-  ln -s /usr/bin/gfortran-4.4 gfortran
 
 Next, append the following lines to the end of
 ``$HOME/chroma_env/bin/activate`` to add the CUDA tools to the path::
@@ -168,78 +186,47 @@ Chroma uses the ROOT I/O system to record event information to disk
 for access later.  In addition, we expect many Chroma users will
 want to use ROOT to analyze the output of Chroma.
 
-Begin by downloading the ROOT 5.30 tarball from `the ROOT download
-page <http://root.cern.ch/drupal/content/production-version-530>`_.
-As of this writing, the latest version is 5.30.04.  Then, from the
-download directory, execute the following commands::
+Begin by downloading the `ROOT 5.32.02 tarball
+<ftp://root.cern.ch/root/root_v5.32.02.source.tar.gz>`_.  Then, from
+the download directory, execute the following commands::
 
-  tar xvf root_v5.30.04.source.tar.gz
+  tar xvf root_v5.32.02.source.tar.gz
   mkdir $VIRTUAL_ENV/src/
-  mv root $VIRTUAL_ENV/src/root-5.30.04
-  cd $VIRTUAL_ENV/src/root-5.30.04
+  mv root $VIRTUAL_ENV/src/root-5.32.02
+  cd $VIRTUAL_ENV/src/root-5.32.02
   ./configure
   make
 
 We also need to append a ``source`` line to ``$VIRTUAL_ENV/bin/activate``::
 
-  source $VIRTUAL_ENV/src/root-5.30.04/bin/thisroot.sh
+  source $VIRTUAL_ENV/src/root-5.32.02/bin/thisroot.sh
 
 
-Step 5: CLHEP and GEANT4
-^^^^^^^^^^^^^^^^^^^^^^^^
+Step 5: GEANT4
+^^^^^^^^^^^^^^
 
 Chroma uses GEANT4 to propagate particles other than optical photons
 and create the initial photon vertices propagated on the GPU.  These
 instructions describe how to compile GEANT4 using the new CMake-based
-build system, which requires at least GEANT4.9.4.
+build system which uses a bundled version of CLHEP and automatically
+downloads data files.  This requires at least GEANT4.9.5.
 
-GEANT4 depends on CLHEP, so first go to the `CLHEP Download Page
-<http://proj-clhep.web.cern.ch/proj-clhep/DISTRIBUTION/>`_ and
-download the latest 2.1 series source file.  From your download
-directory, run the following commands::
+Download the `GEANT4.9.5.p01 source code
+<http://geant4.cern.ch/support/source/geant4.9.5.p01.tar.gz>`_ and run
+the following::
 
-  tar xvf clhep-2.1.1.0.tgz
-  mv 2.1.1.0 $VIRTUAL_ENV/src/clhep-2.1.1.0
-  cd $VIRTUAL_ENV/src/clhep-2.1.1.0/CLHEP
-  ./configure --prefix=$VIRTUAL_ENV/
-  make install
-  
-Now go to the `GEANT4 Download Page <http://geant4.cern.ch/support/download.shtml>`_ and download:
-
-* GNU or Linux tar format source code
-* Neutron data files with thermal cross sections
-* Data files for low energy electromagnetic processes
-* Data files for photon evaporation
-* Data files for radioactive decay hadronic processes
-* Data files for nuclear shell effects
-* Data files for evaluated neutron cross-sections on natural composition of elements
-
-(I wish there was an easier way to get GEANT4 and all of its data files!)
-
-Next go to your download directory and run the following commands::
-
-  tar xvf geant4.9.4.p02.tar.gz
-  tar xvf G4EMLOW.6.19.tar.gz
-  tar xvf G4PhotonEvaporation.2.1.tar.gz
-  tar xvf G4RadioactiveDecay.3.3.tar.gz
-  tar xvf G4ABLA.3.0.tar.gz
-  tar xvf G4NEUTRONXS.1.0.tar.gz
-  mkdir geant4.9.4.p02/data
-  mv G4EMLOW6.19 PhotonEvaporation2.1 RadioactiveDecay3.3 G4ABLA3.0 G4NEUTRONXS1.0 geant4.9.4.p02/data/
-  mv geant4.9.4.p02 $VIRTUAL_ENV/src/
+  tar xvf geant4.9.5.p01.tar.gz
+  mv geant4.9.5.p01 $VIRTUAL_ENV/src/
   cd $VIRTUAL_ENV/src/
-  mkdir geant4.9.4.p02-build
-  cd geant4.9.4.p02-build
-  cmake -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV ../geant4.9.4.p02
+  mkdir geant4.9.5.p01-build
+  cd geant4.9.5.p01-build
+  cmake -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DGEANT4_INSTALL_DATA=ON ../geant4.9.5.p01
   make install
 
 GEANT4 requires several environment variables to locate data files.  Set
-these by appending the following lines to ``$VIRTUAL_ENV/bin/activate``::
+these by appending the following line to ``$VIRTUAL_ENV/bin/activate``::
 
-  export G4LEVELGAMMADATA=$VIRTUAL_ENV/src/geant4.9.4.p02/data/PhotonEvaporation2.1
-  export G4LEDATA=$VIRTUAL_ENV/src/geant4.9.4.p02/data/G4EMLOW6.19
-  export G4NEUTRONHPDATA=$VIRTUAL_ENV/src/geant4.9.4.p02/data/G4NDL3.14
-  export G4RADIOACTIVEDATA=$VIRTUAL_ENV/src/geant4.9.4.p02/data/RadioactiveDecay3.3
+  source $VIRTUAL_ENV/bin/geant4.sh
 
 
 Step 6: g4py
@@ -250,9 +237,8 @@ had to fix a few bugs and add wrapper a few additional classes for
 Chroma, so for now you will need to use our fork of g4py::
 
   cd $VIRTUAL_ENV/src
-  hg clone https://bitbucket.org/seibert/g4py
+  hg clone https://bitbucket.org/seibert/g4py#geant4.9.5.p01
   cd g4py
-  export CLHEP_BASE_DIR=$VIRTUAL_ENV
   # select system name from linux, linux64, macosx as appropriate
   ./configure linux64 --prefix=$VIRTUAL_ENV --with-g4-incdir=$VIRTUAL_ENV/include/geant4 --with-g4-libdir=$VIRTUAL_ENV/lib --libdir=$VIRTUAL_ENV/lib/python2.7/site-packages/
   make install
@@ -283,4 +269,3 @@ install of the Chroma package::
 Now you can enable the Chroma environment whenever you want by typing
 ``source $HOME/chroma_env/bin/activate``, or by placing that line in the
 ``.bashrc`` login script.
-
