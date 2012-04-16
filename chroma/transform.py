@@ -6,8 +6,13 @@ def make_rotation_matrix(phi, n):
     counter-clockwise around the axis `n` (when looking towards +infinity).
 
     Source: Weissten, Eric W. "Rotation Formula." Mathworld.
+
+    Raises ValueError if n has zero magnitude
     """
-    n = np.asarray(n)/np.linalg.norm(n)
+    norm = np.linalg.norm(n)
+    if norm == 0.0:
+        raise ValueError('rotation axis has zero magnitude')
+    n = np.asarray(n)/norm
     
     return np.cos(phi)*np.identity(3) + (1-np.cos(phi))*np.outer(n,n) + \
         np.sin(phi)*np.array([[0,n[2],-n[1]],[-n[2],0,n[0]],[n[1],-n[0],0]])
