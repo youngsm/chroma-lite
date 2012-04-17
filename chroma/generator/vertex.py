@@ -76,8 +76,13 @@ def pi0_gun(pos_iter, dir_iter, ke_iter, t0_iter=constant(0.0), start_id=0, gamm
 def constant_particle_gun(particle_name, pos, dir, ke, t0=0.0, start_id=0):
     '''Convenience wrapper around particle gun that assumes all
     arguments are constants, rather than generators.'''
+    if (dir == 0.0).all():
+        dir_gen = isotropic()
+    else:
+        dir_gen = constant(dir)
+    
     if particle_name == 'pi0':
-        return pi0_gun(constant(pos), constant(dir), constant(ke),
+        return pi0_gun(constant(pos), dir_gen, constant(ke),
                        constant(t0), start_id=start_id)
     else:
-        return particle_gun(constant(particle_name), constant(pos), constant(dir), constant(ke), constant(t0), start_id=start_id)
+        return particle_gun(constant(particle_name), constant(pos), dir_gen, constant(ke), constant(t0), start_id=start_id)
