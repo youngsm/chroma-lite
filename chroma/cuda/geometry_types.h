@@ -11,13 +11,33 @@ struct Material
     float wavelength0;
 };
 
+// surface models
+enum {
+    SURFACE_DEFAULT,
+    SURFACE_SPECULAR, // perfect specular reflector
+    SURFACE_DIFFUSE, // perfect diffuse reflector
+    SURFACE_COMBO, // both specular and diffuse components
+    SURFACE_MIRROR, // mirror including complex index
+    SURFACE_PHOTOCATHODE, // transmissive photocathode with complex index
+    SURFACE_TPB
+};
+
+// not all parameters are used by all surface models!
 struct Surface
 {
+    // process probabilities
     float *detect;
     float *absorb;
+    float *reemit;
+    float *reflect_tpb;
     float *reflect_diffuse;
     float *reflect_specular;
+
+    float *reemission_wavelength;
+    float *reemission_cdf;
+    unsigned int model;
     unsigned int n;
+    unsigned int reemission_n;
     float step;
     float wavelength0;
 };

@@ -173,8 +173,12 @@ class Surface(object):
 
         self.set('detect', 0)
         self.set('absorb', 0)
+        self.set('reemit', 0)
+        self.set('reflect_tpb', 0)
         self.set('reflect_diffuse', 0)
         self.set('reflect_specular', 0)
+        self.set('reemission_wavelength', 0)
+        self.set('reemission_cdf', 0)
 
     def set(self, name, value, wavelengths=standard_wavelengths):
         if np.iterable(value):

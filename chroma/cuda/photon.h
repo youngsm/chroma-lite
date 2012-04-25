@@ -50,6 +50,7 @@ enum
     RAYLEIGH_SCATTER = 0x1 << 4,
     REFLECT_DIFFUSE  = 0x1 << 5,
     REFLECT_SPECULAR = 0x1 << 6,
+    SURFACE_REEMIT   = 0x1 << 7,
     NAN_ABORT        = 0x1 << 31
 }; // processes
 
@@ -179,8 +180,9 @@ rayleigh_scatter(Photon &p, curandState &rng)
     p.polarization /= norm(p.polarization);
 } // scatter
 
-__device__ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
-                                     bool use_weights=false, int scatter_first=0)
+__device__
+int propagate_to_boundary(Photon &p, State &s, curandState &rng,
+                          bool use_weights=false, int scatter_first=0)
 {
     float absorption_distance = -s.absorption_length*logf(curand_uniform(&rng));
     float scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
@@ -317,77 +319,154 @@ propagate_at_boundary(Photon &p, State &s, curandState &rng)
 } // propagate_at_boundary
 
 __device__ int
+propagate_at_specular_reflector(Photon &p, State &s)
+{
+    float incident_angle = get_theta(s.surface_normal, -p.direction);
+    float3 incident_plane_normal = cross(p.direction, s.surface_normal);
+    incident_plane_normal /= norm(incident_plane_normal);
+
+    p.direction = rotate(s.surface_normal, incident_angle, incident_plane_normal);
+
+    p.history |= REFLECT_SPECULAR;
+
+    return CONTINUE;
+} // reflect_specular
+
+__device__ int
+propagate_at_diffuse_reflector(Photon &p, State &s, curandState &rng)
+{
+    p.direction = uniform_sphere(&rng);
+
+    if (dot(p.direction, s.surface_normal) < 0.0f)
+        p.direction = -p.direction;
+
+    p.polarization = cross(uniform_sphere(&rng), p.direction);
+    p.polarization /= norm(p.polarization);
+
+    p.history |= REFLECT_DIFFUSE;
+
+    return CONTINUE;
+} // reflect_diffuse
+
+__device__ int
+propagate_at_mirror(Photon &p, State &s, bool use_weights=false)
+{
+    // just a perfect specular reflector for now...
+    return propagate_at_specular_reflector(p, s);
+} // propagate_at_mirror
+
+__device__ int
+propagate_at_photocathode(Photon &p, State &s, curandState &rng, bool use_weights=false)
+{
+    return CONTINUE;
+} // propagate_at_photocathode
+
+__device__ int
+propagate_at_tpb(Photon &p, State &s, curandState &rng, Surface *surface, bool use_weights=false)
+{
+    float absorb = interp_property(surface, p.wavelength, surface->absorb);
+    float reflect = interp_property(surface, p.wavelength, surface->reflect_tpb);
+    float reemit = interp_property(surface, p.wavelength, surface->reemit);
+
+    float uniform_sample = curand_uniform(&rng);
+
+    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD && absorb < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
+         // Prevent absorption and reweight accordingly
+        float survive = 1.0f - absorb;
+        absorb = 0.0f;
+        p.weight *= survive;
+
+        reflect /= survive;
+        reemit /= survive;
+    }
+
+    if (uniform_sample < absorb) {
+        p.history |= SURFACE_ABSORB;
+        return BREAK;
+    }
+    else if (uniform_sample < absorb + reemit) {
+        p.history |= SURFACE_ABSORB;
+        p.history |= SURFACE_REEMIT;
+
+        // pick a new wavelength according to the reemission cdf
+        p.wavelength = sample_cdf(&rng, surface->reemission_n, surface->reemission_wavelength, surface->reemission_cdf);
+
+        // reemit isotropically (eh?)
+        return propagate_at_diffuse_reflector(p, s, rng);
+    }
+    else {
+        return propagate_at_diffuse_reflector(p, s, rng);
+    }
+
+} // propagate_at_tpb
+
+__device__ int
 propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
                      bool use_weights=false)
 {
     Surface *surface = geometry->surfaces[s.surface_index];
 
-    /* since the surface properties are interpolated linearly, we are
-       guaranteed that they still sum to 1.0. */
-
-    float detect = interp_property(surface, p.wavelength, surface->detect);
-    float absorb = interp_property(surface, p.wavelength, surface->absorb);
-    float reflect_diffuse = interp_property(surface, p.wavelength, surface->reflect_diffuse);
-    float reflect_specular = interp_property(surface, p.wavelength, surface->reflect_specular);
-
-    float uniform_sample = curand_uniform(&rng);
-
-    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD 
-	&& absorb < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
-	// Prevent absorption and reweight accordingly
-	float survive = 1.0f - absorb;
-	absorb = 0.0f;
-	p.weight *= survive;
-
-	// Renormalize remaining probabilities
-	detect /= survive;
-	reflect_diffuse /= survive;
-	reflect_specular /= survive;
+    if (surface->model == SURFACE_SPECULAR)
+        return propagate_at_specular_reflector(p, s);
+    else if (surface->model == SURFACE_DIFFUSE)
+        return propagate_at_diffuse_reflector(p, s, rng);
+    else if (surface->model == SURFACE_MIRROR)
+        return propagate_at_mirror(p, s);
+    else if (surface->model = SURFACE_PHOTOCATHODE) {
+        //propagate_at_photocathode();
+        p.history |= SURFACE_DETECT;
+        return BREAK;
     }
-
-    if (use_weights && detect > 0.0f) {
-	p.history |= SURFACE_DETECT;
-	p.weight *= detect;
-	return BREAK;
-    }
-
-    if (uniform_sample < absorb) {
-	p.history |= SURFACE_ABSORB;
-	return BREAK;
-    }
-    else if (uniform_sample < absorb + detect) {
-	p.history |= SURFACE_DETECT;
-	return BREAK;
-    }
-    else if (uniform_sample < absorb + detect + reflect_diffuse) {
-	// diffusely reflect
-	p.direction = uniform_sphere(&rng);
-
-	if (dot(p.direction, s.surface_normal) < 0.0f)
-	    p.direction = -p.direction;
-
-	// randomize polarization?
-	p.polarization = cross(uniform_sphere(&rng), p.direction);
-	p.polarization /= norm(p.polarization);
-
-	p.history |= REFLECT_DIFFUSE;
-
-	return CONTINUE;
-    }
+    else if (surface->model == SURFACE_TPB)
+        return propagate_at_tpb(p, s, rng, surface, use_weights);
     else {
-	// specularly reflect
-	float incident_angle = get_theta(s.surface_normal,-p.direction);
-	float3 incident_plane_normal = cross(p.direction, s.surface_normal);
-	incident_plane_normal /= norm(incident_plane_normal);
+        // if no surface model is specified, do a combination of specular and
+        // diffuse reflection, detection, and absorption based on relative
+        // probabilties (i.e. the "old" behavior)
 
-	p.direction = rotate(s.surface_normal, incident_angle,
-			     incident_plane_normal);
+        // since the surface properties are interpolated linearly, we are
+        // guaranteed that they still sum to 1.0.
+        float detect = interp_property(surface, p.wavelength, surface->detect);
+        float absorb = interp_property(surface, p.wavelength, surface->absorb);
+        float reflect_diffuse = interp_property(surface, p.wavelength, surface->reflect_diffuse);
+        float reflect_specular = interp_property(surface, p.wavelength, surface->reflect_specular);
 
-	p.history |= REFLECT_SPECULAR;
+        float uniform_sample = curand_uniform(&rng);
 
-	return CONTINUE;
+        if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD 
+	    && absorb < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
+            // Prevent absorption and reweight accordingly
+            float survive = 1.0f - absorb;
+            absorb = 0.0f;
+            p.weight *= survive;
+
+            // Renormalize remaining probabilities
+            detect /= survive;
+            reflect_diffuse /= survive;
+            reflect_specular /= survive;
+        }
+
+        if (use_weights && detect > 0.0f) {
+            p.history |= SURFACE_DETECT;
+            p.weight *= detect;
+            return BREAK;
+        }
+
+        if (uniform_sample < absorb) {
+            p.history |= SURFACE_ABSORB;
+            return BREAK;
+        }
+        else if (uniform_sample < absorb + detect) {
+            p.history |= SURFACE_DETECT;
+            return BREAK;
+        }
+        else if (uniform_sample < absorb + detect + reflect_diffuse)
+            return propagate_at_diffuse_reflector(p, s, rng);
+        else
+            return propagate_at_specular_reflector(p, s);
     }
 
 } // propagate_at_surface
 
 #endif
+
