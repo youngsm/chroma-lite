@@ -174,9 +174,11 @@ class Surface(object):
         self.set('detect', 0)
         self.set('absorb', 0)
         self.set('reemit', 0)
-        self.set('reflect_tpb', 0)
+        self.set('reflect', 0)
         self.set('reflect_diffuse', 0)
         self.set('reflect_specular', 0)
+        self.set('eta', 0)
+        self.set('k', 0)
         self.set('reemission_wavelength', 0)
         self.set('reemission_cdf', 0)
 
