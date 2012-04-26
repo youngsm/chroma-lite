@@ -51,17 +51,15 @@ Parameters::
 ``SURFACE_WLS``
 ---------------
 
-A model of wavelength-shifting surfaces. Surfaces may absorb and reflect (these probabilities should sum to 1). Reflection is diffuse. If a photon is absorbed, it may be reemitted with a probability given in ``float *reemit`` (normalized to 1). The reemission spectrum CDF is defined in ``float* reemission_wavelength`` (x) and ``float* reemission_cdf`` (y), both of length ``reemission_n``. The CDF must start at 0 and end at 1. This model does not enforce conservation of energy, and cannot reemit multiple photons!
+A model of wavelength-shifting surfaces. Surfaces may absorb and reflect (these probabilities should sum to 1). Reflection is diffuse. If a photon is absorbed, it may be reemitted with a probability given in ``float *reemit`` (normalized to 1). The reemission spectrum CDF is defined in ``float* reemission_cdf``. The CDF must start at 0 and end at 1. This model does not enforce conservation of energy, and cannot reemit multiple photons!
 
 Parameters::
 
     float *absorb
     float *reflect
     float *reemit
-    float *reemission_wavelength
     float *reemission_cdf
     unsigned int n
-    unsigned int reemission_n
     float step
     float wavelength0
 
