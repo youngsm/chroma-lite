@@ -359,7 +359,7 @@ propagate_complex(Photon &p, State &s, curandState &rng, Surface* surface, bool 
 
     float uniform_sample = curand_uniform(&rng);
 
-    /* thin film optical model, adapted from RAT PMT optical model by P. Jones */
+    // thin film optical model, adapted from RAT PMT optical model by P. Jones
     cuFloatComplex n1 = make_cuFloatComplex(s.refractive_index1, 0.0f);
     cuFloatComplex n2 = make_cuFloatComplex(n2_eta, n2_k);
     cuFloatComplex n3 = make_cuFloatComplex(s.refractive_index2, 0.0f);
@@ -503,7 +503,7 @@ propagate_complex(Photon &p, State &s, curandState &rng, Surface* surface, bool 
         p.history |= SURFACE_TRANSMIT;
         return CONTINUE;
     }
-} // propagate_at_photocathode
+} // propagate_complex
 
 __device__ int
 propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool use_weights=false)

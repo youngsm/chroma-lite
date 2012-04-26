@@ -37,10 +37,10 @@ struct Surface
     unsigned int model;
     unsigned int n;
     unsigned int reemission_n;
+    unsigned int transmissive;
     float step;
     float wavelength0;
     float thickness;
-    bool transmissive;
 };
 
 struct Triangle

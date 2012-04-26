@@ -81,24 +81,50 @@ class GPUGeometry(object):
             detect_gpu = ga.to_gpu(detect)
             absorb = interp_material_property(wavelengths, surface.absorb)
             absorb_gpu = ga.to_gpu(absorb)
+            reemit = interp_material_property(wavelengths, surface.reemit)
+            reemit_gpu = ga.to_gpu(reemit)
+            reflect = interp_material_property(wavelengths, surface.reflect)
+            reflect_gpu = ga.to_gpu(reflect)
             reflect_diffuse = interp_material_property(wavelengths, surface.reflect_diffuse)
             reflect_diffuse_gpu = ga.to_gpu(reflect_diffuse)
             reflect_specular = interp_material_property(wavelengths, surface.reflect_specular)
             reflect_specular_gpu = ga.to_gpu(reflect_specular)
+            eta = interp_material_property(wavelengths, surface.eta)
+            eta_gpu = ga.to_gpu(eta)
+            k = interp_material_property(wavelengths, surface.k)
+            k_gpu = ga.to_gpu(k)
+
+            reemission_wavelength = interp_material_property(wavelengths, surface.reemission_wavelength)
+            reemission_wavelength_gpu = ga.to_gpu(reemission_wavelength)
+            reemission_cdf = interp_material_property(wavelengths, surface.reemission_cdf)
+            reemission_cdf_gpu = ga.to_gpu(reemission_cdf)
 
             self.surface_data.append(detect_gpu)
             self.surface_data.append(absorb_gpu)
+            self.surface_data.append(reemit_gpu)
+            self.surface_data.append(reflect_gpu)
             self.surface_data.append(reflect_diffuse_gpu)
             self.surface_data.append(reflect_specular_gpu)
+            self.surface_data.append(eta)
+            self.surface_data.append(k)
+            self.surface_data.append(reemission_wavelength)
+            self.surface_data.append(reemission_cdf)
 
             surface_gpu = \
                 make_gpu_struct(surface_struct_size,
-                                [detect_gpu, absorb_gpu,
+                                [detect_gpu, absorb_gpu, reemit_gpu, reflect_gpu,
                                  reflect_diffuse_gpu,
                                  reflect_specular_gpu,
+                                 eta_gpu, k_gpu,
+                                 reemission_wavelength_gpu,
+                                 reemission_cdf_gpu,
+                                 np.uint32(surface.model),
                                  np.uint32(len(wavelengths)),
+                                 np.uint32(len(reemission_wavelength_gpu)),
+                                 np.uint32(surface.transmissive),
                                  np.float32(wavelength_step),
-                                 np.float32(wavelengths[0])])
+                                 np.float32(wavelengths[0]),
+                                 np.float32(surface.thickness)])
 
             self.surface_ptrs.append(surface_gpu)
 

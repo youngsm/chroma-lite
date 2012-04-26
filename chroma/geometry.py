@@ -168,8 +168,9 @@ vacuum.set('scattering_length', 1e6)
 
 class Surface(object):
     """Surface optical properties."""
-    def __init__(self, name='none'):
+    def __init__(self, name='none', model=0):
         self.name = name
+        self.model = model
 
         self.set('detect', 0)
         self.set('absorb', 0)
@@ -181,6 +182,9 @@ class Surface(object):
         self.set('k', 0)
         self.set('reemission_wavelength', 0)
         self.set('reemission_cdf', 0)
+
+        self.thickness = 0.0
+        self.transmissive = 0
 
     def set(self, name, value, wavelengths=standard_wavelengths):
         if np.iterable(value):
