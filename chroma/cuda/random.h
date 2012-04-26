@@ -44,6 +44,26 @@ sample_cdf(curandState *rng, int ncdf, float *cdf_x, float *cdf_y)
     return cdf_x[lower] * frac + cdf_x[upper] * (1.0f - frac);
 }
 
+// Sample from a uniformly-sampled CDF
+__device__ float
+sample_cdf(curandState *rng, int ncdf, float x0, float delta, float *cdf_y)
+{
+    float u = curand_uniform(rng);
+
+    int lower = 0;
+    int upper = ncdf - 1;
+    while(lower < upper-1) {
+	int half = (lower + upper) / 2;
+	if (u < cdf_y[half])
+	    upper = half;
+	else
+	    lower = half;
+    }
+  
+    float frac = (u - cdf_y[lower]) / (cdf_y[upper] - cdf_y[lower]);
+    return (x0 + delta * lower) * frac + (x0 + delta * upper) * (1.0f - frac);
+}
+
 extern "C"
 {
 

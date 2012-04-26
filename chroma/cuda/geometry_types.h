@@ -30,13 +30,10 @@ struct Surface
     float *reflect_specular;
     float *eta;
     float *k;
-
-    float *reemission_wavelength;
     float *reemission_cdf;
 
     unsigned int model;
     unsigned int n;
-    unsigned int reemission_n;
     unsigned int transmissive;
     float step;
     float wavelength0;

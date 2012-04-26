@@ -493,7 +493,7 @@ propagate_complex(Photon &p, State &s, curandState &rng, Surface* surface, bool 
         return BREAK;
     }
     else if (uniform_sample < absorb + reflect) {
-        return propagate_at_specular_reflector(p, s);
+        return propagate_at_diffuse_reflector(p, s, rng);
     }
     else {
         // transmit
@@ -515,7 +515,7 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
     float uniform_sample = curand_uniform(&rng);
 
     if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD && absorb < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
-         // Prevent absorption and reweight accordingly
+        // Prevent absorption and reweight accordingly
         float survive = 1.0f - absorb;
         absorb = 0.0f;
         p.weight *= survive;
@@ -528,7 +528,7 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
         float uniform_sample_reemit = curand_uniform(&rng);
         if (uniform_sample_reemit < reemit) {
             p.history |= SURFACE_REEMIT;
-            p.wavelength = sample_cdf(&rng, surface->reemission_n, surface->reemission_wavelength, surface->reemission_cdf);
+            p.wavelength = sample_cdf(&rng, surface->n, surface->wavelength0, surface->step, surface->reemission_cdf);
             return propagate_at_diffuse_reflector(p, s, rng); // reemit isotropically (eh?)
         }
 

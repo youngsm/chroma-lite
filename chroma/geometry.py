@@ -180,7 +180,6 @@ class Surface(object):
         self.set('reflect_specular', 0)
         self.set('eta', 0)
         self.set('k', 0)
-        self.set('reemission_wavelength', 0)
         self.set('reemission_cdf', 0)
 
         self.thickness = 0.0

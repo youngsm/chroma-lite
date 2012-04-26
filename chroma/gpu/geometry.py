@@ -93,9 +93,6 @@ class GPUGeometry(object):
             eta_gpu = ga.to_gpu(eta)
             k = interp_material_property(wavelengths, surface.k)
             k_gpu = ga.to_gpu(k)
-
-            reemission_wavelength = interp_material_property(wavelengths, surface.reemission_wavelength)
-            reemission_wavelength_gpu = ga.to_gpu(reemission_wavelength)
             reemission_cdf = interp_material_property(wavelengths, surface.reemission_cdf)
             reemission_cdf_gpu = ga.to_gpu(reemission_cdf)
 
@@ -105,22 +102,17 @@ class GPUGeometry(object):
             self.surface_data.append(reflect_gpu)
             self.surface_data.append(reflect_diffuse_gpu)
             self.surface_data.append(reflect_specular_gpu)
-            self.surface_data.append(eta)
-            self.surface_data.append(k)
-            self.surface_data.append(reemission_wavelength)
-            self.surface_data.append(reemission_cdf)
+            self.surface_data.append(eta_gpu)
+            self.surface_data.append(k_gpu)
+            self.surface_data.append(reemission_cdf_gpu)
 
             surface_gpu = \
                 make_gpu_struct(surface_struct_size,
                                 [detect_gpu, absorb_gpu, reemit_gpu, reflect_gpu,
-                                 reflect_diffuse_gpu,
-                                 reflect_specular_gpu,
-                                 eta_gpu, k_gpu,
-                                 reemission_wavelength_gpu,
-                                 reemission_cdf_gpu,
+                                 reflect_diffuse_gpu,reflect_specular_gpu,
+                                 eta_gpu, k_gpu, reemission_cdf_gpu,
                                  np.uint32(surface.model),
                                  np.uint32(len(wavelengths)),
-                                 np.uint32(len(reemission_wavelength_gpu)),
                                  np.uint32(surface.transmissive),
                                  np.float32(wavelength_step),
                                  np.float32(wavelengths[0]),
