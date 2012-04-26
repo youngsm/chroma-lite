@@ -493,10 +493,7 @@ propagate_complex(Photon &p, State &s, curandState &rng, Surface* surface, bool 
         return BREAK;
     }
     else if (uniform_sample < absorb + reflect) {
-        // specularly reflect
-        p.direction = rotate(s.surface_normal, incident_angle, incident_plane_normal);
-        p.history |= REFLECT_SPECULAR;
-        return CONTINUE;
+        return propagate_at_specular_reflector(p, s);
     }
     else {
         // transmit
