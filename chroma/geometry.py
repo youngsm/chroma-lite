@@ -175,7 +175,6 @@ class Surface(object):
         self.set('detect', 0)
         self.set('absorb', 0)
         self.set('reemit', 0)
-        self.set('reflect', 0)
         self.set('reflect_diffuse', 0)
         self.set('reflect_specular', 0)
         self.set('eta', 0)

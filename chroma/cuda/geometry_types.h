@@ -14,8 +14,6 @@ struct Material
 // surface models
 enum {
     SURFACE_DEFAULT,  // specular + diffuse + absorption + detection
-    SURFACE_SPECULAR, // perfect specular reflector
-    SURFACE_DIFFUSE,  // perfect diffuse reflector
     SURFACE_COMPLEX,  // use complex index of refraction
     SURFACE_WLS       // wavelength-shifting reemission
 };
@@ -25,7 +23,6 @@ struct Surface
     float *detect;
     float *absorb;
     float *reemit;
-    float *reflect;
     float *reflect_diffuse;
     float *reflect_specular;
     float *eta;
@@ -71,3 +68,4 @@ struct Geometry
 };
 
 #endif
+

@@ -83,8 +83,6 @@ class GPUGeometry(object):
             absorb_gpu = ga.to_gpu(absorb)
             reemit = interp_material_property(wavelengths, surface.reemit)
             reemit_gpu = ga.to_gpu(reemit)
-            reflect = interp_material_property(wavelengths, surface.reflect)
-            reflect_gpu = ga.to_gpu(reflect)
             reflect_diffuse = interp_material_property(wavelengths, surface.reflect_diffuse)
             reflect_diffuse_gpu = ga.to_gpu(reflect_diffuse)
             reflect_specular = interp_material_property(wavelengths, surface.reflect_specular)
@@ -99,7 +97,6 @@ class GPUGeometry(object):
             self.surface_data.append(detect_gpu)
             self.surface_data.append(absorb_gpu)
             self.surface_data.append(reemit_gpu)
-            self.surface_data.append(reflect_gpu)
             self.surface_data.append(reflect_diffuse_gpu)
             self.surface_data.append(reflect_specular_gpu)
             self.surface_data.append(eta_gpu)
@@ -108,7 +105,7 @@ class GPUGeometry(object):
 
             surface_gpu = \
                 make_gpu_struct(surface_struct_size,
-                                [detect_gpu, absorb_gpu, reemit_gpu, reflect_gpu,
+                                [detect_gpu, absorb_gpu, reemit_gpu,
                                  reflect_diffuse_gpu,reflect_specular_gpu,
                                  eta_gpu, k_gpu, reemission_cdf_gpu,
                                  np.uint32(surface.model),

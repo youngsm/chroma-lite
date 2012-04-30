@@ -332,7 +332,7 @@ propagate_at_specular_reflector(Photon &p, State &s)
     p.history |= REFLECT_SPECULAR;
 
     return CONTINUE;
-} // reflect_specular
+} // propagate_at_specular_reflector
 
 __device__ int
 propagate_at_diffuse_reflector(Photon &p, State &s, curandState &rng)
@@ -348,16 +348,16 @@ propagate_at_diffuse_reflector(Photon &p, State &s, curandState &rng)
     p.history |= REFLECT_DIFFUSE;
 
     return CONTINUE;
-} // reflect_diffuse
+} // propagate_at_diffuse_reflector
 
 __device__ int
 propagate_complex(Photon &p, State &s, curandState &rng, Surface* surface, bool use_weights=false)
 {
     float detect = interp_property(surface, p.wavelength, surface->detect);
+    float reflect_specular = interp_property(surface, p.wavelength, surface->reflect_specular);
+    float reflect_diffuse = interp_property(surface, p.wavelength, surface->reflect_diffuse);
     float n2_eta = interp_property(surface, p.wavelength, surface->eta);
     float n2_k = interp_property(surface, p.wavelength, surface->k);
-
-    float uniform_sample = curand_uniform(&rng);
 
     // thin film optical model, adapted from RAT PMT optical model by P. Jones
     cuFloatComplex n1 = make_cuFloatComplex(s.refractive_index1, 0.0f);
@@ -475,28 +475,33 @@ propagate_complex(Photon &p, State &s, curandState &rng, Surface* surface, bool 
     }
 
     if (use_weights && detect > 0.0f) {
-        p.history |= SURFACE_ABSORB;
         p.history |= SURFACE_DETECT;
         p.weight *= detect;
         return BREAK;
     }
 
-    if (uniform_sample < absorb) {
-        // absorb
-        p.history |= SURFACE_ABSORB;
+    float uniform_sample = curand_uniform(&rng);
 
+    if (uniform_sample < absorb) {
         // detection probability is conditional on absorption here
         float uniform_sample_detect = curand_uniform(&rng);
         if (uniform_sample_detect < detect)
             p.history |= SURFACE_DETECT;
+        else
+            p.history |= SURFACE_ABSORB;
 
         return BREAK;
     }
-    else if (uniform_sample < absorb + reflect) {
-        return propagate_at_diffuse_reflector(p, s, rng);
+    else if (uniform_sample < absorb + reflect || !surface->transmissive) {
+        // reflect, specularly (default) or diffusely
+        float uniform_sample_reflect = curand_uniform(&rng);
+        if (uniform_sample_reflect < reflect_diffuse)
+            return propagate_at_diffuse_reflector(p, s, rng);
+        else
+            return propagate_at_specular_reflector(p, s);
     }
     else {
-        // transmit
+        // refract and transmit
         p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
         p.polarization = cross(incident_plane_normal, p.direction);
         p.polarization /= norm(p.polarization);
@@ -509,7 +514,8 @@ __device__ int
 propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool use_weights=false)
 {
     float absorb = interp_property(surface, p.wavelength, surface->absorb);
-    float reflect = interp_property(surface, p.wavelength, surface->reflect);
+    float reflect_specular = interp_property(surface, p.wavelength, surface->reflect_specular);
+    float reflect_diffuse = interp_property(surface, p.wavelength, surface->reflect_diffuse);
     float reemit = interp_property(surface, p.wavelength, surface->reemit);
 
     float uniform_sample = curand_uniform(&rng);
@@ -519,12 +525,11 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
         float survive = 1.0f - absorb;
         absorb = 0.0f;
         p.weight *= survive;
-        reflect /= survive;
+        reflect_diffuse /= survive;
+        reflect_specular /= survive;
     }
 
     if (uniform_sample < absorb) {
-        p.history |= SURFACE_ABSORB;
-
         float uniform_sample_reemit = curand_uniform(&rng);
         if (uniform_sample_reemit < reemit) {
             p.history |= SURFACE_REEMIT;
@@ -532,10 +537,16 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
             return propagate_at_diffuse_reflector(p, s, rng); // reemit isotropically (eh?)
         }
 
+        p.history |= SURFACE_ABSORB;
         return BREAK;
     }
-    else if (uniform_sample < absorb + reflect) {
-        return propagate_at_diffuse_reflector(p, s, rng);
+    else if (uniform_sample < absorb + reflect_specular + reflect_diffuse) {
+        // choose how to reflect, defaulting to diffuse
+        float uniform_sample_reflect = curand_uniform(&rng) * (reflect_specular + reflect_diffuse);
+        if (uniform_sample_reflect < reflect_specular)
+            return propagate_at_specular_reflector(p, s);
+        else
+            return propagate_at_diffuse_reflector(p, s, rng);
     }
     else {
         p.history |= SURFACE_TRANSMIT;
@@ -549,18 +560,14 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
 {
     Surface *surface = geometry->surfaces[s.surface_index];
 
-    if (surface->model == SURFACE_SPECULAR)
-        return propagate_at_specular_reflector(p, s);
-    else if (surface->model == SURFACE_DIFFUSE)
-        return propagate_at_diffuse_reflector(p, s, rng);
-    else if (surface->model == SURFACE_COMPLEX)
+    if (surface->model == SURFACE_COMPLEX)
         return propagate_complex(p, s, rng, surface, use_weights);
     else if (surface->model == SURFACE_WLS)
         return propagate_at_wls(p, s, rng, surface, use_weights);
     else {
-        // if no surface model is specified, do a combination of specular and
+        // use default surface model: do a combination of specular and
         // diffuse reflection, detection, and absorption based on relative
-        // probabilties (i.e. the "old" behavior)
+        // probabilties
 
         // since the surface properties are interpolated linearly, we are
         // guaranteed that they still sum to 1.0.
