@@ -13,10 +13,11 @@ from chroma.tools import enable_debug_on_crash
 
 class TestReemission(unittest.TestCase):
     def testBulkReemission(self):
-        '''Test bulk reemission by starting a bunch of monoenergetic photons at
-        the center of a wavelength-shifting sphere, forcing reemission, and
-        checking that the final wavelength distribution matches the wls
-        spectrum.
+        '''Test bulk reemission 
+
+        Start a bunch of monoenergetic photons at the center of a wavelength-
+        shifting sphere, forcing reemission, and check that the final
+        wavelength distribution matches the wls spectrum.
         '''
         nphotons = 1000
 

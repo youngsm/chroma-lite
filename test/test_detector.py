@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 
 from chroma.geometry import Solid, Geometry, vacuum
+from chroma.loader import create_geometry_from_obj
 from chroma.detector import Detector
 from chroma.make import box
 from chroma.sim import Simulation
@@ -17,10 +18,10 @@ class TestDetector(unittest.TestCase):
         cube.set_time_dist_gaussian(1.2, -6.0, 6.0)
         cube.set_charge_dist_gaussian(1.0, 0.1, 0.5, 1.5)
 
-        cube.build(use_cache=False)
+        geo = create_geometry_from_obj(cube, update_bvh_cache=False)
 
-        self.cube = cube
-        self.sim = Simulation(cube, geant4_processes=0)
+        self.geo = geo
+        self.sim = Simulation(self.geo, geant4_processes=0)
         
     def testTime(self):
         '''Test PMT time distribution'''

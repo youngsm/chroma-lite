@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 
 import chroma.demo
+from chroma.loader import create_geometry_from_obj
 from chroma.generator.photon import G4ParallelGenerator
 from chroma.generator.vertex import constant_particle_gun
 from chroma.demo.optics import water
@@ -11,8 +12,7 @@ from chroma.sim import Simulation
 
 class TestPDF(unittest.TestCase):
     def setUp(self):
-        self.detector = chroma.demo.tiny()
-        self.detector.build()
+        self.detector = create_geometry_from_obj(chroma.demo.tiny(), update_bvh_cache=False)
         self.vertex_gen = constant_particle_gun('e-', (0,0,0), (1,0,0), 10)
 
     def testGPUPDF(self):

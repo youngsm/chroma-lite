@@ -40,10 +40,6 @@ class Simulation(object):
 
         self.context = gpu.create_cuda_context(cuda_device)
 
-        if not hasattr(detector, 'mesh'):
-            # need to build geometry
-            detector.build()
-
         if hasattr(detector, 'num_channels'):
             self.gpu_geometry = gpu.GPUDetector(detector)
             self.gpu_daq = gpu.GPUDaq(self.gpu_geometry)

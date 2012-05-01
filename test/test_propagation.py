@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 
 from chroma.geometry import Solid, Geometry, vacuum
+from chroma.loader import create_geometry_from_obj
 from chroma.make import box
 from chroma.sim import Simulation
 from chroma.event import Photons
@@ -19,8 +20,8 @@ class TestPropagation(unittest.TestCase):
         # Setup geometry
         cube = Geometry(vacuum)
         cube.add_solid(Solid(box(100,100,100), vacuum, vacuum))
-        cube.build(use_cache=False)
-        sim = Simulation(cube, geant4_processes=0)
+        geo = create_geometry_from_obj(cube, update_bvh_cache=False)
+        sim = Simulation(geo, geant4_processes=0)
 
         # Create initial photons
         nphotons = 10000

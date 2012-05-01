@@ -9,7 +9,8 @@ class TestRayIntersection(unittest.TestCase):
         self.context = chroma.gpu.create_cuda_context()
         self.module = chroma.gpu.get_cu_module('mesh.h')
         self.gpu_funcs = chroma.gpu.GPUFuncs(self.module)
-        self.box = chroma.gpu.GPUGeometry(chroma.build(chroma.make.cube(size=1000.0)))
+        cube = chroma.loader.create_geometry_from_obj(chroma.make.cube(size=1000.0), update_bvh_cache=False)
+        self.box = chroma.gpu.GPUGeometry(cube)
 
         pos, dir = chroma.project.from_film()
         self.pos_gpu = ga.to_gpu(chroma.gpu.to_float3(pos))
