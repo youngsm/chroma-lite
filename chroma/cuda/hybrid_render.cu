@@ -44,9 +44,6 @@ to_diffuse(Photon &p, State &s, Geometry *g, curandState &rng, int max_steps)
 	    if (p.history & REFLECT_DIFFUSE)
 		break;
 
-            if (p.history & SURFACE_REEMIT)
-                break;
-
 	    if (command == BREAK)
 		break;
 

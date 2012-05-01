@@ -36,6 +36,8 @@ struct State
     float refractive_index1, refractive_index2;
     float absorption_length;
     float scattering_length;
+    float reemission_prob;
+    Material *material1;
 
     int surface_index;
 
@@ -53,6 +55,7 @@ enum
     REFLECT_SPECULAR = 0x1 << 6,
     SURFACE_REEMIT   = 0x1 << 7,
     SURFACE_TRANSMIT = 0x1 << 8,
+    BULK_REEMIT      = 0x1 << 9,
     NAN_ABORT        = 0x1 << 31
 }; // processes
 
@@ -77,53 +80,56 @@ __device__ void
 fill_state(State &s, Photon &p, Geometry *g)
 {
     p.last_hit_triangle = intersect_mesh(p.position, p.direction, g,
-					 s.distance_to_boundary,
-					 p.last_hit_triangle);
+                                         s.distance_to_boundary,
+                                         p.last_hit_triangle);
 
     if (p.last_hit_triangle == -1) {
-	p.history |= NO_HIT;
-	return;
+        p.history |= NO_HIT;
+        return;
     }
-    
+
     Triangle t = get_triangle(g, p.last_hit_triangle);
-    
+
     unsigned int material_code = g->material_codes[p.last_hit_triangle];
-    
+
     int inner_material_index = convert(0xFF & (material_code >> 24));
     int outer_material_index = convert(0xFF & (material_code >> 16));
     s.surface_index = convert(0xFF & (material_code >> 8));
-    
+
     float3 v01 = t.v1 - t.v0;
     float3 v12 = t.v2 - t.v1;
-    
+
     s.surface_normal = normalize(cross(v01, v12));
-				 
+
     Material *material1, *material2;
     if (dot(s.surface_normal,-p.direction) > 0.0f) {
-	// outside to inside
-	material1 = g->materials[outer_material_index];
-	material2 = g->materials[inner_material_index];
+        // outside to inside
+        material1 = g->materials[outer_material_index];
+        material2 = g->materials[inner_material_index];
 
-	s.inside_to_outside = false;
+        s.inside_to_outside = false;
     }
     else {
-	// inside to outside
-	material1 = g->materials[inner_material_index];
-	material2 = g->materials[outer_material_index];
-	s.surface_normal = -s.surface_normal;
+        // inside to outside
+        material1 = g->materials[inner_material_index];
+        material2 = g->materials[outer_material_index];
+        s.surface_normal = -s.surface_normal;
 
-	s.inside_to_outside = true;
+        s.inside_to_outside = true;
     }
 
     s.refractive_index1 = interp_property(material1, p.wavelength,
-					  material1->refractive_index);
+                                          material1->refractive_index);
     s.refractive_index2 = interp_property(material2, p.wavelength,
-					  material2->refractive_index);
+                                          material2->refractive_index);
     s.absorption_length = interp_property(material1, p.wavelength,
-					  material1->absorption_length);
+                                          material1->absorption_length);
     s.scattering_length = interp_property(material1, p.wavelength,
-					  material1->scattering_length);
+                                          material1->scattering_length);
+    s.reemission_prob = interp_property(material1, p.wavelength,
+                                        material1->reemission_prob);
 
+    s.material1 = material1;
 } // fill_state
 
 __device__ float3
@@ -189,7 +195,7 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
     float absorption_distance = -s.absorption_length*logf(curand_uniform(&rng));
     float scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
 
-    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD) // Prevent absorption
+    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD && s.reemission_prob == 0) // Prevent absorption
 	absorption_distance = 1e30;
     else
 	use_weights = false;
@@ -224,15 +230,25 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
     }
 
     if (absorption_distance <= scattering_distance) {
-	if (absorption_distance <= s.distance_to_boundary) {
-	    p.time += absorption_distance/(SPEED_OF_LIGHT/s.refractive_index1);
-	    p.position += absorption_distance*p.direction;
-	    p.history |= BULK_ABSORB;
+        if (absorption_distance <= s.distance_to_boundary) {
+            p.time += absorption_distance/(SPEED_OF_LIGHT/s.refractive_index1);
+            p.position += absorption_distance*p.direction;
 
-	    p.last_hit_triangle = -1;
-
-	    return BREAK;
-	} // photon is absorbed in material1
+            float uniform_sample_reemit = curand_uniform(&rng);
+            if (uniform_sample_reemit < s.reemission_prob) {
+                p.wavelength = sample_cdf(&rng, s.material1->n, 
+                                          s.material1->wavelength0,
+                                          s.material1->step,
+                                          s.material1->reemission_cdf);
+                p.history |= BULK_REEMIT;
+                return CONTINUE;
+            } // photon is reemitted
+            else {
+                p.last_hit_triangle = -1;
+                p.history |= BULK_ABSORB;
+                return BREAK;
+            } // photon is absorbed in material1
+	}
     }
     else {
 	if (scattering_distance <= s.distance_to_boundary) {
@@ -257,7 +273,7 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
     // Scale weight by absorption probability along this distance
     if (use_weights)
 	p.weight *= expf(-s.distance_to_boundary/s.absorption_length);
-    
+
     p.position += s.distance_to_boundary*p.direction;
     p.time += s.distance_to_boundary/(SPEED_OF_LIGHT/s.refractive_index1);
 

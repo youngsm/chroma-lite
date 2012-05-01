@@ -46,15 +46,23 @@ class GPUGeometry(object):
             absorption_length_gpu = ga.to_gpu(absorption_length)
             scattering_length = interp_material_property(wavelengths, material.scattering_length)
             scattering_length_gpu = ga.to_gpu(scattering_length)
+            reemission_prob = interp_material_property(wavelengths, material.reemission_prob)
+            reemission_prob_gpu = ga.to_gpu(reemission_prob)
+            reemission_cdf = interp_material_property(wavelengths, material.reemission_cdf)
+            reemission_cdf_gpu = ga.to_gpu(reemission_cdf)
 
             self.material_data.append(refractive_index_gpu)
             self.material_data.append(absorption_length_gpu)
             self.material_data.append(scattering_length_gpu)
+            self.material_data.append(reemission_prob)
+            self.material_data.append(reemission_cdf)
 
             material_gpu = \
                 make_gpu_struct(material_struct_size,
                                 [refractive_index_gpu, absorption_length_gpu,
                                  scattering_length_gpu,
+                                 reemission_prob_gpu,
+                                 reemission_cdf_gpu,
                                  np.uint32(len(wavelengths)),
                                  np.float32(wavelength_step),
                                  np.float32(wavelengths[0])])
