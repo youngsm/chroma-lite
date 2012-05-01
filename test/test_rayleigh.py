@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 
 from chroma.geometry import Solid, Geometry
+from chroma.loader import create_geometry_from_obj
 from chroma.make import box
 from chroma.sim import Simulation
 from chroma.demo.optics import water
@@ -15,8 +16,8 @@ class TestRayleigh(unittest.TestCase):
     def setUp(self):
         self.cube = Geometry(water)
         self.cube.add_solid(Solid(box(100,100,100), water, water))
-        self.cube.build(use_cache=False)
-        self.sim = Simulation(self.cube, geant4_processes=0)
+        self.geo = create_geometry_from_obj(self.cube, update_bvh_cache=False)
+        self.sim = Simulation(self.geo, geant4_processes=0)
 
         nphotons = 100000
         pos = np.tile([0,0,0], (nphotons,1)).astype(np.float32)

@@ -40,7 +40,7 @@ class TestReemission(unittest.TestCase):
         world = Geometry(vacuum)
         world.add_solid(Solid(sphere(1000), vacuum, vacuum, surface=detector))
         world.add_solid(Solid(sphere(100), scint, vacuum))
-        w = create_geometry_from_obj(world)
+        w = create_geometry_from_obj(world, update_bvh_cache=False)
 
         sim = Simulation(w, geant4_processes=0)
 
