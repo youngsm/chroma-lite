@@ -1,5 +1,6 @@
 import sys
 import os
+from itertools import chain
 from hashlib import md5
 import cPickle as pickle
 import gzip
@@ -53,6 +54,16 @@ class Mesh(object):
         self.vertices = unique_vertices.view(self.vertices.dtype).reshape((unique_vertices.shape[0], self.vertices.shape[1]))
         # remap the triangles to the unique vertices
         self.triangles = inverse[self.triangles]
+
+    def remove_null_triangles(self):
+        '''Remove any zero-area triangles from a mesh.
+ 
+        Returns the mask of retained triangles, which may be applied to the
+        material, surface, etc., arrays of an associated ``Solid``.
+        '''
+        mask = np.array([(len(set(x)) == 3) for x in self.triangles])
+        self.triangles = self.triangles[mask]
+        return mask
 
     def assemble(self, key=slice(None), group=True):
         """
@@ -126,6 +137,49 @@ class Solid(object):
 
     def __add__(self, other):
         return Solid(self.mesh + other.mesh, np.concatenate((self.material1, other.material1)), np.concatenate((self.material2, other.material2)), np.concatenate((self.surface, other.surface)), np.concatenate((self.color, other.color)))
+
+    def weld(self, other, shared_triangle_surface=None, shared_triangle_color=None):
+        '''Merge this solid with another at any identical triangles.
+
+        Triangles that are common to both solids will be reduced to one, with the
+        surface and color properties of this one unless otherwise specified with
+        ``shared_triangle_surface`` and/or ``shared_triangle_color``.
+
+        Note that this is NOT a boolean union!
+        '''
+        # create arrays of sets of (three-tuple) points
+        # use sets to take care of point order permutations, numpy element-wise-ness
+        points_self = np.array([set(map(tuple, [self.mesh.vertices[x] for x in y])) for y in self.mesh.triangles], dtype=set)
+        points_other = np.array([set(map(tuple, [other.mesh.vertices[x] for x in y])) for y in other.mesh.triangles], dtype=set)
+
+        # find any triangles in other that also exist in self
+        match = [np.where(points_other == x)[0] for x in points_self]
+        mask = np.array(map(lambda x: len(x)>0, match))
+        if mask.sum() == 0:
+            raise Exception('cannot weld solids with no shared triangles')
+
+        # get triangle ids of the duplicates
+        duplicates = sorted(list(chain(*[np.where(points_other == x)[0] for x in points_self])))
+
+        # create temporary second solid -- solid2 with duplicate triangles removed
+        mesh = Mesh(other.mesh.vertices, np.delete(other.mesh.triangles, duplicates, 0))
+        material1 = np.delete(other.material1, duplicates, 0)
+        material2 = np.delete(other.material2, duplicates, 0)
+        surface = np.delete(other.surface, duplicates, 0)
+        color = np.delete(other.color, duplicates, 0)
+
+        self.mesh = self.mesh + mesh
+        self.material1 = np.concatenate((self.material1, material1))
+        self.material2 = np.concatenate((self.material2, material2))
+        self.surface = np.concatenate((self.surface, surface))
+        self.color = np.concatenate((self.color, color))
+
+        # set properties at interface
+        self.material2[mask] = other.material1[0]
+        if shared_triangle_surface is not None:
+            self.surface[mask] = shared_triangle_surface
+        if shared_triangle_color is not None:
+            self.color[mask] = shared_triangle_color
 
     @memoize_method_with_dictionary_arg
     def material1_indices(self, material_lookup):
@@ -295,3 +349,4 @@ class Geometry(object):
             self.surface_index[self.surface_index == surface_lookup[None]] = -1
         except KeyError:
             pass
+
