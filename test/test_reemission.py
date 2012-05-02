@@ -19,19 +19,19 @@ class TestReemission(unittest.TestCase):
         shifting sphere, forcing reemission, and check that the final
         wavelength distribution matches the wls spectrum.
         '''
-        nphotons = 1000
+        nphotons = 1e6
 
         # set up detector -- a sphere of 'scintillator' surrounded by a
         # detecting sphere
         scint = Material('scint')
         scint.set('refractive_index', 1)
-        scint.set('absorption_length', 1)
+        scint.set('absorption_length', 1.0)
         scint.set('scattering_length', 1e7)
         scint.set('reemission_prob', 1)
 
         x = np.arange(0,1000,10)
         norm = scipy.stats.norm(scale=50, loc=600)
-        pdf = nphotons * 10 * norm.pdf(x)
+        pdf = 10 * norm.pdf(x)
         cdf = norm.cdf(x)
         scint.reemission_cdf = np.array(zip(x, cdf))
 
@@ -40,7 +40,7 @@ class TestReemission(unittest.TestCase):
 
         world = Geometry(vacuum)
         world.add_solid(Solid(sphere(1000), vacuum, vacuum, surface=detector))
-        world.add_solid(Solid(sphere(100), scint, vacuum))
+        world.add_solid(Solid(sphere(500), scint, vacuum))
         w = create_geometry_from_obj(world, update_bvh_cache=False)
 
         sim = Simulation(w, geant4_processes=0)
@@ -62,16 +62,18 @@ class TestReemission(unittest.TestCase):
 
         # compare wavelength distribution to scintillator's reemission pdf
         hist, edges = np.histogram(final_wavelengths, bins=x)
-        print 'detected', sum(hist), 'of', nphotons, 'photons'
+        print 'detected', hist.sum(), 'of', nphotons, 'photons'
+        hist_norm = 1.0 * hist / (1.0 * hist.sum() / 1000)
+        pdf /= (1.0 * pdf.sum() / 1000)
 
-        chi2 = scipy.stats.chisquare(hist, pdf[:-1])[1]
+        chi2 = scipy.stats.chisquare(hist_norm, pdf[:-1])[1]
         print 'chi2 =', chi2
 
         # show histogram comparison
         #plt.figure(1)
         #width = edges[1] - edges[0]
         #plt.bar(left=edges, height=pdf, width=width, color='red')
-        #plt.bar(left=edges[:-1], height=hist, width=width)
+        #plt.bar(left=edges[:-1], height=hist_norm, width=width)
         #plt.show()
 
         self.assertTrue(chi2 > 0.75)

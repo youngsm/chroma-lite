@@ -240,9 +240,12 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
                                           s.material1->wavelength0,
                                           s.material1->step,
                                           s.material1->reemission_cdf);
+                p.direction = uniform_sphere(&rng);
+                p.polarization = cross(uniform_sphere(&rng), p.direction);
+                p.polarization /= norm(p.polarization);
                 p.history |= BULK_REEMIT;
                 return CONTINUE;
-            } // photon is reemitted
+            } // photon is reemitted isotropically
             else {
                 p.last_hit_triangle = -1;
                 p.history |= BULK_ABSORB;
