@@ -22,7 +22,12 @@ __device__ uint4 read_skip_l1(uint4 *ptr)
 __device__ Node
 get_node(Geometry *geometry, const unsigned int &i)
 {
-    uint4 node = geometry->nodes[i];
+    uint4 node; 
+    if (i < geometry->nprimary_nodes)
+	node = geometry->primary_nodes[i];
+    else
+	node = geometry->extra_nodes[i - geometry->nprimary_nodes];
+	
     Node node_struct;
 
     uint3 lower_int = make_uint3(node.x & 0xFFFF, node.y & 0xFFFF, node.z & 0xFFFF);

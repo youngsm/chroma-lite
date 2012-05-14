@@ -11,7 +11,7 @@ from chroma.gpu.tools import get_cu_module, get_cu_source, cuda_options, \
 from chroma.log import logger
 
 class GPUGeometry(object):
-    def __init__(self, geometry, wavelengths=None, print_usage=False):
+    def __init__(self, geometry, wavelengths=None, print_usage=False, min_free_gpu_mem=300e6):
         if wavelengths is None:
             wavelengths = standard_wavelengths
 
@@ -137,7 +137,6 @@ class GPUGeometry(object):
         self.vertices[:] = to_float3(geometry.mesh.vertices)
         self.triangles[:] = to_uint3(geometry.mesh.triangles)
 
-        self.nodes = ga.to_gpu(geometry.bvh.nodes)
         self.world_origin = ga.vec.make_float3(*geometry.bvh.world_coords.world_origin)
         self.world_scale = np.float32(geometry.bvh.world_coords.world_scale)
 
@@ -149,15 +148,38 @@ class GPUGeometry(object):
         self.colors = ga.to_gpu(colors)
         self.solid_id_map = ga.to_gpu(geometry.solid_id.astype(np.uint32))
 
+        # Limit memory usage by splitting BVH into on and off-GPU parts
+        gpu_free, gpu_total = cuda.mem_get_info()
+        node_array_usage = geometry.bvh.nodes.nbytes
+
+        # Figure out how many elements we can fit on the GPU,
+        # but no fewer than 100 elements, and no more than the number of actual nodes
+        n_nodes = len(geometry.bvh.nodes)
+        split_index = min(
+            max(int((gpu_free - min_free_gpu_mem) / geometry.bvh.nodes.itemsize),100),
+            n_nodes
+            )
+        
+        self.nodes = ga.to_gpu(geometry.bvh.nodes[:split_index])
+        n_extra = max(1, (n_nodes - split_index)) # forbid zero size
+        self.extra_nodes = mapped_empty(shape=n_extra,
+                                        dtype=geometry.bvh.nodes.dtype,
+                                        write_combined=True)
+        if split_index < n_nodes:
+            logger.info('Splitting BVH between GPU and CPU memory at node %d' % split_index)
+            self.extra_nodes[:] = geometry.bvh.nodes[split_index:]
+
         self.gpudata = make_gpu_struct(geometry_struct_size,
                                        [Mapped(self.vertices), 
                                         Mapped(self.triangles),
                                         self.material_codes,
                                         self.colors, self.nodes,
+                                        Mapped(self.extra_nodes),
                                         self.material_pointer_array,
                                         self.surface_pointer_array,
                                         self.world_origin,
-                                        self.world_scale])
+                                        self.world_scale,
+                                        np.int32(len(self.nodes))])
 
         self.geometry = geometry
 

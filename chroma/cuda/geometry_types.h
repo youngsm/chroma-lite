@@ -57,11 +57,13 @@ struct Geometry
     uint3 *triangles;
     unsigned int *material_codes;
     unsigned int *colors;
-    uint4 *nodes;
+    uint4 *primary_nodes;
+    uint4 *extra_nodes;
     Material **materials;
     Surface **surfaces;
     float3 world_origin;
     float world_scale;
+    int nprimary_nodes;
 };
 
 #endif
