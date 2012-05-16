@@ -19,14 +19,27 @@ __device__ uint4 read_skip_l1(uint4 *ptr)
   return val;
 }
 
+__device__ uint4
+get_packed_node(Geometry *geometry, const unsigned int &i)
+{
+    if (i < geometry->nprimary_nodes)
+	return geometry->primary_nodes[i];
+    else
+	return geometry->extra_nodes[i - geometry->nprimary_nodes];
+}
+__device__ void
+put_packed_node(Geometry *geometry, const unsigned int &i, const uint4 &node)
+{
+    if (i < geometry->nprimary_nodes)
+	geometry->primary_nodes[i] = node;
+    else
+        geometry->extra_nodes[i - geometry->nprimary_nodes] = node;
+}
+
 __device__ Node
 get_node(Geometry *geometry, const unsigned int &i)
 {
-    uint4 node; 
-    if (i < geometry->nprimary_nodes)
-	node = geometry->primary_nodes[i];
-    else
-	node = geometry->extra_nodes[i - geometry->nprimary_nodes];
+    uint4 node = get_packed_node(geometry, i); 
 	
     Node node_struct;
 

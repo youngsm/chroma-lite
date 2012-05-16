@@ -548,14 +548,12 @@ extern "C"
      unsigned int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
      unsigned int stride = gridDim.x * blockDim.x;
 
-     uint4 *node = geometry->nodes;
-
      const int MAX_CHILD = 1 << (32 - CHILD_BITS);
      float distance[MAX_CHILD];
      uint4 children[MAX_CHILD];
 
      for (unsigned int i=start+thread_id; i < end; i += stride) {
-       uint4 this_node = node[i];
+       uint4 this_node = get_packed_node(geometry, i);
        unsigned int nchild = this_node.w >> CHILD_BITS;
        unsigned int child_id = this_node.w &  ~NCHILD_MASK;
 
@@ -563,7 +561,7 @@ extern "C"
 	 continue;
 
        for (unsigned int i=0; i < nchild; i++) {
-	 children[i] = node[child_id + i];
+	 children[i] = get_packed_node(geometry, child_id+i);
 	 Node unpacked = get_node(geometry, child_id+i);
 	 float3 delta = unpacked.upper - unpacked.lower;
 	 distance[i] = -(delta.x * delta.y + delta.y * delta.z + delta.z * delta.x);
@@ -572,7 +570,7 @@ extern "C"
        piksrt2(nchild, distance, children);
 
        for (unsigned int i=0; i < nchild; i++)
-	 node[child_id + i] = children[i];
+	 put_packed_node(geometry, child_id + i, children[i]);
      }
   }
 
