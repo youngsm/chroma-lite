@@ -19,12 +19,14 @@ def mesh_grid(grid):
 
     return mesh
 
-def linear_extrude(x1, y1, height, x2=None, y2=None, center=None):
+def linear_extrude(x1, y1, height, x2=None, y2=None, center=None, endcaps=True):
     """
     Return the solid mesh formed by linearly extruding the polygon formed by
     the x and y points `x1` and `y1` by a distance `height`. If `x2` and `y2`
     are given extrude by connecting the points `x1` and `y1` to `x2` and `y2`;
-    this allows the creation of tapered solids.
+    this allows the creation of tapered solids.  If `endcaps` is False, then
+    the triangles on the endcaps will be left off, and the mesh will not be
+    closed.
 
     .. note::
         The path traced by the points `x` and `y` should go counter-clockwise,
@@ -49,7 +51,12 @@ def linear_extrude(x1, y1, height, x2=None, y2=None, center=None):
 
     n = len(x1)
 
-    vertex_iterators = [izip(repeat(0,n),repeat(0,n),repeat(-height/2.0,n)),izip(x1,y1,repeat(-height/2.0,n)),izip(x2,y2,repeat(height/2.0,n)),izip(repeat(0,n),repeat(0,n),repeat(height/2.0,n))]
+    vertex_iterators = [izip(x1,y1,repeat(-height/2.0,n)),
+                        izip(x2,y2,repeat(height/2.0,n))]
+    if endcaps:
+        vertex_iterators = [izip(repeat(0,n),repeat(0,n),repeat(-height/2.0,n))] \
+            + vertex_iterators \
+            + [izip(repeat(0,n),repeat(0,n),repeat(height/2.0,n))]
 
     vertices = np.fromiter(flatten(roundrobin(*vertex_iterators)), float)
     vertices = vertices.reshape((len(vertices)//3,3))
