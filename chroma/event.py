@@ -8,6 +8,9 @@ SURFACE_ABSORB   = 0x1 << 3
 RAYLEIGH_SCATTER = 0x1 << 4
 REFLECT_DIFFUSE  = 0x1 << 5
 REFLECT_SPECULAR = 0x1 << 6
+SURFACE_REEMIT   = 0x1 << 7
+SURFACE_TRANSMIT = 0x1 << 8
+BULK_REEMIT      = 0x1 << 9
 NAN_ABORT        = 0x1 << 31
 
 class Vertex(object):
