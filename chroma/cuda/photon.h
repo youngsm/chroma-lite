@@ -553,11 +553,14 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
         if (uniform_sample_reemit < reemit) {
             p.history |= SURFACE_REEMIT;
             p.wavelength = sample_cdf(&rng, surface->n, surface->wavelength0, surface->step, surface->reemission_cdf);
-            return propagate_at_diffuse_reflector(p, s, rng); // reemit isotropically (eh?)
-        }
-
-        p.history |= SURFACE_ABSORB;
-        return BREAK;
+	    p.direction = uniform_sphere(&rng);
+	    p.polarization = cross(uniform_sphere(&rng), p.direction);
+	    p.polarization /= norm(p.polarization);
+            return CONTINUE;
+        } else {
+	  p.history |= SURFACE_ABSORB;
+	  return BREAK;
+	}
     }
     else if (uniform_sample < absorb + reflect_specular + reflect_diffuse) {
         // choose how to reflect, defaulting to diffuse
