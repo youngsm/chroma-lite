@@ -149,7 +149,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
     p.history = histories[photon_id];
     p.weight = weights[photon_id];
 
-    if (p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB))
+    if (p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB | NAN_ABORT))
 	return;
 
     State s;
@@ -205,7 +205,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
     weights[photon_id] = p.weight;
 
     // Not done, put photon in output queue
-    if ((p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB)) == 0) {
+    if ((p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB | NAN_ABORT)) == 0) {
 	int out_idx = atomicAdd(output_queue, 1);
 	output_queue[out_idx] = photon_id;
     }
