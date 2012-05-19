@@ -54,8 +54,8 @@ class GPUGeometry(object):
             self.material_data.append(refractive_index_gpu)
             self.material_data.append(absorption_length_gpu)
             self.material_data.append(scattering_length_gpu)
-            self.material_data.append(reemission_prob)
-            self.material_data.append(reemission_cdf)
+            self.material_data.append(reemission_prob_gpu)
+            self.material_data.append(reemission_cdf_gpu)
 
             material_gpu = \
                 make_gpu_struct(material_struct_size,
