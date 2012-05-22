@@ -141,3 +141,19 @@ def torus(radius, offset, nsteps=64, circle_steps=None):
         circle_steps = nsteps
     profile_angles = np.linspace(0, 2*np.pi, circle_steps)
     return rotate_extrude(np.cos(profile_angles) + offset, np.sin(profile_angles), nsteps)
+
+def convex_polygon(x, y):
+    """
+    Return a polygon mesh in the x-y plane. `x` and `y` are the x and
+    y coordinates for the points in the polygon.  The simple triangulation
+    method used here requires that the polygon be convex and the points
+    are specified in order.
+    """
+    vertices = np.column_stack( (x, y, np.zeros_like(x)) )
+    # Every triangle includes 
+    triangles = np.empty(shape=(len(vertices)-2,3), dtype=np.int32)
+    triangles[:,0] = 0 # Every triangle includes vertex zero
+    triangles[:,1] = np.arange(1, len(vertices)-1)
+    triangles[:,2] = np.arange(2, len(vertices))
+    
+    return Mesh(vertices=vertices, triangles=triangles)
