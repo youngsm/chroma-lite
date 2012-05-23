@@ -356,10 +356,15 @@ propagate_at_specular_reflector(Photon &p, State &s)
 __device__ int
 propagate_at_diffuse_reflector(Photon &p, State &s, curandState &rng)
 {
-    p.direction = uniform_sphere(&rng);
-
-    if (dot(p.direction, s.surface_normal) < 0.0f)
-        p.direction = -p.direction;
+    float ndotv;
+    do {
+	p.direction = uniform_sphere(&rng);
+	ndotv = dot(p.direction, s.surface_normal);
+	if (ndotv < 0.0f) {
+	    p.direction = -p.direction;
+	    ndotv = -ndotv;
+	}
+    } while (! (curand_uniform(&rng) < ndotv) );
 
     p.polarization = cross(uniform_sphere(&rng), p.direction);
     p.polarization /= norm(p.polarization);
