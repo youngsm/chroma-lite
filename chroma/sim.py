@@ -145,6 +145,8 @@ class Simulation(object):
 
         if isinstance(first_element, event.Event):
             iterable = self.photon_generator.generate_events(iterable)
+        elif isinstance(first_element, event.Photons):
+            iterable = (event.Event(photons_beg=x) for x in iterable)
 
         for ev in iterable:
             gpu_photons_no_scatter = gpu.GPUPhotons(ev.photons_beg, ncopies=nreps)
