@@ -136,7 +136,7 @@ class GPUGeometry(object):
                                       write_combined=True)
         self.vertices[:] = to_float3(geometry.mesh.vertices)
         self.triangles[:] = to_uint3(geometry.mesh.triangles)
-
+        
         self.world_origin = ga.vec.make_float3(*geometry.bvh.world_coords.world_origin)
         self.world_scale = np.float32(geometry.bvh.world_coords.world_scale)
 
@@ -168,6 +168,17 @@ class GPUGeometry(object):
         if split_index < n_nodes:
             logger.info('Splitting BVH between GPU and CPU memory at node %d' % split_index)
             self.extra_nodes[:] = geometry.bvh.nodes[split_index:]
+
+        # See if there is enough memory to put the and/ortriangles back on the GPU
+        gpu_free, gpu_total = cuda.mem_get_info()
+        if self.triangles.nbytes < (gpu_free - min_free_gpu_mem):
+            self.triangles = ga.to_gpu(self.triangles)
+            logger.info('Optimization: Sufficient memory to move triangles onto GPU')
+
+        gpu_free, gpu_total = cuda.mem_get_info()
+        if self.vertices.nbytes < (gpu_free - min_free_gpu_mem):
+            self.vertices = ga.to_gpu(self.vertices)
+            logger.info('Optimization: Sufficient memory to move vertices onto GPU')
 
         self.gpudata = make_gpu_struct(geometry_struct_size,
                                        [Mapped(self.vertices), 

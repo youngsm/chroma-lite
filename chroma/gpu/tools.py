@@ -185,8 +185,15 @@ def format_array(name, array):
 
 def Mapped(array):
     '''Analog to pycuda.driver.InOut(), but indicates this array
-    is memory mapped to the device space and should not be copied.'''
-    return np.intp(array.base.get_device_pointer())
+    is memory mapped to the device space and should not be copied.
+
+    To simplify coding, Mapped() will pass anything with a gpudata
+    member, like a gpuarray, through unchanged.
+    '''
+    if hasattr(array, 'gpudata'):
+        return array
+    else:
+        return np.intp(array.base.get_device_pointer())
 
 def mapped_alloc(pagelocked_alloc_func, shape, dtype, write_combined):
     '''Returns a pagelocked host array mapped into the CUDA device
