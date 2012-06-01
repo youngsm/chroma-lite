@@ -117,12 +117,31 @@ class Photons(object):
         last_hit_triangles = np.concatenate((self.last_hit_triangles, other.last_hit_triangles))
         flags = np.concatenate((self.flags, other.flags))
         weights = np.concatenate((self.weights, other.weights))
-        return Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags,
-                       weights)
+        return Photons(pos, dir, pol, wavelengths, t,
+                       last_hit_triangles, flags, weights)
 
     def __len__(self):
         '''Returns the number of photons in self.'''
         return len(self.pos)
+
+    def reduced(self, reduction_factor=1.0):
+        '''Return a new Photons object with approximately
+        len(self)*reduction_factor photons.  Photons are selected
+        randomly.'''
+        n = len(self)
+        choice = np.random.permutation(n)[:int(n*reduction_factor)]
+        print len(choice)
+        pos = self.pos[choice]
+        dir = self.dir[choice]
+        pol = self.pol[choice]
+        wavelengths = self.wavelengths[choice]
+        last_hit_triangles = self.last_hit_triangles[choice]
+        t = self.t[choice]
+        flags = self.flags[choice]
+        weights = self.weights[choice]
+
+        return Photons(pos, dir, pol, wavelengths, t,
+                       last_hit_triangles, flags, weights)        
 
 class Channels(object):
     def __init__(self, hit, t, q, flags=None):
