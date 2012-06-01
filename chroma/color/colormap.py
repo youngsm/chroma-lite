@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.cm as cm
 
-def map_to_color(a, range=None, map=cm.hsv, weights=None):
+def map_to_color(a, range=None, map=cm.jet_r, weights=None):
     a = np.asarray(a)
     if range is None:
         range = (a.min(), a.max())
