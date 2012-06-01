@@ -680,7 +680,8 @@ class EventViewer(Camera):
         marker = Solid(pyramid, vacuum, vacuum)
 
         geometry = Geometry()
-        for pos in self.ev.photons_beg.pos[::100]:
+        sample_factor = max(1, len(self.ev.photons_beg.pos) / 10000)
+        for pos in self.ev.photons_beg.pos[::sample_factor]:
             geometry.add_solid(marker, displacement=pos, rotation=make_rotation_matrix(np.random.uniform(0,2*np.pi), uniform_sphere()))
 
         geometry = create_geometry_from_obj(geometry)
