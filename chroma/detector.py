@@ -120,6 +120,18 @@ class Detector(Geometry):
         pdf_y = np.exp(-0.5 * (pdf_x[1:]/rms)**2)
         self.time_cdf = self._pdf_to_cdf(pdf_x, pdf_y)
 
+    def set_time_dist(self, bin_edges, bin_contents):
+        '''Set the time PDF directly from a histogram.
+
+          `bin_edges`: array
+            bin edges of PDF.  length is len(bin_contents) + 1
+          `bin_contents`: array
+            The contents of each bin in the histogram.  The array
+            should not be normalized for bin width if variable bin
+            widths are present.
+        '''
+        self.time_cdf = self._pdf_to_cdf(bin_edges, bin_contents)
+
     def set_charge_dist_gaussian(self, mean, rms, lo, hi, nsamples=50):
         pdf_x = np.linspace(lo, hi, nsamples+1, endpoint=True)
         pdf_y = np.exp(-0.5 * ((pdf_x[1:] - mean)/rms)**2)
