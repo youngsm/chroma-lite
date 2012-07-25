@@ -14,7 +14,7 @@ from chroma.log import logger
 
 # all material/surface properties are interpolated at these
 # wavelengths when they are sent to the gpu
-standard_wavelengths = np.arange(200, 810, 20).astype(np.float32)
+standard_wavelengths = np.arange(60, 810, 20).astype(np.float32)
 
 class Mesh(object):
     "Triangle mesh object."
