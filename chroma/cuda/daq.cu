@@ -130,14 +130,14 @@ run_daq_many(curandState *s, unsigned int detection_state,
 	int channel_offset = channel_index + i * channel_stride;
 
 	if (curand_uniform(&rng) < weight) {
-	    float time = photon_time + curand_normal(&rng) * 1.2f;// + 
-	    //sample_cdf(&rng, detector->time_cdf_len,
-	    //	       detector->time_cdf_x, detector->time_cdf_y);
+	    float time = photon_time + curand_normal(&rng) + 
+	      sample_cdf(&rng, detector->time_cdf_len,
+			 detector->time_cdf_x, detector->time_cdf_y);
 	    unsigned int time_int = float_to_sortable_int(time);
 	
-	    float charge = 1.0f; //sample_cdf(&rng, detector->charge_cdf_len,
-	    //detector->charge_cdf_x,
-	    //detector->charge_cdf_y);
+	    float charge = sample_cdf(&rng, detector->charge_cdf_len,
+				      detector->charge_cdf_x,
+				      detector->charge_cdf_y);
 	    unsigned int charge_int = roundf(charge / detector->charge_unit);
 	    
 	    atomicMin(earliest_time_int + channel_offset, time_int);
@@ -154,7 +154,7 @@ convert_sortable_int_to_float(int n, unsigned int *sortable_ints,
 			      float *float_output)
 {
     int id = threadIdx.x + blockDim.x * blockIdx.x;
-	
+    
     if (id < n)
 	float_output[id] = sortable_int_to_float(sortable_ints[id]);
 }
