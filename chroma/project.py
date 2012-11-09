@@ -3,9 +3,9 @@ from chroma.transform import normalize
 
 def from_film(position=(0,0,0), axis1=(0,0,1), axis2=(1,0,0), size=(800,600),
               width=35.0, focal_length=18.0):
-    """Project rays from a piece of film located at whose focal point is
-    located at `position`. `axis1` and `axis2` specify the vectors pointing
-    along the length and height of the film respectively.
+    """Project rays from a piece of film whose focal point is located at
+    `position`. `axis1` and `axis2` specify the vectors pointing along the
+    length and height of the film respectively.
     """
 
     height = width*(size[1]/float(size[0]))
@@ -33,4 +33,4 @@ def from_film(position=(0,0,0), axis1=(0,0,1), axis2=(1,0,0), size=(800,600),
     grid += axis2*width/2 - axis1*height/2
     grid -= np.cross(axis1,axis2)*focal_length
 
-    return grid+position, normalize(-grid)
+    return np.tile(position,(n,1)), normalize(-grid)
