@@ -5,13 +5,15 @@ Chroma development tends to live on the bleeding-edge.  Installation
 of Chroma requires a more significant hardware and software investment
 than other packages, but we think the rewards are worth it!
 
+.. _hardware-prerequisites:
+
 Hardware Prerequisites
 ----------------------
 
 At a minimum, Chroma requires:
 
 * An x86 or x86-64 CPU.
-* A NVIDIA GPU that supports CUDA compute capability 1.1 or later.
+* A NVIDIA GPU that supports CUDA compute capability 2.0 or later.
 
 However, Chroma can be quite demanding with large detector geometries.
 Both the CPU and GPU will need sufficient memory hold the detector
@@ -70,27 +72,6 @@ For development, we also recommend:
 * sphinx 1.1 dev or later (to generate the documentation with mathjax support)
 
 We will explain how to install all of these packages in the following section.
-
-.. _ubuntu11.04_quick:
-
-Quick Installation: Ubuntu 11.04
---------------------------------
-
-Andy Mastbaum has provided a shell script that downloads and compiles
-all of the Chroma prerequisites.  It has been tested to work with
-Ubuntu 11.04.  To use this script, first go perform
-:ref:`ubuntu_11.04_step1` and :ref:`ubuntu_11.04_step2` in the
-Step-by-Step Installation guide.  Then download
-:download:`chroma-setup.sh` and run the following::
-
-  chmod +x chroma-setup.sh
-  ./chroma-setup -j4 -n ~/chroma_env
-
-This will download and compile (with 4 CPU cores; increase the ``-j``
-option if you have more cores) all the source code required to create
-a self-contained Chroma environment in ``$HOME/chroma_env``.  To setup
-your environment to use Chroma, just run ``source
-$HOME/chroma_env/bin/activate``.
 
 Step-by-Step Installation: Ubuntu 11.04
 ---------------------------------------
