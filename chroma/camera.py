@@ -24,8 +24,7 @@ import pygame
 from pygame.locals import *
 
 def bvh_mesh(geometry, layer):
-    lower_bounds = geometry.lower_bounds[geometry.layers == layer]
-    upper_bounds = geometry.upper_bounds[geometry.layers == layer]
+    lower_bounds, upper_bounds = geometry.bvh.get_layer(layer).get_bounds()
 
     if len(lower_bounds) == 0 or len(upper_bounds) == 0:
         raise Exception('no nodes at layer %i' % layer)
