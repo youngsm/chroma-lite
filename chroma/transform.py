@@ -38,20 +38,11 @@ def rotate_matrix(x, phi, n):
     rotation_matrix = make_rotation_matrix(phi, n)
     return np.inner(np.asarray(x),rotation_matrix)
 
+def norm(x):
+    "Returns the norm of the vector `x`."
+    return np.sqrt((x*x).sum(-1))
+
 def normalize(x):
     "Returns unit vectors in the direction of `x`."
-    x = np.asarray(x, dtype=float)
-
-    if x.shape[-1] != 3:
-        raise ValueError('dimension of last axis must be 3.')
-
-    d = len(x.shape)
-
-    if d == 1:
-        norm = np.sqrt(x.dot(x))
-    elif d == 2:
-        norm = np.sqrt(np.sum(x*x, axis=1))[:,np.newaxis]
-    else:
-        raise ValueError('len(`x`.shape) must be zero or one.')
-
-    return x/norm
+    x = np.atleast_2d(np.asarray(x, dtype=float))
+    return (x/norm(x)[:,np.newaxis]).squeeze()

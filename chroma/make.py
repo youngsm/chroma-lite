@@ -103,6 +103,10 @@ def cube(size, height=None, center=(0,0,0)):
 
     return linear_extrude([-size/2.0,size/2.0,size/2.0,-size/2.0],[-size/2.0,-size/2.0,size/2.0,size/2.0], height=size, center=center)
 
+def cylinder_along_z(radius, height, points=100):
+    angles = np.linspace(0, 2*np.pi, points, endpoint=False)
+    return linear_extrude(radius*np.cos(angles), radius*np.sin(angles), height)
+
 def cylinder(radius, height, radius2=None, nsteps=64):
     """
     Return a cylinder mesh with a radius of length `radius`, and a height of

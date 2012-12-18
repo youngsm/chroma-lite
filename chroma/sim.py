@@ -53,7 +53,7 @@ class Simulation(object):
         self.pdf_config = None
 
     def simulate(self, iterable, keep_photons_beg=False,
-                 keep_photons_end=False, run_daq=True, max_steps=10):
+                 keep_photons_end=False, run_daq=True, max_steps=1000):
         try:
             first_element, iterable = itertoolset.peek(iterable)
         except TypeError:
