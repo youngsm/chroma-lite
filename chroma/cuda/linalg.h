@@ -155,6 +155,12 @@ cross(const float3 &a, const float3 &b)
     return make_float3(a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x);
 }
 
+__device__ float3
+abs(const float3&a)
+{
+    return make_float3(abs(a.x),abs(a.y),abs(a.z));
+}
+
 __device__ float
 norm(const float3 &a)
 {
