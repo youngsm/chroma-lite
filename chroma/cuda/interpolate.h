@@ -32,19 +32,20 @@ interp(float x, int n, float *xp, float *fp)
 __device__ float
 interp_uniform(float x, int n, float x0, float dx, float *fp)
 {
-    if (x <= xp[0])
-	return xp[0];
+    if (x <= x0)
+	return x0;
 
-    if (x >= xp[n-1])
-	return xp[n-1];
+    float xmax = x0 + dx*(n-1);
+
+    if (x >= xmax)
+	return xmax;
 
     int lower = (x - x0)/dx;
     int upper = lower + 1;
 
     float df = fp[upper] - fp[lower];
-    float dx = xp[upper] - xp[lower];
 
-    return fp[lower] + df*(x-xp[lower])/dx;
+    return fp[lower] + df*(x-(x0+dx*lower))/dx;
 }
 
 #endif
