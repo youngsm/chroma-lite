@@ -138,19 +138,6 @@ class Photons(object):
         choice = np.random.permutation(n)[:int(n*reduction_factor)]
         return self[choice]
 
-        # print len(choice)
-        # pos = self.pos[choice]
-        # dir = self.dir[choice]
-        # pol = self.pol[choice]
-        # wavelengths = self.wavelengths[choice]
-        # last_hit_triangles = self.last_hit_triangles[choice]
-        # t = self.t[choice]
-        # flags = self.flags[choice]
-        # weights = self.weights[choice]
-
-        # return Photons(pos, dir, pol, wavelengths, t,
-        #                last_hit_triangles, flags, weights)        
-
 class Channels(object):
     def __init__(self, hit, t, q, flags=None):
         '''Create a list of n channels.  All channels in the detector must 
