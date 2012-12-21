@@ -21,6 +21,17 @@ make_rotation_matrix(float phi, const float3 &n)
 __device__ float3
 rotate(const float3 &a, float phi, const float3 &n)
 {
+    float cos_phi = cosf(phi);
+    float sin_phi = sinf(phi);
+
+    return a*cos_phi + n*dot(a,n)*(1.0f-cos_phi) + cross(a,n)*sin_phi;
+}
+
+/* rotate points counterclockwise, when looking towards +infinity,
+   through an angle `phi` about the axis `n`. */
+__device__ float3
+rotate_with_matrix(const float3 &a, float phi, const float3 &n)
+{
     return make_rotation_matrix(phi,n)*a;
 }
 

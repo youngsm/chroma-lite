@@ -31,17 +31,6 @@ rotate(int nthreads, float3 *a, float phi, float3 axis)
     a[id] = rotate(a[id], phi, axis);
 }
 
-__global__ void
-rotate_(int nthreads, float3 *a, float phi, float3 axis)
-{
-    int id = blockIdx.x*blockDim.x + threadIdx.x;
-
-    if (id >= nthreads)
-	return;
-
-    a[id] = rotate(a[id], phi, axis);
-}
-
 /* Rotate the points `a` through an angle `phi` counter-clockwise
    (when looking towards +infinity along `axis`) about the axis defined
    by the point `point` and the vector `axis` . */
