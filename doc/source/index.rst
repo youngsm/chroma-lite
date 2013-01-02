@@ -50,6 +50,7 @@ Subscribe to the mailing list for update announcements!
    render
    simulation
    likelihood
+   examples
 
 Authors
 -------
