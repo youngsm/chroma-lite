@@ -75,31 +75,32 @@ class Photons(object):
                Survival probability for each photon.  Used by 
                photon propagation code when computing likelihood functions.
         '''
-        self.pos = pos
-        self.dir = dir
-        self.pol = pol
-        self.wavelengths = wavelengths
+        self.pos = np.asarray(pos, dtype=np.float32)
+        self.dir = np.asarray(dir, dtype=np.float32)
+        self.pol = np.asarray(pol, dtype=np.float32)
+        self.wavelengths = np.asarray(wavelengths, dtype=np.float32)
 
         if t is None:
             self.t = np.zeros(len(pos), dtype=np.float32)
         else:
-            self.t = t
+            self.t = np.asarray(t, dtype=np.float32)
 
         if last_hit_triangles is None:
             self.last_hit_triangles = np.empty(len(pos), dtype=np.int32)
             self.last_hit_triangles.fill(-1)
         else:
-            self.last_hit_triangles = last_hit_triangles
+            self.last_hit_triangles = np.asarray(last_hit_triangles,
+                                                 dtype=np.int32)
 
         if flags is None:
             self.flags = np.zeros(len(pos), dtype=np.uint32)
         else:
-            self.flags = flags
+            self.flags = np.asarray(flags, dtype=np.uint32)
 
         if weights is None:
             self.weights = np.ones(len(pos), dtype=np.float32)
         else:
-            self.weights = weights
+            self.weights = np.asarray(weights, dtype=np.float32)
 
     def __add__(self, other):
         '''Concatenate two Photons objects into one list of photons.
