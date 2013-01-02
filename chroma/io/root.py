@@ -85,13 +85,17 @@ def root_event_to_python_event(ev):
         pyev.photons_end = photons
 
     # channels
-    hit = np.empty(ev.nchannels, dtype=np.int32)
-    t = np.empty(ev.nchannels, dtype=np.float32)
-    q = np.empty(ev.nchannels, dtype=np.float32)
-    flags = np.empty(ev.nchannels, dtype=np.uint32)
+    if ev.nchannels > 0:
+        hit = np.empty(ev.nchannels, dtype=np.int32)
+        t = np.empty(ev.nchannels, dtype=np.float32)
+        q = np.empty(ev.nchannels, dtype=np.float32)
+        flags = np.empty(ev.nchannels, dtype=np.uint32)
 
-    ROOT.get_channels(ev, hit, t, q, flags)
-    pyev.channels = event.Channels(hit.astype(bool), t, q, flags)
+        ROOT.get_channels(ev, hit, t, q, flags)
+        pyev.channels = event.Channels(hit.astype(bool), t, q, flags)
+    else:
+        pyev.channels = None
+
     return pyev
     
 class RootReader(object):
@@ -223,6 +227,10 @@ class RootWriter(object):
                 self.ev.nhit = 0
                 self.ev.channels.resize(0)
                 self.ev.nchannels = len(pyev.channels.hit)
+        else:
+            self.ev.nhit = 0
+            self.ev.channels.resize(0)
+            self.ev.nchannels = 0
 
         self.T.Fill()
 
