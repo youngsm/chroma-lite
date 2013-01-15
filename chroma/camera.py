@@ -80,7 +80,6 @@ class Camera(multiprocessing.Process):
             self.spnav = False
 
     def init_gpu(self):
-        print 'init_gpu()'
         self.context = gpu.create_cuda_context(self.device_id)
 
         self.gpu_geometry = gpu.GPUGeometry(self.geometry)
@@ -317,7 +316,6 @@ class Camera(multiprocessing.Process):
             self.update()
 
     def update_pixels(self, gpu_geometry=None, keep_last_render=False):
-        print 'self.point = ', self.point
         if gpu_geometry is None:
             gpu_geometry = self.gpu_geometry
 
