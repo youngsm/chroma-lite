@@ -23,6 +23,11 @@ geant4_libs = check_output(['geant4-config','--libs']).split()
 include_dirs=['src']
 if 'VIRTUAL_ENV' in os.environ:
     include_dirs.append(os.path.join(os.environ['VIRTUAL_ENV'], 'include'))
+try:
+    import numpy.distutils
+    include_dirs += numpy.distutils.misc_util.get_numpy_include_dirs()
+except:
+    pass # if numpy doesn't exist yet
 
 setup(
     name = 'Chroma',
