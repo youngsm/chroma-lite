@@ -10,15 +10,6 @@ to_float3(const uint3 &a)
   return make_float3(a.x, a.y, a.z);
 }
 
-__device__ uint4 read_skip_l1(uint4 *ptr)
-{
-  uint4 val;
-  asm(" ld.cg.v4.u32 {%0, %1, %2, %3}, [%4];"
-      : "=r"(val.x), "=r"(val.y), "=r"(val.z), "=r"(val.w) 
-      : "l"(ptr) : "memory");
-  return val;
-}
-
 __device__ uint4
 get_packed_node(Geometry *geometry, const unsigned int &i)
 {
