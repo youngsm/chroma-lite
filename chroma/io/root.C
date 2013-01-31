@@ -42,6 +42,14 @@ struct Event {
   unsigned int nchannels;
 
   Vertex primary_vertex;
+  
+  double TotalQ() const {
+    double sum = 0.0;
+    for (unsigned int i=0; i < channels.size(); i++)
+      sum += channels[i].q;
+    return sum;
+  }
+
 
   std::vector<Vertex> vertices;
   std::vector<Photon> photons_beg;
