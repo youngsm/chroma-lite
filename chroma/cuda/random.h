@@ -4,6 +4,7 @@
 #include <curand_kernel.h>
 
 #include "physical_constants.h"
+#include "interpolate.h"
 
 __device__ float
 uniform(curandState *s, const float &low, const float &high)
@@ -26,22 +27,7 @@ uniform_sphere(curandState *s)
 __device__ float
 sample_cdf(curandState *rng, int ncdf, float *cdf_x, float *cdf_y)
 {
-    float u = curand_uniform(rng);
-
-    // Find u in cdf_y with binary search
-    // list must contain at least 2 elements: 0.0 and 1.0
-    int lower=0;
-    int upper=ncdf-1;
-    while(lower < upper-1) {
-	int half = (lower+upper) / 2;
-	if (u < cdf_y[half])
-	    upper = half;
-	else
-	    lower = half;
-    }
-  
-    float frac = (u - cdf_y[lower]) / (cdf_y[upper] - cdf_y[lower]);
-    return cdf_x[lower] * frac + cdf_x[upper] * (1.0f - frac);
+    return interp(curand_uniform(rng),ncdf,cdf_y,cdf_x);
 }
 
 // Sample from a uniformly-sampled CDF
@@ -52,16 +38,20 @@ sample_cdf(curandState *rng, int ncdf, float x0, float delta, float *cdf_y)
 
     int lower = 0;
     int upper = ncdf - 1;
-    while(lower < upper-1) {
+
+    while(lower < upper-1)
+    {
 	int half = (lower + upper) / 2;
+
 	if (u < cdf_y[half])
 	    upper = half;
 	else
 	    lower = half;
     }
   
-    float frac = (u - cdf_y[lower]) / (cdf_y[upper] - cdf_y[lower]);
-    return (x0 + delta * lower) * frac + (x0 + delta * upper) * (1.0f - frac);
+    float delta_cdf_y = cdf_y[upper] - cdf_y[lower];
+
+    return x0 + delta*lower + delta*(u-cdf_y[lower])/delta_cdf_y;
 }
 
 extern "C"
@@ -100,6 +90,20 @@ fill_uniform_sphere(int nthreads, curandState *s, float3 *a)
 	return;
 
     a[id] = uniform_sphere(&s[id]);
+}
+
+__global__ void
+fill_sample_cdf(int offset, int nthreads, curandState *rng_states,
+		int ncdf, float *cdf_x,	float *cdf_y, float *x)
+{
+    int id = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (id >= nthreads)
+	return;
+
+    curandState *s = rng_states+id;
+
+    x[id+offset] = sample_cdf(s,ncdf,cdf_x,cdf_y);
 }
 
 } // extern "c"

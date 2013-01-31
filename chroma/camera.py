@@ -24,8 +24,7 @@ import pygame
 from pygame.locals import *
 
 def bvh_mesh(geometry, layer):
-    lower_bounds = geometry.lower_bounds[geometry.layers == layer]
-    upper_bounds = geometry.upper_bounds[geometry.layers == layer]
+    lower_bounds, upper_bounds = geometry.bvh.get_layer(layer).get_bounds()
 
     if len(lower_bounds) == 0 or len(upper_bounds) == 0:
         raise Exception('no nodes at layer %i' % layer)
@@ -249,7 +248,15 @@ class Camera(multiprocessing.Process):
             if not os.path.exists(path):
                 break
 
-        pygame.image.save(self.screen, path)
+        try:
+            pygame.image.save(self.screen, path)
+        except ImportError:
+            import Image
+            mode = 'RGBA'
+            data = self.screen.get_buffer()
+            im = Image.frombuffer(mode,self.size,data,'raw',mode,0,1)
+            im.save(path)
+
         print 'image saved to %s' % path
 
     def rotate(self, phi, n):
@@ -671,6 +678,8 @@ class EventViewer(Camera):
         self.rr = RootReader(filename)
         self.display_mode = EventViewer.CHARGE
         self.sum_mode = False
+        self.photon_display_iter = itertools.cycle(['beg','end'])
+        self.photon_display_mode = self.photon_display_iter.next()
 
     def render_particle_track(self):
         x = 10.0
@@ -679,9 +688,14 @@ class EventViewer(Camera):
                                       [0]*3, [0]*3)
         marker = Solid(pyramid, vacuum, vacuum)
 
+        if self.photon_display_mode == 'beg':
+            photons = self.ev.photons_beg
+        else:
+            photons = self.ev.photons_end
+
         geometry = Geometry()
-        sample_factor = max(1, len(self.ev.photons_beg.pos) / 10000)
-        for pos in self.ev.photons_beg.pos[::sample_factor]:
+        sample_factor = max(1, len(photons.pos) / 10000)
+        for pos in photons.pos[::sample_factor]:
             geometry.add_solid(marker, displacement=pos, rotation=make_rotation_matrix(np.random.uniform(0,2*np.pi), uniform_sphere()))
 
         geometry = create_geometry_from_obj(geometry)
@@ -713,6 +727,9 @@ class EventViewer(Camera):
 
     def color_hit_pmts(self):
         self.gpu_geometry.reset_colors()
+
+        if self.ev.channels is None:
+            return
 
         if self.sum_mode:
             hit = self.sum_hit
@@ -750,6 +767,11 @@ class EventViewer(Camera):
 
     def process_event(self, event):
         if event.type == KEYDOWN:
+            if event.key == K_t:
+                self.photon_display_mode = self.photon_display_iter.next()
+                self.render_particle_track()
+                self.update()
+
             if event.key == K_PAGEUP and not self.sum_mode:
                 try:
                     self.ev = self.rr.next()

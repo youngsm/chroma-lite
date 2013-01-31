@@ -284,7 +284,7 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
 
 } // propagate_to_boundary
 
-__device__ void
+__noinline__ __device__ void
 propagate_at_boundary(Photon &p, State &s, curandState &rng)
 {
     float incident_angle = get_theta(s.surface_normal,-p.direction);

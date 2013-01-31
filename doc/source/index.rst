@@ -41,6 +41,7 @@ Subscribe to the mailing list for update announcements!
 .. toctree::
    :maxdepth: 2
 
+   quick_install
    install
    tour
    geometry
@@ -49,6 +50,7 @@ Subscribe to the mailing list for update announcements!
    render
    simulation
    likelihood
+   examples
 
 Authors
 -------

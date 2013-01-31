@@ -1,5 +1,11 @@
 import numpy as np
 
+def get_perp(x):
+    """Returns an arbitrary vector perpendicular to `x`."""
+    a = np.zeros(3)
+    a[np.argmin(abs(x))] = 1
+    return np.cross(a,x)
+
 def make_rotation_matrix(phi, n):
     """
     Make the rotation matrix to rotate points through an angle `phi`
@@ -9,11 +15,8 @@ def make_rotation_matrix(phi, n):
 
     Raises ValueError if n has zero magnitude
     """
-    norm = np.linalg.norm(n)
-    if norm == 0.0:
-        raise ValueError('rotation axis has zero magnitude')
-    n = np.asarray(n)/norm
-    
+    n = normalize(n)
+
     return np.cos(phi)*np.identity(3) + (1-np.cos(phi))*np.outer(n,n) + \
         np.sin(phi)*np.array([[0,n[2],-n[1]],[-n[2],0,n[0]],[n[1],-n[0],0]])
 
@@ -22,22 +25,24 @@ def rotate(x, phi, n):
     Rotate an array of points `x` through an angle phi counter-clockwise
     around the axis `n` (when looking towards +infinity).
     """
-    return np.inner(np.asarray(x),make_rotation_matrix(phi, n))
+    n = normalize(n)
+    x = np.atleast_2d(x)
+    phi = np.atleast_1d(phi)
+
+    return (x*np.cos(phi)[:,np.newaxis] + n*np.dot(x,n)[:,np.newaxis]*(1-np.cos(phi)[:,np.newaxis]) + np.cross(x,n)*np.sin(phi)[:,np.newaxis]).squeeze()
+
+def rotate_matrix(x, phi, n):
+    """Same as rotate() except uses a rotation matrix.
+
+    Can only handle a single rotation angle `phi`."""
+    rotation_matrix = make_rotation_matrix(phi, n)
+    return np.inner(np.asarray(x),rotation_matrix)
+
+def norm(x):
+    "Returns the norm of the vector `x`."
+    return np.sqrt((x*x).sum(-1))
 
 def normalize(x):
     "Returns unit vectors in the direction of `x`."
-    x = np.asarray(x)
-
-    if x.shape[-1] != 3:
-        raise ValueError('dimension of last axis must be 3.')
-
-    d = len(x.shape)
-
-    if d == 1:
-        norm = np.sqrt(x.dot(x))
-    elif d == 2:
-        norm = np.sqrt(np.sum(x*x, axis=1))[:,np.newaxis]
-    else:
-        raise ValueError('len(`x`.shape) must be zero or one.')
-
-    return x/norm
+    x = np.atleast_2d(np.asarray(x, dtype=float))
+    return (x/norm(x)[:,np.newaxis]).squeeze()

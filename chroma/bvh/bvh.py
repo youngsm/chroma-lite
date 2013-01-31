@@ -244,3 +244,16 @@ class BVHLayerSlice(object):
         '''Return the surface area of all the nodes in this layer in world
         units.'''
         return self.area_fixed().sum() * self.world_coords.world_scale**2
+
+    def get_bounds(self):
+        """Returns the lower and upper bounds of this layer in the BVH."""
+        node_info = unpack_nodes(self.nodes)
+        fixed_lower = \
+            np.dstack([node_info[s] for s in ['xlo','ylo','zlo']]).squeeze()
+        fixed_upper = \
+            np.dstack([node_info[s] for s in ['xhi','yhi','zhi']]).squeeze()
+
+        lower_bounds = self.world_coords.fixed_to_world(fixed_lower)
+        upper_bounds = self.world_coords.fixed_to_world(fixed_upper)
+
+        return np.atleast_2d(lower_bounds), np.atleast_2d(upper_bounds)

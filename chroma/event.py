@@ -75,31 +75,32 @@ class Photons(object):
                Survival probability for each photon.  Used by 
                photon propagation code when computing likelihood functions.
         '''
-        self.pos = pos
-        self.dir = dir
-        self.pol = pol
-        self.wavelengths = wavelengths
+        self.pos = np.asarray(pos, dtype=np.float32)
+        self.dir = np.asarray(dir, dtype=np.float32)
+        self.pol = np.asarray(pol, dtype=np.float32)
+        self.wavelengths = np.asarray(wavelengths, dtype=np.float32)
 
         if t is None:
             self.t = np.zeros(len(pos), dtype=np.float32)
         else:
-            self.t = t
+            self.t = np.asarray(t, dtype=np.float32)
 
         if last_hit_triangles is None:
             self.last_hit_triangles = np.empty(len(pos), dtype=np.int32)
             self.last_hit_triangles.fill(-1)
         else:
-            self.last_hit_triangles = last_hit_triangles
+            self.last_hit_triangles = np.asarray(last_hit_triangles,
+                                                 dtype=np.int32)
 
         if flags is None:
             self.flags = np.zeros(len(pos), dtype=np.uint32)
         else:
-            self.flags = flags
+            self.flags = np.asarray(flags, dtype=np.uint32)
 
         if weights is None:
             self.weights = np.ones(len(pos), dtype=np.float32)
         else:
-            self.weights = weights
+            self.weights = np.asarray(weights, dtype=np.float32)
 
     def __add__(self, other):
         '''Concatenate two Photons objects into one list of photons.
@@ -124,24 +125,19 @@ class Photons(object):
         '''Returns the number of photons in self.'''
         return len(self.pos)
 
+    def __getitem__(self, key):
+        return Photons(self.pos[key], self.dir[key], self.pol[key],
+                       self.wavelengths[key], self.t[key],
+                       self.last_hit_triangles[key], self.flags[key],
+                       self.weights[key])
+
     def reduced(self, reduction_factor=1.0):
         '''Return a new Photons object with approximately
         len(self)*reduction_factor photons.  Photons are selected
         randomly.'''
         n = len(self)
         choice = np.random.permutation(n)[:int(n*reduction_factor)]
-        print len(choice)
-        pos = self.pos[choice]
-        dir = self.dir[choice]
-        pol = self.pol[choice]
-        wavelengths = self.wavelengths[choice]
-        last_hit_triangles = self.last_hit_triangles[choice]
-        t = self.t[choice]
-        flags = self.flags[choice]
-        weights = self.weights[choice]
-
-        return Photons(pos, dir, pol, wavelengths, t,
-                       last_hit_triangles, flags, weights)        
+        return self[choice]
 
 class Channels(object):
     def __init__(self, hit, t, q, flags=None):

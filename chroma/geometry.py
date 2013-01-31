@@ -41,6 +41,10 @@ class Mesh(object):
         if remove_duplicate_vertices:
             self.remove_duplicate_vertices()
 
+    def get_triangle_centers(self):
+        "Returns the x,y,z coordinate of the center of each triangle."
+        return np.mean(self.assemble(),axis=1)
+
     def get_bounds(self):
         "Return the lower and upper bounds for the mesh as a tuple."
         return np.min(self.vertices, axis=0), np.max(self.vertices, axis=0)
@@ -99,7 +103,7 @@ class Mesh(object):
 class Solid(object):
     """Solid object attaches materials, surfaces, and colors to each triangle
     in a Mesh object."""
-    def __init__(self, mesh, material1=None, material2=None, surface=None, color=0xffffff):
+    def __init__(self, mesh, material1=None, material2=None, surface=None, color=0x33ffffff):
         self.mesh = mesh
 
         if np.iterable(material1):
