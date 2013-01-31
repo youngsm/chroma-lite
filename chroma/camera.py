@@ -58,7 +58,7 @@ def encode_movie(dir):
 class Camera(multiprocessing.Process):
     "The camera class is used to render a Geometry object."
     def __init__(self, geometry, size=(800,600), device_id=None):
-        multiprocessing.Process.__init__(self)
+        super(Camera, self).__init__()
         self.geometry = geometry
         self.device_id = device_id
         self.size = size
@@ -622,6 +622,7 @@ class Camera(multiprocessing.Process):
             return
 
     def run(self):
+        pygame.init()
         self.window = pygame.display.set_mode(self.size)
         self.screen = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.display.set_caption('')
@@ -825,3 +826,4 @@ def view(obj, size=(800,600), **camera_kwargs):
     geometry = create_geometry_from_obj(obj)
     camera = Camera(geometry, size, **camera_kwargs)
     camera.start()
+    camera.join()

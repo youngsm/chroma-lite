@@ -8,8 +8,6 @@ from pycuda import gpuarray as ga
 
 from chroma.cuda import srcdir
 
-cuda.init()
-
 # standard nvcc options
 cuda_options = ('--use_fast_math',)#, '--ptxas-options=-v']
 
