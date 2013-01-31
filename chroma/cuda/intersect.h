@@ -64,34 +64,42 @@ intersect_triangle(const float3 &origin, const float3 &direction,
     Source: Optimizing ray tracing for CUDA by Hannu Saransaari
     https://wiki.aalto.fi/download/attachments/40023967/gpgpu.pdf
 */
+#define INFINITY __int_as_float(0x7f800000)
+
 __device__ bool
 intersect_box(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
 	      const float3 &lower_bound, const float3 &upper_bound,
 	      float& distance_to_box)
 {
-	float tmin = 0.0f, tmax = 1e30f;
+	float tmin = 0.0f, tmax = INFINITY;
 	float t0, t1;
 
 	// X
-	t0 = lower_bound.x * inv_dir.x + neg_origin_inv_dir.x;
-	t1 = upper_bound.x * inv_dir.x + neg_origin_inv_dir.x;
+	if (isfinite(inv_dir.x)) {
+	  t0 = lower_bound.x * inv_dir.x + neg_origin_inv_dir.x;
+	  t1 = upper_bound.x * inv_dir.x + neg_origin_inv_dir.x;
 	
-	tmin = max(tmin, min(t0, t1));
-	tmax = min(tmax, max(t0, t1));
-	
+	  tmin = max(tmin, min(t0, t1));
+	  tmax = min(tmax, max(t0, t1));
+	}
+
 	// Y
-	t0 = lower_bound.y * inv_dir.y + neg_origin_inv_dir.y;
-	t1 = upper_bound.y * inv_dir.y + neg_origin_inv_dir.y;
+	if (isfinite(inv_dir.y)) {
+	  t0 = lower_bound.y * inv_dir.y + neg_origin_inv_dir.y;
+	  t1 = upper_bound.y * inv_dir.y + neg_origin_inv_dir.y;
 	
-	tmin = max(tmin, min(t0, t1));
-	tmax = min(tmax, max(t0, t1));
+	  tmin = max(tmin, min(t0, t1));
+	  tmax = min(tmax, max(t0, t1));
+	}
 
 	// Z
-	t0 = lower_bound.z * inv_dir.z + neg_origin_inv_dir.z;
-	t1 = upper_bound.z * inv_dir.z + neg_origin_inv_dir.z;
+	if (isfinite(inv_dir.z)) {
+	  t0 = lower_bound.z * inv_dir.z + neg_origin_inv_dir.z;
+	  t1 = upper_bound.z * inv_dir.z + neg_origin_inv_dir.z;
 	
-	tmin = max(tmin, min(t0, t1));
-	tmax = min(tmax, max(t0, t1));
+	  tmin = max(tmin, min(t0, t1));
+	  tmax = min(tmax, max(t0, t1));
+	}
 
 	if (tmin > tmax)
 		return false;
