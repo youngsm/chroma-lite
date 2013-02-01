@@ -4,6 +4,8 @@
 #include <string>
 
 struct Vertex {
+  virtual ~Vertex() { };
+
   std::string particle_name;
   TVector3 pos;
   TVector3 dir;
@@ -15,6 +17,8 @@ struct Vertex {
 };
 
 struct Photon {
+  virtual ~Photon() { };
+
   double t;
   TVector3 pos;
   TVector3 dir;
@@ -28,6 +32,8 @@ struct Photon {
 
 struct Channel {
   Channel() : id(-1), t(-1e9), q(-1e9) { };
+  virtual ~Channel() { };
+
   int id;
   double t;
   double q;
@@ -37,6 +43,8 @@ struct Channel {
 };
 
 struct Event {
+  virtual ~Event() { };
+
   int id;
   unsigned int nhit;
   unsigned int nchannels;
