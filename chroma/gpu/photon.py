@@ -137,7 +137,9 @@ class GPUPhotons(object):
                 temp = input_queue_gpu
                 input_queue_gpu = output_queue_gpu
                 output_queue_gpu = temp
-                output_queue_gpu[:1].set(np.uint32(1))
+                # Assign with a numpy array of length 1 to silence
+                # warning from PyCUDA about setting array with different strides/storage orders.
+                output_queue_gpu[:1].set(np.ones(shape=1, dtype=np.uint32))
                 nphotons = input_queue_gpu[:1].get()[0] - 1
 
         if ga.max(self.flags).get() & (1 << 31):
