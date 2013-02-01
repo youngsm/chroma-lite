@@ -19,6 +19,11 @@ def check_output(*popenargs, **kwargs):
 
 geant4_cflags = check_output(['geant4-config','--cflags']).split()
 geant4_libs = check_output(['geant4-config','--libs']).split()
+# For GEANT4.9.4 built without cmake
+try:
+    clhep_libs = check_output(['clhep-config','--libs']).split()
+except OSError:
+    clhep_libs = []
 
 include_dirs=['src']
 if 'VIRTUAL_ENV' in os.environ:
@@ -42,14 +47,14 @@ setup(
                   ['src/G4chroma.cc'],
                   include_dirs=include_dirs,
                   extra_compile_args=geant4_cflags,
-                  extra_link_args=geant4_libs,
+                  extra_link_args=geant4_libs+clhep_libs,
                   libraries=['boost_python'],
                   ),
         Extension('chroma.generator.mute',
                   ['src/mute.cc'],
                   include_dirs=include_dirs,
                   extra_compile_args=geant4_cflags,
-                  extra_link_args=geant4_libs,
+                  extra_link_args=geant4_libs+clhep_libs,
                   libraries=['boost_python']),
         ],
  
