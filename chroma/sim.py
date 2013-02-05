@@ -55,7 +55,10 @@ class Simulation(object):
     def simulate(self, iterable, keep_photons_beg=False,
                  keep_photons_end=False, run_daq=True, max_steps=100):
         try:
-            first_element, iterable = itertoolset.peek(iterable)
+            if isinstance(iterable, event.Photons):
+                raise TypeError # Kludge because Photons looks iterable
+            else:
+                first_element, iterable = itertoolset.peek(iterable)
         except TypeError:
             first_element, iterable = iterable, [iterable]
 
