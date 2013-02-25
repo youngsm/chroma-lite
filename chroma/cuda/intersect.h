@@ -64,14 +64,15 @@ intersect_triangle(const float3 &origin, const float3 &direction,
     Source: Optimizing ray tracing for CUDA by Hannu Saransaari
     https://wiki.aalto.fi/download/attachments/40023967/gpgpu.pdf
 */
-#define INFINITY __int_as_float(0x7f800000)
+// INFINITY is already defined elsewhere
+#define CHROMA_INFINITY __int_as_float(0x7f800000)
 
 __device__ bool
 intersect_box(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
 	      const float3 &lower_bound, const float3 &upper_bound,
 	      float& distance_to_box)
 {
-	float tmin = 0.0f, tmax = INFINITY;
+	float tmin = 0.0f, tmax = CHROMA_INFINITY;
 	float t0, t1;
 
 	// X
