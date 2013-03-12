@@ -41,8 +41,7 @@ Subscribe to the mailing list for update announcements!
 .. toctree::
    :maxdepth: 2
 
-   quick_install
-   install
+   install/overview
    tour
    geometry
    surface
