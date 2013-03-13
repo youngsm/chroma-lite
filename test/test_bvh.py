@@ -99,7 +99,6 @@ def test_unpack_nodes():
     assert_array_equal(unpack['yhi'], [1, 1, 2, 1])
     assert_array_equal(unpack['zlo'], [0, 0, 0, 1])
     assert_array_equal(unpack['zhi'], [1, 1, 1, 2])
-    assert unpack['leaf'].all()
 
     layer = bvh.get_layer(1)
     unpack = unpack_nodes(layer.nodes)
@@ -110,7 +109,6 @@ def test_unpack_nodes():
     assert_array_equal(unpack['zlo'], [0, 0])
     assert_array_equal(unpack['zhi'], [1, 2])
     assert_array_equal(unpack['child'], [3, 5])
-    assert not unpack['leaf'].any()
 
     layer = bvh.get_layer(0)
     unpack = unpack_nodes(layer.nodes)
@@ -121,7 +119,6 @@ def test_unpack_nodes():
     assert_array_equal(unpack['zlo'], [0])
     assert_array_equal(unpack['zhi'], [2])
     assert_array_equal(unpack['child'], [1])
-    assert not unpack['leaf'].any()
 
 
 class TestBVH(unittest.TestCase):
