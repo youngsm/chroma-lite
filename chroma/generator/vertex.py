@@ -76,6 +76,8 @@ def pi0_gun(pos_iter, dir_iter, ke_iter, t0_iter=constant(0.0), start_id=0, gamm
 def constant_particle_gun(particle_name, pos, dir, ke, t0=0.0, start_id=0):
     '''Convenience wrapper around particle gun that assumes all
     arguments are constants, rather than generators.'''
+    pos = np.asarray(pos)
+    dir = np.asarray(dir)
     if (dir == 0.0).all():
         dir_gen = isotropic()
     else:

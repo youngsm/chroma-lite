@@ -133,8 +133,13 @@ class G4Generator(object):
                 mass = G4ParticleTable.GetParticleTable().FindParticle(vertex.particle_name).GetPDGMass()
                 total_energy = vertex.ke*MeV + mass
                 self.particle_gun.SetParticleEnergy(total_energy)
-                self.particle_gun.SetParticlePosition(G4ThreeVector(*vertex.pos)*mm)
-                self.particle_gun.SetParticleMomentumDirection(G4ThreeVector(*vertex.dir).unit())
+
+                # Must be float type to call GEANT4 code
+                pos = np.asarray(vertex.pos, dtype=np.float64)
+                dir = np.asarray(vertex.dir, dtype=np.float64)
+
+                self.particle_gun.SetParticlePosition(G4ThreeVector(*pos)*mm)
+                self.particle_gun.SetParticleMomentumDirection(G4ThreeVector(*dir).unit())
                 self.particle_gun.SetParticleTime(vertex.t0*ns)
 
                 if vertex.pol is not None:
