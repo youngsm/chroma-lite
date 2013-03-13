@@ -42,7 +42,7 @@ class TestDetector(unittest.TestCase):
                           wavelengths=wavelengths)
 
         hit_times = []
-        for ev in self.sim.simulate(photons for i in xrange(10000)):
+        for ev in self.sim.simulate(photons for i in xrange(1000)):
             if ev.channels.hit[0]:
                 hit_times.append(ev.channels.t[0])
         hit_times = np.array(hit_times)
