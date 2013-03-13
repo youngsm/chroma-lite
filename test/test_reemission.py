@@ -19,7 +19,7 @@ class TestReemission(unittest.TestCase):
         shifting sphere, forcing reemission, and check that the final
         wavelength distribution matches the wls spectrum.
         '''
-        nphotons = 1e6
+        nphotons = 1e5
 
         # set up detector -- a sphere of 'scintillator' surrounded by a
         # detecting sphere
