@@ -57,7 +57,7 @@ def create_leaf_nodes(mesh, morton_bits=16, round_to_multiple=1):
     
     # Call GPU to compute nodes
     nodes = ga.zeros(shape=round_up_to_multiple(len(triangles), 
-                                                1),#round_to_multiple),
+                                                round_to_multiple),
                      dtype=ga.vec.uint4)
     morton_codes = ga.empty(shape=len(triangles), dtype=np.uint64)
 
@@ -229,7 +229,10 @@ def merge_nodes(nodes, degree, max_ratio=None):
             #print 'intermediate: %e' % node_areas(new_parent_nodes).max()
         print 'old: %e' % node_areas(parent_nodes).max()
         print 'new: %e' % node_areas(new_parent_nodes).max()
-        parent_nodes = new_parent_nodes
+        if len(new_parent_nodes) < len(nodes):
+            # Only adopt new set of parent nodes if it actually reduces the
+            # total number of nodes at this level by 1.
+            parent_nodes = new_parent_nodes
 
     return parent_nodes
 
