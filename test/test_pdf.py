@@ -38,8 +38,10 @@ class TestPDF(unittest.TestCase):
             gpu_photons = gpu.GPUPhotons(ev.photons_beg)
             gpu_photons.propagate(gpu_geometry, rng_states, nthreads_per_block,
                                   max_blocks)
-            gpu_channels = gpu_daq.acquire(gpu_photons, rng_states,
-                                           nthreads_per_block, max_blocks)
+            gpu_daq.begin_acquire()
+            gpu_daq.acquire(gpu_photons, rng_states,
+                            nthreads_per_block, max_blocks)
+            gpu_channels = gpu_daq.end_acquire()
             gpu_pdf.add_hits_to_pdf(gpu_channels)
 
         hitcount, pdf = gpu_pdf.get_pdfs()
