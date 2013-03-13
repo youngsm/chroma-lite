@@ -98,7 +98,6 @@ Step 3: Install Chroma
 Now we can checkout a copy of Chroma and install it.  By default, we will put it into the $VIRTUAL_ENV/src directory, but anywhere is fine::
 
   cd $VIRTUAL_ENV/src
-  hg clone https://
   hg clone https://bitbucket.org/chroma/chroma
   cd chroma
   python setup.py develop
