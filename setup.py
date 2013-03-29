@@ -25,7 +25,20 @@ try:
 except OSError:
     clhep_libs = []
 
+
 include_dirs=['src']
+
+##### figure out location of pyublas headers
+try:
+    from imp import find_module
+    file, pathname, descr = find_module("pyublas")
+    from os.path import join
+    include_dirs.append(join(pathname, "include"))
+except:
+    pass  # Don't throw exceptions if prereqs not installed yet
+
+#####
+
 if 'VIRTUAL_ENV' in os.environ:
     include_dirs.append(os.path.join(os.environ['VIRTUAL_ENV'], 'include'))
 try:
