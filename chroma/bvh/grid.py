@@ -68,7 +68,9 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
                 new_parent_morton_parts.extend([np.repeat(morton_part[0], 
                                                           len(extra_first)), morton_part[1:]])
 
-            parent_morton_codes = np.concatenate(new_parent_morton_parts)
+            # Explicitly cast all lists to uint64 dtype to ensure final array has correct type
+            # (Empty array is implicitly float64 dtype)
+            parent_morton_codes = np.concatenate([p.astype(np.uint64) for p in new_parent_morton_parts])
             first_child = np.concatenate(new_first_child_parts)
             nchild = np.ediff1d(first_child, to_end=nnodes - first_child[-1]).astype(np.uint32)
               
