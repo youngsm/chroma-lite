@@ -33,8 +33,8 @@ Step 3: Install the CUDA Driver and Toolkit
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The NVIDIA driver can be installed by going to the `CUDA Downloads
-<https://developer.nvidia.com/cuda-downloads>`_ and downloading the package
-corresponding to your operating system.This single package includes a current
+<https://developer.nvidia.com/cuda-downloads>`_ and downloading the rpm package
+corresponding to your operating system, and then following the installation instructions `here <http://docs.nvidia.com/cuda/cuda-getting-started-guide-for-linux/index.html#package-manager-installation>`_. This single package includes a current
 NVIDIA driver, the CUDA compiler toolkit, and sample programs.
 
 Drop to a console terminal by pressing `CTRL+ALT+F1` and then enter::
