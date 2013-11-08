@@ -12,7 +12,6 @@ import sys
 import pycuda.driver as cuda
 from pycuda import gpuarray as ga
 
-from chroma.color import map_to_color
 from chroma.geometry import Mesh, Solid, Geometry, vacuum
 from chroma.transform import rotate, make_rotation_matrix
 from chroma.sample import uniform_sphere
@@ -727,6 +726,7 @@ class EventViewer(Camera):
         print 'Done.'
 
     def color_hit_pmts(self):
+        from chroma.color import map_to_color
         self.gpu_geometry.reset_colors()
 
         if self.ev.channels is None:
