@@ -1,5 +1,5 @@
 import pycuda.autoinit
-import unittest
+from unittest_find import unittest
 from chroma.bvh import make_simple_bvh, BVH
 from chroma.bvh.bvh import node_areas
 import chroma.models

@@ -1,7 +1,7 @@
 import chroma.parabola as parabola
 import numpy
 from uncertainties import ufloat, unumpy
-import unittest
+from unittest_find import unittest
 from numpy.testing import assert_almost_equal
 
 class Test1D(unittest.TestCase):

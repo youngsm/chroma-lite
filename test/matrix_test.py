@@ -1,5 +1,6 @@
 import os
 import numpy as np
+np.seterr(divide='ignore')
 from pycuda import autoinit
 from pycuda.compiler import SourceModule
 import pycuda.driver as cuda

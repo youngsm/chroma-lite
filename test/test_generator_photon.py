@@ -1,4 +1,4 @@
-import unittest
+from unittest_find import unittest
 import itertools
 
 from chroma import generator

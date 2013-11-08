@@ -4,7 +4,7 @@ from pycuda import gpuarray
 import numpy as np
 import ROOT
 import os
-import unittest
+from unittest_find import unittest
 import chroma
 
 class TestSampling(unittest.TestCase):

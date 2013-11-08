@@ -1,4 +1,4 @@
-import unittest
+from unittest_find import unittest
 import itertools
 import numpy as np
 import chroma.generator.vertex
