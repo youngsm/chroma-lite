@@ -15,7 +15,7 @@ from pycuda import gpuarray as ga
 from chroma.geometry import Mesh, Solid, Geometry, vacuum
 from chroma.transform import rotate, make_rotation_matrix
 from chroma.sample import uniform_sphere
-from chroma.project import from_film
+from chroma.tools import from_film
 from chroma import make
 from chroma import gpu
 from chroma.loader import create_geometry_from_obj
