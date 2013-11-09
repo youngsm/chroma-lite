@@ -5,6 +5,7 @@ from chroma.pi0 import pi0_decay
 from chroma import event
 from chroma.sample import uniform_sphere
 from chroma.itertoolset import repeatfunc
+from chroma.transform import norm
 
 # generator parts for use with gun()
 
@@ -43,7 +44,7 @@ def flat(e_lo, e_hi):
 def particle_gun(particle_name_iter, pos_iter, dir_iter, ke_iter, 
                  t0_iter=constant(0.0), start_id=0):
     for i, particle_name, pos, dir, ke, t0 in izip(count(start_id), particle_name_iter, pos_iter, dir_iter, ke_iter, t0_iter):
-        dir /= np.linalg.norm(dir)
+        dir = dir/norm(dir)
         vertex = event.Vertex(particle_name, pos, dir, ke, t0=t0)
         ev_vertex = event.Event(i, vertex, [vertex])
         yield ev_vertex
@@ -54,7 +55,7 @@ def pi0_gun(pos_iter, dir_iter, ke_iter, t0_iter=constant(0.0), start_id=0, gamm
         gamma1_dir_iter = isotropic()
 
     for i, pos, dir, ke, t0, gamma1_dir in izip(count(start_id), pos_iter, dir_iter, ke_iter, t0_iter, gamma1_dir_iter):
-        dir /= np.linalg.norm(dir)
+        dir = dir/norm(dir)
         primary_vertex = event.Vertex('pi0', pos, dir, ke, t0=t0)
 
         # In rest frame

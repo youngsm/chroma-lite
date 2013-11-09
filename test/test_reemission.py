@@ -1,6 +1,5 @@
 from unittest_find import unittest
 import numpy as np
-import scipy.stats
 #import matplotlib.pyplot as plt
 
 from chroma.geometry import Solid, Geometry, Surface, Material
@@ -12,6 +11,7 @@ from chroma.event import Photons, SURFACE_DETECT
 from chroma.tools import enable_debug_on_crash
 
 class TestReemission(unittest.TestCase):
+    @unittest.skip('need to implement scipy stats functions here')
     def testBulkReemission(self):
         '''Test bulk reemission 
 
@@ -19,6 +19,7 @@ class TestReemission(unittest.TestCase):
         shifting sphere, forcing reemission, and check that the final
         wavelength distribution matches the wls spectrum.
         '''
+        import scipy.stats
         nphotons = 1e5
 
         # set up detector -- a sphere of 'scintillator' surrounded by a

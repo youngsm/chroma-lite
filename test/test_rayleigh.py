@@ -52,6 +52,6 @@ class TestRayleigh(unittest.TestCase):
         # (1 + \cos^2 \theta)\sin \theta according to GEANT4 physics
         # reference manual.
         f = ROOT.TF1("pol_func", "[0]*(1+cos(x)**2)*sin(x)", 0, np.pi)
-        h.Fit(f)
+        h.Fit(f, 'NQ')
         self.assertGreater(f.GetProb(), 1e-3)
 

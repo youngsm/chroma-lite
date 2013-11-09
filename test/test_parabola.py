@@ -7,7 +7,7 @@ from numpy.testing import assert_almost_equal
 class Test1D(unittest.TestCase):
     def setUp(self):
         self.x = numpy.array([[-1.0], [0.0], [1.0]])
-        self.y = unumpy.uarray(([2.0, 1.0, 6.0], [0.1, 0.1, 0.1]))
+        self.y = unumpy.uarray([2.0, 1.0, 6.0], [0.1, 0.1, 0.1])
         self.a = 1.0
         self.b = numpy.array([2.0])
         self.c = numpy.array([[3.0]])
@@ -25,9 +25,9 @@ class Test1D(unittest.TestCase):
         assert_almost_equal(c[0,0].nominal_value, 3.0)
 
         # Compare to ROOT TGraph fitting uncerts
-        assert_almost_equal(a.std_dev(), 0.1)
-        assert_almost_equal(b[0].std_dev(), 0.0707107)
-        assert_almost_equal(c[0,0].std_dev(), 0.122474, decimal=5)
+        assert_almost_equal(a.std_dev, 0.1)
+        assert_almost_equal(b[0].std_dev, 0.0707107)
+        assert_almost_equal(c[0,0].std_dev, 0.122474, decimal=5)
 
 
 class Test2D(unittest.TestCase):
@@ -46,7 +46,7 @@ class Test2D(unittest.TestCase):
                 + x0 * self.b[0] + x1 * self.b[1] \
                 + x0**2 * self.c[0,0] + x0 * x1 * self.c[0,1] \
                 + x1 * x0 * self.c[1,0] + x1**2 * self.c[1,1]
-            self.y[i] = ufloat((value, 0.1))
+            self.y[i] = ufloat(value, 0.1)
 
     def test_parabola_eval(self):
         y = parabola.parabola_eval(self.x, self.a, self.b, self.c)
