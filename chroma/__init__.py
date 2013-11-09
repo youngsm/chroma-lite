@@ -12,7 +12,6 @@ from chroma import likelihood
 from chroma.likelihood import Likelihood
 from chroma import make
 from chroma.demo import optics
-from chroma import project
 from chroma import sample
 from chroma.sim import Simulation
 from chroma.stl import mesh_from_stl
