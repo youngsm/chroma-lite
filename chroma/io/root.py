@@ -21,6 +21,9 @@ if not hasattr(ROOT, 'Vertex') or not hasattr(ROOT, 'Channel'):
     if not os.path.exists(home_root_C) or \
             os.stat(package_root_C).st_mtime > os.stat(home_root_C).st_mtime:
         shutil.copy2(src=package_root_C, dst=home_root_C)
+    # ACLiC problem with ROOT
+    # see http://root.cern.ch/phpBB3/viewtopic.php?f=3&t=14280&start=15
+    ROOT.gSystem.Load('libCint')
     # Import this C file for access to data structure
     ROOT.gROOT.ProcessLine('.L '+home_root_C+'+')
 
