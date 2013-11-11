@@ -7,7 +7,6 @@ extra_objects = []
 
 if 'VIRTUAL_ENV' in os.environ:
     boost_lib = os.path.join(os.environ['VIRTUAL_ENV'],'lib','libboost_python.so')
-    print boost_lib
     if os.path.exists(boost_lib):
         # use local copy of boost
         extra_objects.append(boost_lib)
