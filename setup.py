@@ -2,6 +2,17 @@ from setuptools import setup, find_packages, Extension
 import subprocess
 import os
 
+libraries = ['boost_python']
+extra_objects = []
+
+if 'VIRTUAL_ENV' in os.environ:
+    boost_lib = os.path.join(os.environ['VIRTUAL_ENV'],'lib','libboost_python.so')
+    print boost_lib
+    if os.path.exists(boost_lib):
+        # use local copy of boost
+        extra_objects.append(boost_lib)
+        libraries.remove('boost_python')
+
 def check_output(*popenargs, **kwargs):
     if 'stdout' in kwargs:
         raise ValueError('stdout argument not allowed, it will be overridden.')
@@ -60,14 +71,16 @@ setup(
                   include_dirs=include_dirs,
                   extra_compile_args=geant4_cflags,
                   extra_link_args=geant4_libs+clhep_libs,
-                  libraries=['boost_python'],
+                  extra_objects=extra_objects,
+                  libraries=libraries,
                   ),
         Extension('chroma.generator.mute',
                   ['src/mute.cc'],
                   include_dirs=include_dirs,
                   extra_compile_args=geant4_cflags,
                   extra_link_args=geant4_libs+clhep_libs,
-                  libraries=['boost_python']),
+                  extra_objects=extra_objects,
+                  libraries=libraries),
         ],
  
     setup_requires = ['pyublas'],
