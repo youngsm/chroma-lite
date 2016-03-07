@@ -10,15 +10,31 @@ public:
   virtual void SetCuts();
 };
 
+#include <G4UserSteppingAction.hh>
 #include <G4UserTrackingAction.hh>
 #include <vector>
 #include <G4ThreeVector.hh>
 
-class PhotonTrackingAction : public G4UserTrackingAction
+class SteppingAction : public G4UserSteppingAction
 {
 public:
-  PhotonTrackingAction();
-  virtual ~PhotonTrackingAction();
+  SteppingAction();
+  virtual ~SteppingAction();
+  
+  void EnableScint(bool enabled);
+  
+  void UserSteppingAction(const G4Step* aStep);
+  
+private:
+    bool scint;
+
+};
+
+class TrackingAction : public G4UserTrackingAction
+{
+public:
+  TrackingAction();
+  virtual ~TrackingAction();
   
   int GetNumPhotons() const;
   void Clear();

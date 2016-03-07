@@ -1,6 +1,12 @@
 #include "G4chroma.hh"
+#include "GLG4Scint.hh"
+#include <G4SteppingManager.hh>
 #include <G4OpticalPhysics.hh>
 #include <G4EmPenelopePhysics.hh>
+
+#include <iostream>
+
+using namespace std;
 
 ChromaPhysicsList::ChromaPhysicsList():  G4VModularPhysicsList()
 {
@@ -9,9 +15,12 @@ ChromaPhysicsList::ChromaPhysicsList():  G4VModularPhysicsList()
 
   // General Physics
   RegisterPhysics( new G4EmPenelopePhysics(0) );
-  // Optical Physics
+  // Optical Physics w/o Scintillation
   G4OpticalPhysics* opticalPhysics = new G4OpticalPhysics();
+  opticalPhysics->Configure(kScintillation,false);
   RegisterPhysics( opticalPhysics );
+  // Scintillation (handled by stepping!)
+  new GLG4Scint();
 }
 
 ChromaPhysicsList::~ChromaPhysicsList()
@@ -24,21 +33,57 @@ void ChromaPhysicsList::SetCuts(){
   SetCutsWithDefault();   
 }
 
+SteppingAction::SteppingAction()
+{
+    scint = true;
+}
 
-PhotonTrackingAction::PhotonTrackingAction()
+SteppingAction::~SteppingAction()
 {
 }
 
-PhotonTrackingAction::~PhotonTrackingAction()
+void SteppingAction::EnableScint(bool enabled) {
+    scint = enabled;
+    cout << "Set scintillation to: " << enabled << endl;
+}
+
+void SteppingAction::UserSteppingAction(const G4Step* aStep) {
+
+    if (scint) {
+        
+        G4VParticleChange * pParticleChange = GLG4Scint::GenericPostPostStepDoIt(aStep);
+        
+        /*
+        G4int iSecondary= pParticleChange->GetNumberOfSecondaries();
+        if (iSecondary > 0) {
+            // add secondaries to the list
+            while ( (iSecondary--) > 0 ) {
+                G4Track * tempSecondaryTrack = pParticleChange->GetSecondary(iSecondary);
+                fpSteppingManager->GetfSecondary()->push_back( tempSecondaryTrack );
+            }
+        }
+        
+        pParticleChange->Clear();
+        */
+    }
+    
+}
+
+
+TrackingAction::TrackingAction()
 {
 }
 
-int PhotonTrackingAction::GetNumPhotons() const
+TrackingAction::~TrackingAction()
+{
+}
+
+int TrackingAction::GetNumPhotons() const
 {
   return pos.size();
 }
 
-void PhotonTrackingAction::Clear()
+void TrackingAction::Clear()
 {
   pos.clear();
   dir.clear();
@@ -47,72 +92,72 @@ void PhotonTrackingAction::Clear()
   t0.clear();
 }
 
-void PhotonTrackingAction::GetX(double *x) const
+void TrackingAction::GetX(double *x) const
 {
   for (unsigned i=0; i < pos.size(); i++) x[i] = pos[i].x();
 }
 
-void PhotonTrackingAction::GetY(double *y) const
+void TrackingAction::GetY(double *y) const
 {
   for (unsigned i=0; i < pos.size(); i++) y[i] = pos[i].y();
 }
 
-void PhotonTrackingAction::GetZ(double *z) const
+void TrackingAction::GetZ(double *z) const
 {
   for (unsigned i=0; i < pos.size(); i++) z[i] = pos[i].z();
 }
 
-void PhotonTrackingAction::GetDirX(double *dir_x) const
+void TrackingAction::GetDirX(double *dir_x) const
 {
   for (unsigned i=0; i < dir.size(); i++) dir_x[i] = dir[i].x();
 }
 
-void PhotonTrackingAction::GetDirY(double *dir_y) const
+void TrackingAction::GetDirY(double *dir_y) const
 {
   for (unsigned i=0; i < dir.size(); i++) dir_y[i] = dir[i].y();
 }
 
-void PhotonTrackingAction::GetDirZ(double *dir_z) const
+void TrackingAction::GetDirZ(double *dir_z) const
 {
   for (unsigned i=0; i < dir.size(); i++) dir_z[i] = dir[i].z();
 }
 
-void PhotonTrackingAction::GetPolX(double *pol_x) const
+void TrackingAction::GetPolX(double *pol_x) const
 {
   for (unsigned i=0; i < pol.size(); i++) pol_x[i] = pol[i].x();
 }
 
-void PhotonTrackingAction::GetPolY(double *pol_y) const
+void TrackingAction::GetPolY(double *pol_y) const
 {
   for (unsigned i=0; i < pol.size(); i++) pol_y[i] = pol[i].y();
 }
 
-void PhotonTrackingAction::GetPolZ(double *pol_z) const
+void TrackingAction::GetPolZ(double *pol_z) const
 {
   for (unsigned i=0; i < pol.size(); i++) pol_z[i] = pol[i].z();
 }
 
-void PhotonTrackingAction::GetWavelength(double *wl) const
+void TrackingAction::GetWavelength(double *wl) const
 {
   for (unsigned i=0; i < wavelength.size(); i++) wl[i] = wavelength[i];
 }
 
-void PhotonTrackingAction::GetT0(double *t) const
+void TrackingAction::GetT0(double *t) const
 {
   for (unsigned i=0; i < t0.size(); i++) t[i] = t0[i];
 }
 
-void PhotonTrackingAction::PreUserTrackingAction(const G4Track *track)
+void TrackingAction::PreUserTrackingAction(const G4Track *track)
 {
-  G4ParticleDefinition *particle = track->GetDefinition();
-  if (particle->GetParticleName() == "opticalphoton") {
-    pos.push_back(track->GetPosition()/mm);
-    dir.push_back(track->GetMomentumDirection());
-    pol.push_back(track->GetPolarization());
-    wavelength.push_back( (h_Planck * c_light / track->GetKineticEnergy()) / nanometer );
-    t0.push_back(track->GetGlobalTime() / ns);
-    const_cast<G4Track *>(track)->SetTrackStatus(fStopAndKill);
-  }
+    G4ParticleDefinition *particle = track->GetDefinition();
+    if (particle->GetParticleName() == "opticalphoton") {
+        pos.push_back(track->GetPosition()/mm);
+        dir.push_back(track->GetMomentumDirection());
+        pol.push_back(track->GetPolarization());
+        wavelength.push_back( (h_Planck * c_light / track->GetKineticEnergy()) / nanometer );
+        t0.push_back(track->GetGlobalTime() / ns);
+        const_cast<G4Track *>(track)->SetTrackStatus(fStopAndKill);
+    }
 }
 
 #include <boost/python.hpp>
@@ -120,77 +165,77 @@ void PhotonTrackingAction::PreUserTrackingAction(const G4Track *track)
 
 using namespace boost::python;
 
-pyublas::numpy_vector<double> PTA_GetX(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetX(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetX(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetY(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetY(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetY(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetZ(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetZ(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetZ(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetDirX(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetDirX(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetDirX(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetDirY(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetDirY(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetDirY(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetDirZ(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetDirZ(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetDirZ(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetPolX(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetPolX(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetPolX(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetPolY(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetPolY(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetPolY(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetPolZ(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetPolZ(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetPolZ(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetWave(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetWave(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetWavelength(&r[0]);
   return r;
 }
 
-pyublas::numpy_vector<double> PTA_GetT0(const PhotonTrackingAction *pta)
+pyublas::numpy_vector<double> PTA_GetT0(const TrackingAction *pta)
 {
   pyublas::numpy_vector<double> r(pta->GetNumPhotons());
   pta->GetT0(&r[0]);
@@ -204,11 +249,17 @@ void export_Chroma()
     .def(init<>())
     ;
 
-  class_<PhotonTrackingAction, PhotonTrackingAction*, bases<G4UserTrackingAction>,
-	 boost::noncopyable > ("PhotonTrackingAction", "Tracking action that saves photons")
+  class_<SteppingAction, SteppingAction*, bases<G4UserSteppingAction>,
+	 boost::noncopyable > ("SteppingAction", "Stepping action for hacking purposes")
     .def(init<>())
-    .def("GetNumPhotons", &PhotonTrackingAction::GetNumPhotons)
-    .def("Clear", &PhotonTrackingAction::Clear)
+    .def("EnableScint",&SteppingAction::EnableScint)
+    ;  
+  
+  class_<TrackingAction, TrackingAction*, bases<G4UserTrackingAction>,
+	 boost::noncopyable > ("TrackingAction", "Tracking action that saves photons")
+    .def(init<>())
+    .def("GetNumPhotons", &TrackingAction::GetNumPhotons)
+    .def("Clear", &TrackingAction::Clear)
     .def("GetX", PTA_GetX)
     .def("GetY", PTA_GetY)
     .def("GetZ", PTA_GetZ)

@@ -47,7 +47,9 @@ class G4Generator(object):
         self.world.CreateBoxVolume(self.world_material, 100*m, 100*m, 100*m)
         self.world.PlaceIt(G4ThreeVector(0,0,0))
 
-        self.tracking_action = _g4chroma.PhotonTrackingAction()
+        self.stepping_action = _g4chroma.SteppingAction()
+        gRunManager.SetUserAction(self.stepping_action)
+        self.tracking_action = _g4chroma.TrackingAction()
         gRunManager.SetUserAction(self.tracking_action)
         g4mute()
         gRunManager.Initialize()

@@ -66,7 +66,7 @@ setup(
                'bin/chroma-server'],
     ext_modules = [
         Extension('chroma.generator._g4chroma',
-                  ['src/G4chroma.cc'],
+                  ['src/G4chroma.cc','src/GLG4Scint.cc'],
                   include_dirs=include_dirs,
                   extra_compile_args=geant4_cflags,
                   extra_link_args=geant4_libs+clhep_libs,
@@ -84,7 +84,7 @@ setup(
  
     setup_requires = ['pyublas'],
     install_requires = ['uncertainties','pyzmq-static','spnav', 'pycuda', 
-                        'numpy>=1.6', 'pygame', 'nose', 'sphinx', 'unittest2'],
-    test_suite = 'nose.collector',
+                        'numpy>=1.6', 'pygame', 'nose', 'sphinx'],
+    #test_suite = 'nose.collector',
     
 )
