@@ -157,10 +157,10 @@ def make_gpu_struct(size, members):
                                 'arrange struct member variables in order of '
                                 'decreasing size.')
 
-            cuda.memcpy_htod(int(struct)+i, np.intp(int(member)))
+            cuda.memcpy_htod(int(struct)+i, np.intp(int(member)).data)
             i += 8
         elif np.isscalar(member) or (hasattr(member, 'dtype') and member.dtype in vec_dtypes and member.shape == ()):
-            cuda.memcpy_htod(int(struct)+i, member)
+            cuda.memcpy_htod(int(struct)+i, member.data)
             i += member.nbytes
         else:
             raise TypeError('expected a GPU device pointer or scalar type.')

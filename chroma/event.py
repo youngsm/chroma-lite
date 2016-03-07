@@ -206,7 +206,7 @@ class Event(object):
                 self.vertices = [vertices]
         else:
             self.vertices = []
-
+        
         self.photons_beg = photons_beg
         self.photons_end = photons_end
         self.channels = channels

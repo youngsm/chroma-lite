@@ -94,6 +94,7 @@ class Camera(multiprocessing.Process):
         self.clock = pygame.time.Clock()
 
         self.doom_mode = False
+        
         try:
             if self.width == 640: # SECRET DOOM MODE!
                 print 'shotgun activated!'
