@@ -317,7 +317,7 @@ public:
         return QuenchingFactor;
     }
 
-    static void     SetQuenchingFactor(G4double qf);
+    static void SetQuenchingFactor(G4double qf);
 
     static G4double GetTimePrecGoal() {
         return TimePrecGoal;

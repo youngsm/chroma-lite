@@ -3,6 +3,8 @@
 #include <G4SteppingManager.hh>
 #include <G4OpticalPhysics.hh>
 #include <G4EmPenelopePhysics.hh>
+#include "G4SystemOfUnits.hh"
+#include "G4PhysicalConstants.hh"
 
 #include <iostream>
 

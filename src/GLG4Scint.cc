@@ -21,6 +21,8 @@
 
 // [see detailed class description in GLG4Scint.hh]
 
+#include "G4SystemOfUnits.hh"
+#include "G4PhysicalConstants.hh"
 #include "G4UnitsTable.hh"
 #include "GLG4Scint.hh"
 #include "G4ios.hh"
@@ -226,9 +228,7 @@ GLG4Scint::PostPostStepDoIt(const G4Track& aTrack, const G4Step& aStep) {
     const MyPhysicsTable::Entry *physicsEntry =  myPhysicsTable->GetEntry(aMaterial->GetIndex());
 
     if (!physicsEntry) return &aParticleChange;
-    G4cout << "Material index: " << aMaterial->GetIndex() << ' ';
-    G4cout << "Physics entry: " << physicsEntry << G4endl;
-
+    
     // Retrieve the Light Yield or Scintillation Integral for this material
     G4double ScintillationYield                       = physicsEntry->light_yield;
     G4PhysicsOrderedFreeVector *ScintillationIntegral = physicsEntry->spectrumIntegral;
@@ -238,10 +238,6 @@ GLG4Scint::PostPostStepDoIt(const G4Track& aTrack, const G4Step& aStep) {
     G4double TotalEnergyDeposit = aStep.GetTotalEnergyDeposit();
     
     if (TotalEnergyDeposit <= 0.0) return &aParticleChange;
-
-    //FIXME between here
-    
-    G4cout << physicsEntry << ' ' << physicsEntry->QuenchingArray << G4endl;
     
     // Finds E-dependent QF, unless the user provided an E-independent one
     if (!UserQF) {
@@ -252,18 +248,13 @@ GLG4Scint::PostPostStepDoIt(const G4Track& aTrack, const G4Step& aStep) {
             SetQuenchingFactor(1.0);
         }
     }
-
     
     // If no LY defined Max Scintillation Integral == ScintillationYield
     
     if (!ScintillationYield) {
-        //ScintillationYield = ScintillationIntegral->GetMaxValue();
+        ScintillationYield = ScintillationIntegral->GetMaxValue();
     }
     
-    
-    //FIXME and here
-    
-
     // Set positions, directions, etc.
     G4StepPoint *pPreStepPoint  = aStep.GetPreStepPoint();
     G4StepPoint *pPostStepPoint = aStep.GetPostStepPoint();
