@@ -205,6 +205,10 @@ class Material(object):
         self.refractive_index = None
         self.absorption_length = None
         self.scattering_length = None
+        self.scintillation_spectrum = None
+        self.scintillation_light_yield = None
+        self.scintillation_waveform = None
+        self.scintillation_mod = None
         self.set('reemission_prob', 0)
         self.set('reemission_cdf', 0)
         self.density = 0.0 # g/cm^3

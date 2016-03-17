@@ -54,19 +54,16 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep) {
     if (scint) {
         
         G4VParticleChange * pParticleChange = GLG4Scint::GenericPostPostStepDoIt(aStep);
-        
-        /*
-        G4int iSecondary= pParticleChange->GetNumberOfSecondaries();
-        if (iSecondary > 0) {
-            // add secondaries to the list
-            while ( (iSecondary--) > 0 ) {
-                G4Track * tempSecondaryTrack = pParticleChange->GetSecondary(iSecondary);
-                fpSteppingManager->GetfSecondary()->push_back( tempSecondaryTrack );
-            }
+        if (!pParticleChange) return;
+             
+        const size_t nsecondaries = pParticleChange->GetNumberOfSecondaries();
+        for (size_t i = 0; i < nsecondaries; i++) { 
+            G4Track * tempSecondaryTrack = pParticleChange->GetSecondary(i);
+            fpSteppingManager->GetfSecondary()->push_back( tempSecondaryTrack );
         }
         
         pParticleChange->Clear();
-        */
+        
     }
     
 }

@@ -45,6 +45,7 @@
 #include <G4Event.hh>
 #include <G4EventManager.hh>
 #include <sstream>
+#include <iostream>
 
 // //////////////
 // Helpers
@@ -221,7 +222,7 @@ GLG4Scint::PostPostStepDoIt(const G4Track& aTrack, const G4Step& aStep) {
     
     // Now we are done if we are not actually making photons here
     if (!doScintillation)  return &aParticleChange;
-
+    
     if (aTrack.GetDefinition() == G4OpticalPhoton::OpticalPhoton()) return &aParticleChange;
     
     const G4Material *aMaterial               = aTrack.GetMaterial();
@@ -234,7 +235,7 @@ GLG4Scint::PostPostStepDoIt(const G4Track& aTrack, const G4Step& aStep) {
     G4PhysicsOrderedFreeVector *ScintillationIntegral = physicsEntry->spectrumIntegral;
 
     if (!ScintillationIntegral) return &aParticleChange;
-
+    
     G4double TotalEnergyDeposit = aStep.GetTotalEnergyDeposit();
     
     if (TotalEnergyDeposit <= 0.0) return &aParticleChange;
@@ -287,6 +288,7 @@ GLG4Scint::PostPostStepDoIt(const G4Track& aTrack, const G4Step& aStep) {
 
     // Calculate MeanNumPhotons
     G4double MeanNumPhotons = (ScintillationYield * GetQuenchingFactor() * QuenchedTotalEnergyDeposit * (1.0 + birksConstant * (physicsEntry->ref_dE_dx)));
+    //std::cout << "Generated photons: " << MeanNumPhotons << std::cout;
 
     if (MeanNumPhotons <= 0.0) {
         return &aParticleChange;
