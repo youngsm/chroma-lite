@@ -124,6 +124,22 @@ class Photons(object):
     def __len__(self):
         '''Returns the number of photons in self.'''
         return len(self.pos)
+        
+    def __str__(self):
+        if len(self.pos) == 1:
+            return 'Photon(pos='+str(self.pos[0])+ \
+                         ',dir='+str(self.dir[0])+ \
+                         ',pol='+str(self.pol[0])+ \
+                         ',wavelength='+str(self.wavelengths[0])+ \
+                         ',t='+str(self.t[0])+ \
+                         ',last_hit_triangle='+str(self.last_hit_triangles[0])+ \
+                         ',flag='+str(self.flags[0])+ \
+                         ',weight='+str(self.weights[0])+ \
+                         ')'
+        else:
+            return 'Photons['+str(len(self.pos))+']'
+    
+    __repr__ = __str__
 
     def __getitem__(self, key):
         return Photons(self.pos[key], self.dir[key], self.pol[key],
@@ -167,7 +183,7 @@ class Channels(object):
         return self.hit.nonzero(), self.t[self.hit], self.q[self.hit]
 
 class Event(object):
-    def __init__(self, id=0, primary_vertex=None, vertices=None, photons_beg=None, photons_end=None, channels=None):
+    def __init__(self, id=0, primary_vertex=None, vertices=None, photons_beg=None, photons_end=None, hits=None, channels=None):
         '''Create an event.
 
             id: int
@@ -209,4 +225,5 @@ class Event(object):
         
         self.photons_beg = photons_beg
         self.photons_end = photons_end
+        self.hits = hits
         self.channels = channels

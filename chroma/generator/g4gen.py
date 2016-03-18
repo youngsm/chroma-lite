@@ -51,9 +51,9 @@ class G4Generator(object):
         gRunManager.SetUserAction(self.stepping_action)
         self.tracking_action = _g4chroma.TrackingAction()
         gRunManager.SetUserAction(self.tracking_action)
-        g4mute()
+        #g4mute()
         gRunManager.Initialize()
-        g4unmute()
+        #g4unmute()
         # preinitialize the process by running a simple event
         self.generate_photons([Vertex('e-', (0,0,0), (1,0,0), 0, 1.0)], mute=True)
         

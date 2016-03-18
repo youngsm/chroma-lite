@@ -78,6 +78,77 @@ class GPUPhotons(object):
         flags = self.flags.get()
         weights = self.weights.get()
         return event.Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights)
+        
+    def get_hits(self, gpu_detector, target_flag=(0x1<<2), nthreads_per_block=64, max_blocks=1024,
+               start_photon=None, nphotons=None):
+        '''Return a map of GPUPhoton objects containing only photons that
+        have a particular bit set in their history word and were detected by
+        a channel.'''
+        cuda.Context.get_current().synchronize()
+        index_counter_gpu = ga.zeros(shape=1, dtype=np.uint32)
+        cuda.Context.get_current().synchronize()
+        if start_photon is None:
+            start_photon = 0
+        if nphotons is None:
+            nphotons = self.pos.size - start_photon
+
+        # First count how much space we need
+        for first_photon, photons_this_round, blocks in chunk_iterator(nphotons, nthreads_per_block, max_blocks):
+            self.gpu_funcs.count_photon_hits(np.int32(start_photon+first_photon), 
+                                         np.int32(photons_this_round),
+                                         np.uint32(target_flag),
+                                         self.flags,
+                                         gpu_detector.solid_id_map,
+                                         self.last_hit_triangles,
+                                         gpu_detector.detector_gpu,
+                                         index_counter_gpu,
+                                         block=(nthreads_per_block,1,1), 
+                                         grid=(blocks, 1))
+        cuda.Context.get_current().synchronize()
+        reduced_nphotons = int(index_counter_gpu.get()[0])
+        
+        # Then allocate new storage space
+        pos = ga.empty(shape=reduced_nphotons, dtype=ga.vec.float3)
+        dir = ga.empty(shape=reduced_nphotons, dtype=ga.vec.float3)
+        pol = ga.empty(shape=reduced_nphotons, dtype=ga.vec.float3)
+        wavelengths = ga.empty(shape=reduced_nphotons, dtype=np.float32)
+        t = ga.empty(shape=reduced_nphotons, dtype=np.float32)
+        last_hit_triangles = ga.empty(shape=reduced_nphotons, dtype=np.int32)
+        flags = ga.empty(shape=reduced_nphotons, dtype=np.uint32)
+        weights = ga.empty(shape=reduced_nphotons, dtype=np.float32)
+        channels = ga.empty(shape=reduced_nphotons, dtype=np.int32)
+
+        # And finaly copy hits, if there are any
+        if reduced_nphotons > 0:
+            index_counter_gpu.fill(0)
+            for first_photon, photons_this_round, blocks in \
+                    chunk_iterator(nphotons, nthreads_per_block, max_blocks):
+                self.gpu_funcs.copy_photon_hits(np.int32(start_photon+first_photon), 
+                                            np.int32(photons_this_round), 
+                                            np.uint32(target_flag),
+                                            gpu_detector.solid_id_map,
+                                            gpu_detector.detector_gpu,
+                                            index_counter_gpu, 
+                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights,
+                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles, weights, channels,
+                                            block=(nthreads_per_block,1,1), 
+                                            grid=(blocks, 1))
+            assert index_counter_gpu.get()[0] == reduced_nphotons
+            
+        pos = pos.get().view(np.float32).reshape((len(pos),3))
+        dir = dir.get().view(np.float32).reshape((len(dir),3))
+        pol = pol.get().view(np.float32).reshape((len(pol),3))
+        wavelengths = wavelengths.get()
+        t = t.get()
+        last_hit_triangles = last_hit_triangles.get()
+        flags = flags.get()
+        weights = weights.get()
+        channels = channels.get()
+        hitmap = {}
+        for chan in np.unique(channels):
+            mask = (channels == chan).astype(bool)
+            hitmap[chan] = event.Photons(pos[mask], dir[mask], pol[mask], wavelengths[mask], t[mask], last_hit_triangles[mask], flags[mask], weights[mask])
+        return hitmap
 
     def iterate_copies(self):
         '''Returns an iterator that yields GPUPhotonsSlice objects

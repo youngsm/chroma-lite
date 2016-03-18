@@ -36,8 +36,8 @@ class Detector(Geometry):
         self.channel_id_to_channel_index = {}
 
         # zero time and unit charge distributions
-        self.time_cdf = (np.array([-0.01, 0.01]), np.array([0.0, 1.0]))
-        self.charge_cdf = (np.array([0.99, 1.00]), np.array([0.0, 1.0]))
+        self.time_cdf = (np.array([-0.00000001, 0.00000001]), np.array([0.0, 1.0]))
+        self.charge_cdf = (np.array([0.999999999, 1.00000000]), np.array([0.0, 1.0]))
 
     def add_solid(self, solid, rotation=None, displacement=None):
         """

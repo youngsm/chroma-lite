@@ -2,6 +2,7 @@
 
 #include "linalg.h"
 #include "geometry.h"
+#include "detector.h"
 #include "photon.h"
 
 #include "stdio.h"
@@ -105,6 +106,74 @@ copy_photons(int first_photon, int nthreads, unsigned int target_flag,
 	new_histories[offset] = histories[photon_id];
 	new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
 	new_weights[offset] = weights[photon_id];
+    }
+}
+
+__global__ void
+count_photon_hits(int first_photon, int nphotons, unsigned int detection_state,
+            unsigned int *histories, int *solid_map, int *last_hit_triangles,
+            Detector *detector, unsigned int *index_counter)
+{
+    int id = blockIdx.x*blockDim.x + threadIdx.x;
+    __shared__ unsigned int counter;
+
+    if (threadIdx.x == 0) counter = 0;
+    
+    __syncthreads();
+
+    if (id < nphotons) {
+	    int photon_id = first_photon + id;
+	    if (histories[photon_id] & detection_state) {
+	        int triangle_id = last_hit_triangles[photon_id];
+        	if (triangle_id > -1) {
+	            int solid_id = solid_map[triangle_id];
+	            int channel_index = detector->solid_id_to_channel_index[solid_id];
+	            if (channel_index >= 0) atomicAdd(&counter, 1);
+	        }
+	    }
+    }
+    
+    __syncthreads();
+
+    if (threadIdx.x == 0) atomicAdd(index_counter, counter);
+}
+
+__global__ void
+copy_photon_hits(int first_photon, int nphotons, unsigned int detection_state, 
+            int *solid_map, Detector *detector, unsigned int *index_counter,
+            float3 *positions, float3 *directions,
+            float *wavelengths, float3 *polarizations,
+            float *times, unsigned int *histories,
+            int *last_hit_triangles, float *weights,
+            float3 *new_positions, float3 *new_directions,
+            float *new_wavelengths, float3 *new_polarizations,
+            float *new_times, unsigned int *new_histories,
+            int *new_last_hit_triangles, float *new_weights,
+            int *new_channels)
+{
+    int id = blockIdx.x*blockDim.x + threadIdx.x;
+    
+    if (id < nphotons) {
+	    int photon_id = first_photon + id;
+	    if (histories[photon_id] & detection_state) {
+	        int triangle_id = last_hit_triangles[photon_id];
+        	if (triangle_id > -1) {
+	            int solid_id = solid_map[triangle_id];
+	            int channel_index = detector->solid_id_to_channel_index[solid_id];
+	            if (channel_index >= 0) {
+	                int offset = atomicAdd(index_counter, 1);	
+	                new_positions[offset] = positions[photon_id];
+	                new_directions[offset] = directions[photon_id];
+	                new_polarizations[offset] = polarizations[photon_id];
+	                new_wavelengths[offset] = wavelengths[photon_id];
+	                new_times[offset] = times[photon_id];
+	                new_histories[offset] = histories[photon_id];
+	                new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
+	                new_weights[offset] = weights[photon_id];
+	                new_channels[offset] = channel_index;
+	            }
+	        }
+	    }
     }
 }
 

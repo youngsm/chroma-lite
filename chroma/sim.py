@@ -53,7 +53,7 @@ class Simulation(object):
         self.pdf_config = None
 
     def simulate(self, iterable, keep_photons_beg=False,
-                 keep_photons_end=False, run_daq=True, max_steps=100):
+                 keep_photons_end=False, keep_hits=True, run_daq=False, max_steps=100):
         if isinstance(iterable, event.Photons):
             first_element, iterable = iterable, [iterable]
         else:
@@ -83,8 +83,12 @@ class Simulation(object):
 
             if keep_photons_end:
                 ev.photons_end = gpu_photons.get()
-
+            
+            if hasattr(self.detector, 'num_channels') and keep_hits:
+                ev.hits = gpu_photons.get_hits(self.gpu_geometry)
+                
             # Skip running DAQ if we don't have one
+            # Disabled by default because incredibly special-case
             if hasattr(self, 'gpu_daq') and run_daq:
                 self.gpu_daq.begin_acquire()
                 self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
