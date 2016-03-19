@@ -40,6 +40,7 @@ void ChromaPhysicsList::SetCuts(){
 SteppingAction::SteppingAction()
 {
     scint = true;
+    children_mapped = false;
 }
 
 SteppingAction::~SteppingAction()
@@ -86,10 +87,20 @@ void SteppingAction::UserSteppingAction(const G4Step *step) {
 
 void SteppingAction::clearTracking() {
     trackmap.clear();    
+    children_mapped = false;
 }
 
 Track SteppingAction::getTrack(int id) {
+    if (!children_mapped) mapChildren();
     return trackmap[id];
+}
+
+void SteppingAction::mapChildren() {
+    for (auto it = trackmap.begin(); it != trackmap.end(); it++) {
+        const int parent = it->second.parent_id;
+        trackmap[parent].addChild(it->first);
+    }
+    children_mapped = true;
 }
 
 int Track::getNumSteps() { 
@@ -246,6 +257,8 @@ void export_Chroma()
     .def("getStepKE",PTA_getStepKE)
     .def("getStepEDep",PTA_getStepEDep)
     //.def("getStepProcess",PTA_getStepProcess)
+    .def("getNumChildren",&Track::getNumChildren)
+    .def("getChildTrackID",&Track::getChildTrackID)
     ;  
 
   class_<SteppingAction, SteppingAction*, bases<G4UserSteppingAction>,

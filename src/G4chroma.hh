@@ -49,8 +49,14 @@ public:
     inline const std::vector<Step>& getSteps() { return steps; };  
     int getNumSteps();
     
+    inline int getNumChildren() { return children.size(); }
+    inline int getChildTrackID(int i) { return children[i]; }
+    
+    inline int addChild(int trackid) { children.push_back(trackid); }
+    
 private:
     std::vector<Step> steps;
+    std::vector<int> children;
 };
 
 class SteppingAction : public G4UserSteppingAction
@@ -71,6 +77,8 @@ private:
     
     void appendStep(std::vector<Step> &track, const G4StepPoint* point, const G4Step* step, const bool initial);
     
+    bool children_mapped;
+    void mapChildren();
     std::map<int,Track> trackmap;
 
 };
