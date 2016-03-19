@@ -163,6 +163,7 @@ class G4Generator(object):
                     self.particle_gun.SetParticlePolarization(G4ThreeVector(*vertex.pol).unit())
 
                 self.tracking_action.Clear()
+                self.stepping_action.clearTracking()
                 gRunManager.BeamOn(1)
 
                 if photons is None:

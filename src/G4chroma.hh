@@ -12,8 +12,46 @@ public:
 
 #include <G4UserSteppingAction.hh>
 #include <G4UserTrackingAction.hh>
-#include <vector>
 #include <G4ThreeVector.hh>
+#include <G4Track.hh>
+#include <G4Step.hh>
+#include <G4StepPoint.hh>
+#include <vector>
+#include <map>
+
+class Step {
+public:
+    inline Step(const double _x, const double _y, const double _z, 
+                const double _t, 
+                const double _px, const double _py, const double _pz, 
+                const double _ke, const double _edep, 
+                const std::string &_procname) :
+                x(_x), y(_y), z(_z), t(_t), px(_px), py(_py), pz(_pz), 
+                ke(_ke), edep(_edep), procname(_procname) {
+    }
+    
+    inline ~Step() { }
+
+    const double x,y,z,t,px,py,pz,ke,edep;
+    const std::string procname;
+};
+
+class Track {
+public:
+    inline Track() : id(-1) { }
+    inline ~Track() { }
+    
+    int id, parent_id, pdg_code;
+    double weight;
+    std::string name;
+    
+    void appendStepPoint(const G4StepPoint* point, const G4Step* step, const bool initial = false);  
+    inline const std::vector<Step>& getSteps() { return steps; };  
+    int getNumSteps();
+    
+private:
+    std::vector<Step> steps;
+};
 
 class SteppingAction : public G4UserSteppingAction
 {
@@ -25,8 +63,15 @@ public:
   
   void UserSteppingAction(const G4Step* aStep);
   
+  void clearTracking();
+  Track getTrack(int id);
+  
 private:
     bool scint;
+    
+    void appendStep(std::vector<Step> &track, const G4StepPoint* point, const G4Step* step, const bool initial);
+    
+    std::map<int,Track> trackmap;
 
 };
 
@@ -51,6 +96,8 @@ public:
 
   void GetWavelength(double *wl) const;
   void GetT0(double *t) const;
+  
+  void GetParentTrackID(int *t) const;
 
   virtual void PreUserTrackingAction(const G4Track *);
 
@@ -58,6 +105,7 @@ protected:
   std::vector<G4ThreeVector> pos;
   std::vector<G4ThreeVector> dir;
   std::vector<G4ThreeVector> pol;
+  std::vector<int> parentTrackID;
   std::vector<double> wavelength;
   std::vector<double> t0;
 };

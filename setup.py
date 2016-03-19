@@ -68,7 +68,7 @@ setup(
         Extension('chroma.generator._g4chroma',
                   ['src/G4chroma.cc','src/GLG4Scint.cc'],
                   include_dirs=include_dirs,
-                  extra_compile_args=geant4_cflags,
+                  extra_compile_args=['--std=c++11']+geant4_cflags,
                   extra_link_args=geant4_libs+clhep_libs,
                   extra_objects=extra_objects,
                   libraries=libraries,
