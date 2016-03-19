@@ -13,8 +13,21 @@ SURFACE_TRANSMIT = 0x1 << 8
 BULK_REEMIT      = 0x1 << 9
 NAN_ABORT        = 0x1 << 31
 
+class Steps(object):
+    def __init__(self,x,y,z,t,px,py,pz,ke,edep):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.t = t
+        self.px = px
+        self.py = py
+        self.pz = pz
+        self.ke = ke
+        self.edep = edep
+    
+
 class Vertex(object):
-    def __init__(self, particle_name, pos, dir, ke, t0=0.0, pol=None):
+    def __init__(self, particle_name, pos, dir, ke, t0=0.0, pol=None, steps=None, children=None):
         '''Create a particle vertex.
 
            particle_name: string
@@ -43,6 +56,13 @@ class Vertex(object):
         self.pol = pol
         self.ke = ke
         self.t0 = t0
+        self.steps = steps
+        self.children = children
+        
+    def __str__(self):
+        return 'Vertex('+self.particle_name+',ke='+str(self.ke)+',steps='+str(True if self.steps else False)+')'
+    
+    __repr__ = __str__
 
 class Photons(object):
     def __init__(self, pos, dir, pol, wavelengths, t=None, last_hit_triangles=None, flags=None, weights=None):
@@ -183,14 +203,11 @@ class Channels(object):
         return self.hit.nonzero(), self.t[self.hit], self.q[self.hit]
 
 class Event(object):
-    def __init__(self, id=0, primary_vertex=None, vertices=None, photons_beg=None, photons_end=None, hits=None, channels=None):
+    def __init__(self, id=0, vertices=None, photons_beg=None, photons_end=None, hits=None, channels=None):
         '''Create an event.
 
             id: int
               ID number of this event
-
-            primary_vertex: chroma.event.Vertex
-              Vertex information for primary generating particle.
               
             vertices: list of chroma.event.Vertex objects
               Starting vertices to propagate in this event.  By default
@@ -212,8 +229,6 @@ class Event(object):
         self.id = id
 
         self.nphotons = None
-
-        self.primary_vertex = primary_vertex
 
         if vertices is not None:
             if np.iterable(vertices):

@@ -2,19 +2,16 @@ from chroma.generator.mute import *
 
 import pyublas
 import numpy as np
-from chroma.event import Photons, Vertex
+from chroma.event import Photons, Vertex, Steps
 from chroma.tools import argsort_direction
 
-g4mute()
+#g4mute()
 from Geant4 import *
-g4unmute()
+#g4unmute()
 import g4py.ezgeom
 import g4py.NISTmaterials
 import g4py.ParticleGun
 from chroma.generator import _g4chroma
-
-#cppmute()
-#cppunmute()
 
 class G4Generator(object):
     def __init__(self, material, seed=None):
@@ -55,7 +52,7 @@ class G4Generator(object):
         gRunManager.Initialize()
         #g4unmute()
         # preinitialize the process by running a simple event
-        self.generate_photons([Vertex('e-', (0,0,0), (1,0,0), 0, 1.0)], mute=True)
+        self.generate_photons([Vertex('e-', (0,0,0), (1,0,0), 0.5, 1.0)], mute=True)
         
     def create_g4material(self, material):
         g4material = G4Material('world_material', material.density * g / cm3,
@@ -122,6 +119,17 @@ class G4Generator(object):
             t0 = t0[reorder]
 
         return Photons(pos, dir, pol, wavelengths, t0)
+    
+    def _extract_vertex_from_stepping_action(self, index=1, tracks=True):
+        track = self.stepping_action.getTrack(index)
+        steps = Steps(track.getStepX(),track.getStepY(),track.getStepZ(),track.getStepT(),
+                      track.getStepPX(),track.getStepPY(),track.getStepPZ(),track.getStepKE(),
+                      track.getStepEDep())
+        children = [self._extract_vertex_from_stepping_action(track.getChildTrackID(id),steps) for id in xrange(track.getNumChildren())]
+        return Vertex(track.name, np.array([steps.x[0],steps.y[0],steps.z[0]]), 
+                        np.array([steps.px[0],steps.py[0],steps.pz[0]]), 
+                        steps.ke[0], steps.t[0], steps=steps, children=children)
+        
 
     def generate_photons(self, vertices, mute=False):
         """Use GEANT4 to generate photons produced by propagating `vertices`.
@@ -145,10 +153,12 @@ class G4Generator(object):
         photons = None
 
         try:
+            tracked_vertices = []
             for vertex in vertices:
                 self.particle_gun.SetParticleByName(vertex.particle_name)
-                mass = G4ParticleTable.GetParticleTable().FindParticle(vertex.particle_name).GetPDGMass()
-                total_energy = vertex.ke*MeV + mass
+                #FIXME validate this - Geant4 seems to call 'ParticleEnergy' KineticEnergy
+                #mass = G4ParticleTable.GetParticleTable().FindParticle(vertex.particle_name).GetPDGMass()
+                total_energy = vertex.ke*MeV# + mass
                 self.particle_gun.SetParticleEnergy(total_energy)
 
                 # Must be float type to call GEANT4 code
@@ -165,14 +175,17 @@ class G4Generator(object):
                 self.tracking_action.Clear()
                 self.stepping_action.clearTracking()
                 gRunManager.BeamOn(1)
+                
+                tracked_vertices.append(self._extract_vertex_from_stepping_action())
 
                 if photons is None:
                     photons = self._extract_photons_from_tracking_action()
                 else:
                     photons += self._extract_photons_from_tracking_action()
+                
         finally:
             if mute:
                 pass
                 #g4unmute()
 
-        return photons
+        return (tracked_vertices,photons)

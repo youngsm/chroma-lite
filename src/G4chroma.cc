@@ -90,7 +90,7 @@ void SteppingAction::clearTracking() {
     children_mapped = false;
 }
 
-Track SteppingAction::getTrack(int id) {
+Track& SteppingAction::getTrack(int id) {
     if (!children_mapped) mapChildren();
     return trackmap[id];
 }
@@ -266,7 +266,7 @@ void export_Chroma()
     .def(init<>())
     .def("EnableScint",&SteppingAction::EnableScint)
     .def("clearTracking",&SteppingAction::clearTracking)
-    .def("getTrack",&SteppingAction::getTrack)
+    .def("getTrack",&SteppingAction::getTrack,return_value_policy<reference_existing_object>())
     ;  
   
   class_<TrackingAction, TrackingAction*, bases<G4UserTrackingAction>,

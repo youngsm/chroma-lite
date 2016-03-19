@@ -30,7 +30,7 @@ class G4GeneratorProcess(multiprocessing.Process):
 
         while True:
             ev = vertex_socket.recv_pyobj()
-            ev.photons_beg = gen.generate_photons(ev.vertices)
+            ev.vertices,ev.photons_beg = gen.generate_photons(ev.vertices)
             #print 'type(ev.photons_beg) is %s' % type(ev.photons_beg)
             photon_socket.send_pyobj(ev)
 

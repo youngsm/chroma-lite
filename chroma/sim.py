@@ -65,7 +65,7 @@ class Simulation(object):
         elif isinstance(first_element, event.Photons):
             iterable = (event.Event(photons_beg=x) for x in iterable)
         elif isinstance(first_element, event.Vertex):
-            iterable = (event.Event(primary_vertex=vertex, vertices=[vertex]) for vertex in iterable)
+            iterable = (event.Event(vertices=[vertex]) for vertex in iterable)
             iterable = self.photon_generator.generate_events(iterable)
 
         for ev in iterable:

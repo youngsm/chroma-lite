@@ -70,7 +70,7 @@ public:
   void UserSteppingAction(const G4Step* aStep);
   
   void clearTracking();
-  Track getTrack(int id);
+  Track& getTrack(int id);
   
 private:
     bool scint;
