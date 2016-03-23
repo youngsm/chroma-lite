@@ -2,6 +2,7 @@
 #include <vector>
 #include <TTree.h>
 #include <string>
+#include <map>
 
 struct Vertex {
   virtual ~Vertex() { };
@@ -12,6 +13,11 @@ struct Vertex {
   TVector3 pol;
   double ke;
   double t0;
+  int trackid;
+  int pdgcode;
+  
+  std::vector<Vertex> children;
+  std::vector<double> x,y,z,t,px,py,pz,ke,edep;
 
   ClassDef(Vertex, 1);
 };
@@ -48,8 +54,6 @@ struct Event {
   int id;
   unsigned int nhit;
   unsigned int nchannels;
-
-  Vertex primary_vertex;
   
   double TotalQ() const {
     double sum = 0.0;
@@ -62,6 +66,7 @@ struct Event {
   std::vector<Vertex> vertices;
   std::vector<Photon> photons_beg;
   std::vector<Photon> photons_end;
+  std::map<int,Photon> hits;
   std::vector<Channel> channels;
 
   ClassDef(Event, 1);

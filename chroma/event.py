@@ -27,7 +27,7 @@ class Steps(object):
     
 
 class Vertex(object):
-    def __init__(self, particle_name, pos, dir, ke, t0=0.0, pol=None, steps=None, children=None):
+    def __init__(self, particle_name, pos, dir, ke, t0=0.0, pol=None, steps=None, children=None, trackid=-1, pdgcode=-1):
         '''Create a particle vertex.
 
            particle_name: string
@@ -58,6 +58,8 @@ class Vertex(object):
         self.t0 = t0
         self.steps = steps
         self.children = children
+        self.trackid = trackid
+        self.pdgcode = pdgcode
         
     def __str__(self):
         return 'Vertex('+self.particle_name+',ke='+str(self.ke)+',steps='+str(True if self.steps else False)+')'
@@ -65,7 +67,7 @@ class Vertex(object):
     __repr__ = __str__
 
 class Photons(object):
-    def __init__(self, pos, dir, pol, wavelengths, t=None, last_hit_triangles=None, flags=None, weights=None):
+    def __init__(self, pos=np.empty((0,3)), dir=np.empty((0,3)), pol=np.empty((0,3)), wavelengths=np.empty((0)), t=None, last_hit_triangles=None, flags=None, weights=None):
         '''Create a new list of n photons.
 
             pos: numpy.ndarray(dtype=numpy.float32, shape=(n,3))

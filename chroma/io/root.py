@@ -50,14 +50,26 @@ def root_vertex_to_python_vertex(vertex):
                         dir=tvector3_to_ndarray(vertex.dir),
                         ke=vertex.ke,
                         t0=vertex.t0,
-                        pol=tvector3_to_ndarray(vertex.pol))
+                        pol=tvector3_to_ndarray(vertex.pol),
+                        trackid=vertex.trackid,
+                        pdgcode=vertex.pdgcode)
+
+def python_vertex_to_root_vertex(pvertex,rvertex):
+    rvertex.particle_name = pvertex.particle_name
+    rvertex.pos.SetXYZ(*pvertex.pos)
+    rvertex.dir.SetXYZ(*pvertex.dir)
+    if pvertex.pol is not None:
+        rvertex.pol.SetXYZ(*vertex.pol)
+    rvertex.ke = pvertex.ke
+    rvertex.t0 = pvertex.t0
+    rvertex.trackid = pvertex.trackid
+    rvertex.pdgcode = pvertex.pdgcode
 
 def root_event_to_python_event(ev):
     '''Returns a new chroma.event.Event object created from the
     contents of the ROOT event `ev`.'''
     pyev = event.Event(ev.id)
-    pyev.primary_vertex = root_vertex_to_python_vertex(ev.primary_vertex)
-
+    
     for vertex in ev.vertices:
         pyev.vertices.append(root_vertex_to_python_vertex(vertex))
 
@@ -180,16 +192,6 @@ class RootWriter(object):
         "Write an event.Event object to the ROOT tree as a ROOT.Event object."
         self.ev.id = pyev.id
 
-        if pyev.primary_vertex is not None:
-            self.ev.primary_vertex.particle_name = \
-                pyev.primary_vertex.particle_name
-            self.ev.primary_vertex.pos.SetXYZ(*pyev.primary_vertex.pos)
-            self.ev.primary_vertex.dir.SetXYZ(*pyev.primary_vertex.dir)
-            if pyev.primary_vertex.pol is not None:
-                self.ev.primary_vertex.pol.SetXYZ(*pyev.primary_vertex.pol)
-            self.ev.primary_vertex.ke = pyev.primary_vertex.ke
-            self.ev.primary_vertex.t0 = pyev.primary_vertex.t0
-
         if pyev.photons_beg is not None:
             photons = pyev.photons_beg
             ROOT.fill_photons(self.ev.photons_beg,
@@ -214,13 +216,7 @@ class RootWriter(object):
         if pyev.vertices is not None:
             self.ev.vertices.resize(len(pyev.vertices))
             for i, vertex in enumerate(pyev.vertices):
-                self.ev.vertices[i].particle_name = vertex.particle_name
-                self.ev.vertices[i].pos.SetXYZ(*vertex.pos)
-                self.ev.vertices[i].dir.SetXYZ(*vertex.dir)
-                if vertex.pol is not None:
-                    self.ev.vertices[i].pol.SetXYZ(*vertex.pol)
-                self.ev.vertices[i].ke = vertex.ke
-                self.ev.vertices[i].t0 = vertex.t0
+                python_vertex_to_root_vertex(vertex,self.ev.vertices[i])
 
         if pyev.channels is not None:
             nhit = count_nonzero(pyev.channels.hit)

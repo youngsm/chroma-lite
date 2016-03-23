@@ -128,7 +128,7 @@ class G4Generator(object):
         children = [self._extract_vertex_from_stepping_action(track.getChildTrackID(id),steps) for id in xrange(track.getNumChildren())]
         return Vertex(track.name, np.array([steps.x[0],steps.y[0],steps.z[0]]), 
                         np.array([steps.px[0],steps.py[0],steps.pz[0]]), 
-                        steps.ke[0], steps.t[0], steps=steps, children=children)
+                        steps.ke[0], steps.t[0], steps=steps, children=children, trackid=index, pdgcode=track.pdg_code)
         
 
     def generate_photons(self, vertices, mute=False):
