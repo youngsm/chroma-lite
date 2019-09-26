@@ -48,7 +48,7 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
         nchild = np.ediff1d(first_child, to_end=nnodes - first_child[-1]).astype(np.uint32)
         
         # Expand groups that have too many children
-        excess_children = np.argwhere(nchild > MAX_CHILD)
+        excess_children = np.argwhere(nchild > MAX_CHILD).flatten()
         if len(excess_children) > 0:
             print 'Expanding %d parent nodes' % len(excess_children)
             parent_morton_parts = np.split(parent_morton_codes, excess_children)
