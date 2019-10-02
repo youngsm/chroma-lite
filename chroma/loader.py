@@ -129,7 +129,7 @@ def load_geometry_from_string(geometry_str,
     return geometry
 
 def load_bvh(geometry,  bvh_name="default", 
-             auto_build_bvh=True, read_bvh_cache=True,
+             auto_build_bvh=True, read_bvh_cache=False,
              update_bvh_cache=True, cache_dir=None,
              cuda_device=None):
     if cache_dir is None:

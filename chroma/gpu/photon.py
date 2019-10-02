@@ -147,7 +147,7 @@ class GPUPhotons(object):
         hitmap = {}
         for chan in np.unique(channels):
             mask = (channels == chan).astype(bool)
-            hitmap[chan] = event.Photons(pos[mask], dir[mask], pol[mask], wavelengths[mask], t[mask], last_hit_triangles[mask], flags[mask], weights[mask])
+            hitmap[int(chan)] = event.Photons(pos[mask], dir[mask], pol[mask], wavelengths[mask], t[mask], last_hit_triangles[mask], flags[mask], weights[mask])
         return hitmap
 
     def iterate_copies(self):

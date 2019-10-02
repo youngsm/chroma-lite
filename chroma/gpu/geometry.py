@@ -101,6 +101,10 @@ class GPUGeometry(object):
             k_gpu = ga.to_gpu(k)
             reemission_cdf = interp_material_property(wavelengths, surface.reemission_cdf)
             reemission_cdf_gpu = ga.to_gpu(reemission_cdf)
+            dichroic_reflect = interp_material_property(wavelengths, surface.dichroic_reflect)
+            dichroic_reflect_gpu = ga.to_gpu(dichroic_reflect)
+            dichroic_transmit = interp_material_property(wavelengths, surface.dichroic_transmit)
+            dichroic_transmit_gpu = ga.to_gpu(dichroic_transmit)
 
             self.surface_data.append(detect_gpu)
             self.surface_data.append(absorb_gpu)
@@ -109,13 +113,15 @@ class GPUGeometry(object):
             self.surface_data.append(reflect_specular_gpu)
             self.surface_data.append(eta_gpu)
             self.surface_data.append(k_gpu)
-            self.surface_data.append(reemission_cdf_gpu)
-
+            self.surface_data.append(dichroic_reflect_gpu)
+            self.surface_data.append(dichroic_transmit_gpu)
+            
             surface_gpu = \
                 make_gpu_struct(surface_struct_size,
                                 [detect_gpu, absorb_gpu, reemit_gpu,
                                  reflect_diffuse_gpu,reflect_specular_gpu,
                                  eta_gpu, k_gpu, reemission_cdf_gpu,
+                                 dichroic_reflect_gpu,dichroic_transmit_gpu,
                                  np.uint32(surface.model),
                                  np.uint32(len(wavelengths)),
                                  np.uint32(surface.transmissive),

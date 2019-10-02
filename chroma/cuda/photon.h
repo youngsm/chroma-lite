@@ -65,9 +65,9 @@ __device__ int
 convert(int c)
 {
     if (c & 0x80)
-	return (0xFFFFFF00 | c);
+        return (0xFFFFFF00 | c);
     else
-	return c;
+        return c;
 }
 
 __device__ float
@@ -140,23 +140,23 @@ pick_new_direction(float3 axis, float theta, float phi)
     sincosf(theta, &sin_theta, &cos_theta);
     float cos_phi, sin_phi;
     sincosf(phi, &sin_phi, &cos_phi);
-	
+        
     float sin_axis_theta = sqrt(1.0f - axis.z*axis.z);
     float cos_axis_phi, sin_axis_phi;
-	
+        
     if (isnan(sin_axis_theta) || sin_axis_theta < 0.00001f) {
-	cos_axis_phi = 1.0f;
-	sin_axis_phi = 0.0f;
+        cos_axis_phi = 1.0f;
+        sin_axis_phi = 0.0f;
     }
     else {
-	cos_axis_phi = axis.x / sin_axis_theta;
-	sin_axis_phi = axis.y / sin_axis_theta;
+        cos_axis_phi = axis.x / sin_axis_theta;
+        sin_axis_phi = axis.y / sin_axis_theta;
     }
 
     float dirx = cos_theta*axis.x +
-	sin_theta*(axis.z*cos_phi*cos_axis_phi - sin_phi*sin_axis_phi);
+        sin_theta*(axis.z*cos_phi*cos_axis_phi - sin_phi*sin_axis_phi);
     float diry = cos_theta*axis.y +
-	sin_theta*(cos_phi*axis.z*sin_axis_phi - sin_phi*cos_axis_phi);
+        sin_theta*(cos_phi*axis.z*sin_axis_phi - sin_phi*cos_axis_phi);
     float dirz = cos_theta*axis.z - sin_theta*cos_phi*sin_axis_theta;
 
     return make_float3(dirx, diry, dirz);
@@ -167,9 +167,9 @@ rayleigh_scatter(Photon &p, curandState &rng)
 {
     float cos_theta = 2.0f*cosf((acosf(1.0f - 2.0f*curand_uniform(&rng))-2*PI)/3.0f);
     if (cos_theta > 1.0f)
-	cos_theta = 1.0f;
+        cos_theta = 1.0f;
     else if (cos_theta < -1.0f)
-	cos_theta = -1.0f;
+        cos_theta = -1.0f;
 
     float theta = acosf(cos_theta);
     float phi = uniform(&rng, 0.0f, 2.0f * PI);
@@ -177,11 +177,11 @@ rayleigh_scatter(Photon &p, curandState &rng)
     p.direction = pick_new_direction(p.polarization, theta, phi);
 
     if (1.0f - fabsf(cos_theta) < 1e-6f) {
-	p.polarization = pick_new_direction(p.polarization, PI/2.0f, phi);
+        p.polarization = pick_new_direction(p.polarization, PI/2.0f, phi);
     }
     else {
-	// linear combination of old polarization and new direction
-	p.polarization = p.polarization - cos_theta * p.direction;
+        // linear combination of old polarization and new direction
+        p.polarization = p.polarization - cos_theta * p.direction;
     }
 
     p.direction /= norm(p.direction);
@@ -196,37 +196,37 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
     float scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
 
     if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD && s.reemission_prob == 0) // Prevent absorption
-	absorption_distance = 1e30;
+        absorption_distance = 1e30;
     else
-	use_weights = false;
+        use_weights = false;
 
     if (scatter_first == 1) {
-	// Force scatter
-	float scatter_prob = 1.0f - expf(-s.distance_to_boundary/s.scattering_length);
+        // Force scatter
+        float scatter_prob = 1.0f - expf(-s.distance_to_boundary/s.scattering_length);
 
-	if (scatter_prob > WEIGHT_LOWER_THRESHOLD) {
-	    int i=0;
-	    const int max_i = 1000;
-	    while (i < max_i && scattering_distance > s.distance_to_boundary) {
-		scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
-		i++;
-	    }
-	    p.weight *= scatter_prob;
-	}
+        if (scatter_prob > WEIGHT_LOWER_THRESHOLD) {
+            int i=0;
+            const int max_i = 1000;
+            while (i < max_i && scattering_distance > s.distance_to_boundary) {
+                scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
+                i++;
+            }
+            p.weight *= scatter_prob;
+        }
 
     } else if (scatter_first == -1) {
-	// Prevent scatter
-	float no_scatter_prob = expf(-s.distance_to_boundary/s.scattering_length);
+        // Prevent scatter
+        float no_scatter_prob = expf(-s.distance_to_boundary/s.scattering_length);
 
-	if (no_scatter_prob > WEIGHT_LOWER_THRESHOLD) {
-	    int i=0;
-	    const int max_i = 1000;
-	    while (i < max_i && scattering_distance <= s.distance_to_boundary) {
-		scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
-		i++;
-	    }
-	    p.weight *= no_scatter_prob;
-	}
+        if (no_scatter_prob > WEIGHT_LOWER_THRESHOLD) {
+            int i=0;
+            const int max_i = 1000;
+            while (i < max_i && scattering_distance <= s.distance_to_boundary) {
+                scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
+                i++;
+            }
+            p.weight *= no_scatter_prob;
+        }
     }
 
     if (absorption_distance <= scattering_distance) {
@@ -251,31 +251,31 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
                 p.history |= BULK_ABSORB;
                 return BREAK;
             } // photon is absorbed in material1
-	}
+        }
     }
     else {
-	if (scattering_distance <= s.distance_to_boundary) {
+        if (scattering_distance <= s.distance_to_boundary) {
 
-	    // Scale weight by absorption probability along this distance
-	    if (use_weights)
-		p.weight *= expf(-scattering_distance/s.absorption_length);
+            // Scale weight by absorption probability along this distance
+            if (use_weights)
+                p.weight *= expf(-scattering_distance/s.absorption_length);
 
-	    p.time += scattering_distance/(SPEED_OF_LIGHT/s.refractive_index1);
-	    p.position += scattering_distance*p.direction;
+            p.time += scattering_distance/(SPEED_OF_LIGHT/s.refractive_index1);
+            p.position += scattering_distance*p.direction;
 
-	    rayleigh_scatter(p, rng);
+            rayleigh_scatter(p, rng);
 
-	    p.history |= RAYLEIGH_SCATTER;
+            p.history |= RAYLEIGH_SCATTER;
 
-	    p.last_hit_triangle = -1;
+            p.last_hit_triangle = -1;
 
-	    return CONTINUE;
-	} // photon is scattered in material1
+            return CONTINUE;
+        } // photon is scattered in material1
     } // if scattering_distance < absorption_distance
 
     // Scale weight by absorption probability along this distance
     if (use_weights)
-	p.weight *= expf(-s.distance_to_boundary/s.absorption_length);
+        p.weight *= expf(-s.distance_to_boundary/s.absorption_length);
 
     p.position += s.distance_to_boundary*p.direction;
     p.time += s.distance_to_boundary/(SPEED_OF_LIGHT/s.refractive_index1);
@@ -297,44 +297,44 @@ propagate_at_boundary(Photon &p, State &s, curandState &rng)
     // so we have to pick the plane normal to be the polarization vector
     // to get the correct logic below
     if (incident_plane_normal_length < 1e-6f)
-	incident_plane_normal = p.polarization;
+        incident_plane_normal = p.polarization;
     else
-	incident_plane_normal /= incident_plane_normal_length;
+        incident_plane_normal /= incident_plane_normal_length;
 
     float normal_coefficient = dot(p.polarization, incident_plane_normal);
     float normal_probability = normal_coefficient*normal_coefficient;
 
     float reflection_coefficient;
     if (curand_uniform(&rng) < normal_probability) {
-	// photon polarization normal to plane of incidence
-	reflection_coefficient = -sinf(incident_angle-refracted_angle)/sinf(incident_angle+refracted_angle);
+        // photon polarization normal to plane of incidence
+        reflection_coefficient = -sinf(incident_angle-refracted_angle)/sinf(incident_angle+refracted_angle);
 
-	if ((curand_uniform(&rng) < reflection_coefficient*reflection_coefficient) || isnan(refracted_angle)) {
-	    p.direction = rotate(s.surface_normal, incident_angle, incident_plane_normal);
-			
-	    p.history |= REFLECT_SPECULAR;
-	}
-	else {
-	    p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
-	}
+        if ((curand_uniform(&rng) < reflection_coefficient*reflection_coefficient) || isnan(refracted_angle)) {
+            p.direction = rotate(s.surface_normal, incident_angle, incident_plane_normal);
+                        
+            p.history |= REFLECT_SPECULAR;
+        }
+        else {
+            p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
+        }
 
-	p.polarization = incident_plane_normal;
+        p.polarization = incident_plane_normal;
     }
     else {
-	// photon polarization parallel to plane of incidence
-	reflection_coefficient = tanf(incident_angle-refracted_angle)/tanf(incident_angle+refracted_angle);
+        // photon polarization parallel to plane of incidence
+        reflection_coefficient = tanf(incident_angle-refracted_angle)/tanf(incident_angle+refracted_angle);
 
-	if ((curand_uniform(&rng) < reflection_coefficient*reflection_coefficient) || isnan(refracted_angle)) {
-	    p.direction = rotate(s.surface_normal, incident_angle, incident_plane_normal);
-			
-	    p.history |= REFLECT_SPECULAR;
-	}
-	else {
-	    p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
-	}
+        if ((curand_uniform(&rng) < reflection_coefficient*reflection_coefficient) || isnan(refracted_angle)) {
+            p.direction = rotate(s.surface_normal, incident_angle, incident_plane_normal);
+                        
+            p.history |= REFLECT_SPECULAR;
+        }
+        else {
+            p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
+        }
 
-	p.polarization = cross(incident_plane_normal, p.direction);
-	p.polarization /= norm(p.polarization);
+        p.polarization = cross(incident_plane_normal, p.direction);
+        p.polarization /= norm(p.polarization);
     }
 
 } // propagate_at_boundary
@@ -358,12 +358,12 @@ propagate_at_diffuse_reflector(Photon &p, State &s, curandState &rng)
 {
     float ndotv;
     do {
-	p.direction = uniform_sphere(&rng);
-	ndotv = dot(p.direction, s.surface_normal);
-	if (ndotv < 0.0f) {
-	    p.direction = -p.direction;
-	    ndotv = -ndotv;
-	}
+        p.direction = uniform_sphere(&rng);
+        ndotv = dot(p.direction, s.surface_normal);
+        if (ndotv < 0.0f) {
+            p.direction = -p.direction;
+            ndotv = -ndotv;
+        }
     } while (! (curand_uniform(&rng) < ndotv) );
 
     p.polarization = cross(uniform_sphere(&rng), p.direction);
@@ -558,14 +558,14 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
         if (uniform_sample_reemit < reemit) {
             p.history |= SURFACE_REEMIT;
             p.wavelength = sample_cdf(&rng, surface->n, surface->wavelength0, surface->step, surface->reemission_cdf);
-	    p.direction = uniform_sphere(&rng);
-	    p.polarization = cross(uniform_sphere(&rng), p.direction);
-	    p.polarization /= norm(p.polarization);
+            p.direction = uniform_sphere(&rng);
+            p.polarization = cross(uniform_sphere(&rng), p.direction);
+            p.polarization /= norm(p.polarization);
             return CONTINUE;
         } else {
-	  p.history |= SURFACE_ABSORB;
-	  return BREAK;
-	}
+          p.history |= SURFACE_ABSORB;
+          return BREAK;
+        }
     }
     else if (uniform_sample < absorb + reflect_specular + reflect_diffuse) {
         // choose how to reflect, defaulting to diffuse
@@ -581,6 +581,57 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
     }
 } // propagate_at_wls
 
+
+__noinline__ __device__ int
+propagate_at_dichroic(Photon &p, State &s, curandState &rng, Surface *surface, bool use_weights=false)
+{
+    float uniform_sample = curand_uniform(&rng);
+    float reflect_prob = interp_property(surface, p.wavelength, surface->dichroic_reflect);
+    float transmit_prob = interp_property(surface, p.wavelength, surface->dichroic_transmit);
+    
+    if ((uniform_sample < reflect_prob)) {
+        return propagate_at_specular_reflector(p, s);
+    }
+    else if (uniform_sample < transmit_prob+reflect_prob) {
+        /*
+        float incident_angle = get_theta(s.surface_normal,-p.direction);
+        float refracted_angle = asinf(sinf(incident_angle)*s.refractive_index1/s.refractive_index2);
+        float3 incident_plane_normal = cross(p.direction, s.surface_normal);
+        float incident_plane_normal_length = norm(incident_plane_normal);
+
+        // Photons at normal incidence do not have a unique plane of incidence,
+        // so we have to pick the plane normal to be the polarization vector
+        // to get the correct logic below
+        if (incident_plane_normal_length < 1e-5f)
+            incident_plane_normal = p.polarization;
+        else
+            incident_plane_normal /= incident_plane_normal_length;
+
+        float normal_coefficient = dot(p.polarization, incident_plane_normal);
+        float normal_probability = normal_coefficient*normal_coefficient;
+
+        if (curand_uniform(&rng) < normal_probability) {
+            p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
+            p.polarization = incident_plane_normal/incident_plane_normal_length;
+        }
+        else {
+            p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
+            p.polarization = cross(incident_plane_normal, p.direction);
+            p.polarization /= norm(p.polarization);
+        }
+        p.history |= SURFACE_TRANSMIT;
+        return CONTINUE;
+        */
+        p.history |= SURFACE_TRANSMIT;
+        return CONTINUE;
+    }
+    else {
+        p.history |= SURFACE_ABSORB;
+        return BREAK;
+    }
+
+} // propagate_at_filter
+
 __device__ int
 propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
                      bool use_weights=false)
@@ -591,6 +642,8 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
         return propagate_complex(p, s, rng, surface, use_weights);
     else if (surface->model == SURFACE_WLS)
         return propagate_at_wls(p, s, rng, surface, use_weights);
+    else if (surface->model == SURFACE_DICHROIC)
+        return propagate_at_dichroic(p, s, rng, surface, use_weights);
     else {
         // use default surface model: do a combination of specular and
         // diffuse reflection, detection, and absorption based on relative
@@ -606,7 +659,7 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
         float uniform_sample = curand_uniform(&rng);
 
         if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD 
-	    && absorb < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
+            && absorb < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
             // Prevent absorption and reweight accordingly
             float survive = 1.0f - absorb;
             absorb = 0.0f;

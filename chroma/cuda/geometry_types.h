@@ -13,7 +13,7 @@ struct Material
     float wavelength0;
 };
 
-enum { SURFACE_DEFAULT, SURFACE_COMPLEX, SURFACE_WLS };
+enum { SURFACE_DEFAULT, SURFACE_COMPLEX, SURFACE_WLS, SURFACE_DICHROIC };
 
 struct Surface
 {
@@ -25,6 +25,8 @@ struct Surface
     float *eta;
     float *k;
     float *reemission_cdf;
+    float *dichroic_reflect;
+    float *dichroic_transmit;
 
     unsigned int model;
     unsigned int n;
