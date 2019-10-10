@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from histogram import Histogram
-from histogramdd import HistogramDD
+from .histogram import Histogram
+from .histogramdd import HistogramDD
 
 def draw(obj, title='', xlabel='', ylabel='', **kwargs):
     if isinstance(obj, Histogram):

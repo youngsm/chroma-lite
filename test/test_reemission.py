@@ -1,4 +1,4 @@
-from unittest_find import unittest
+from .unittest_find import unittest
 import numpy as np
 #import matplotlib.pyplot as plt
 
@@ -34,7 +34,7 @@ class TestReemission(unittest.TestCase):
         norm = scipy.stats.norm(scale=50, loc=600)
         pdf = 10 * norm.pdf(x)
         cdf = norm.cdf(x)
-        scint.reemission_cdf = np.array(zip(x, cdf))
+        scint.reemission_cdf = np.array(list(zip(x, cdf)))
 
         detector = Surface('detector')
         detector.set('detect', 1)
@@ -57,18 +57,18 @@ class TestReemission(unittest.TestCase):
         photons = Photons(pos=pos, dir=dir, pol=pol, t=t, wavelengths=wavelengths)
 
         # run simulation and extract final wavelengths
-        event = sim.simulate([photons], keep_photons_end=True).next()
+        event = next(sim.simulate([photons], keep_photons_end=True))
         mask = (event.photons_end.flags & SURFACE_DETECT) > 0
         final_wavelengths = event.photons_end.wavelengths[mask]
 
         # compare wavelength distribution to scintillator's reemission pdf
         hist, edges = np.histogram(final_wavelengths, bins=x)
-        print 'detected', hist.sum(), 'of', nphotons, 'photons'
+        print('detected', hist.sum(), 'of', nphotons, 'photons')
         hist_norm = 1.0 * hist / (1.0 * hist.sum() / 1000)
         pdf /= (1.0 * pdf.sum() / 1000)
 
         chi2 = scipy.stats.chisquare(hist_norm, pdf[:-1])[1]
-        print 'chi2 =', chi2
+        print('chi2 =', chi2)
 
         # show histogram comparison
         #plt.figure(1)

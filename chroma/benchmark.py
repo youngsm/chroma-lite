@@ -28,7 +28,7 @@ def intersect(gpu_geometry, number=100, nphotons=500000, nthreads_per_block=64,
     gpu_funcs = gpu.GPUFuncs(module)
 
     run_times = []
-    for i in tools.progress(range(number)):
+    for i in tools.progress(list(range(number))):
         pos = ga.zeros(nphotons, dtype=ga.vec.float3)
         dir = sample.uniform_sphere(nphotons)
         reorder = tools.argsort_direction(dir)
@@ -55,7 +55,7 @@ def load_photons(number=100, nphotons=500000):
     photons = event.Photons(pos, dir, pol, wavelengths)
 
     run_times = []
-    for i in tools.progress(range(number)):
+    for i in tools.progress(list(range(number))):
         t0 = time.time()
         gpu_photons = gpu.GPUPhotons(photons)
         cuda.Context.get_current().synchronize()
@@ -73,7 +73,7 @@ def propagate(gpu_detector, number=10, nphotons=500000, nthreads_per_block=64,
     rng_states = gpu.get_rng_states(nthreads_per_block*max_blocks)
 
     run_times = []
-    for i in tools.progress(range(number)):
+    for i in tools.progress(list(range(number))):
         pos = np.zeros((nphotons,3))
         dir = sample.uniform_sphere(nphotons)
         reorder = tools.argsort_direction(dir)
@@ -122,7 +122,7 @@ def pdf(gpu_detector, npdfs=10, nevents=100, nreps=16, ndaq=1,
     gpu_pdf.setup_pdf(gpu_detector.nchannels, 100, (-0.5, 999.5), 10, (-0.5, 9.5))
 
     run_times = []
-    for i in tools.progress(range(npdfs)):
+    for i in tools.progress(list(range(npdfs))):
         t0 = time.time()
         gpu_pdf.clear_pdf()
 
@@ -136,7 +136,7 @@ def pdf(gpu_detector, npdfs=10, nevents=100, nreps=16, ndaq=1,
             gpu_photons.propagate(gpu_detector, rng_states,
                                   nthreads_per_block, max_blocks)
             for gpu_photon_slice in gpu_photons.iterate_copies():
-                for idaq in xrange(ndaq):
+                for idaq in range(ndaq):
                     gpu_daq.begin_acquire()
                     gpu_daq.acquire(gpu_photon_slice, rng_states,
                                     nthreads_per_block, max_blocks)
@@ -176,9 +176,9 @@ def pdf_eval(gpu_detector, npdfs=10, nevents=25, nreps=16, ndaq=128,
     rng_states = gpu.get_rng_states(nthreads_per_block*max_blocks)
 
     # Make data event
-    data_ev = g4generator.generate_events(itertools.islice(generator.vertex.constant_particle_gun('e-', (0,0,0),
+    data_ev = next(g4generator.generate_events(itertools.islice(generator.vertex.constant_particle_gun('e-', (0,0,0),
                                                                                                   (1,0,0), 100),
-                                                           1)).next()
+                                                           1)))
     gpu_photons = gpu.GPUPhotons(data_ev.photons_beg)
 
     gpu_photons.propagate(gpu_detector, rng_states,
@@ -202,7 +202,7 @@ def pdf_eval(gpu_detector, npdfs=10, nevents=25, nreps=16, ndaq=128,
                            time_only=True)
 
     run_times = []
-    for i in tools.progress(range(npdfs)):
+    for i in tools.progress(list(range(npdfs))):
         t0 = time.time()
         gpu_pdf.clear_pdf_eval()
 
@@ -250,28 +250,28 @@ if __name__ == '__main__':
     gpu_detector = gpu.GPUDetector(detector)
     
     if 'ray' in tests:
-        print '%s ray intersections/sec.' % \
-            tools.ufloat_to_str(intersect(gpu_detector))
+        print('%s ray intersections/sec.' % \
+            tools.ufloat_to_str(intersect(gpu_detector)))
         # run garbage collection since there is a reference loop
         # in the GPUArray class.
         gc.collect()
 
     if 'load' in tests:
-        print '%s photons loaded/sec.' % tools.ufloat_to_str(load_photons())
+        print('%s photons loaded/sec.' % tools.ufloat_to_str(load_photons()))
         gc.collect()
 
     if 'propagate' in tests:
-        print '%s photons propagated/sec.' % \
-            tools.ufloat_to_str(propagate(gpu_detector))
+        print('%s photons propagated/sec.' % \
+            tools.ufloat_to_str(propagate(gpu_detector)))
         gc.collect()
 
     if 'pdf' in tests:
-        print '%s 100 MeV events histogrammed/s' % \
-            tools.ufloat_to_str(pdf(gpu_detector))
+        print('%s 100 MeV events histogrammed/s' % \
+            tools.ufloat_to_str(pdf(gpu_detector)))
         gc.collect()
 
     if 'pdf_eval' in tests:
-        print '%s 100 MeV events/s accumulated in PDF evaluation data structure (100 GEANT4 x 16 Chroma x 128 DAQ)' % \
-            tools.ufloat_to_str(pdf_eval(gpu_detector))
+        print('%s 100 MeV events/s accumulated in PDF evaluation data structure (100 GEANT4 x 16 Chroma x 128 DAQ)' % \
+            tools.ufloat_to_str(pdf_eval(gpu_detector)))
 
     context.pop()

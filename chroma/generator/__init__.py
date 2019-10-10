@@ -1,4 +1,4 @@
-from vertex import *
-from photon import *
+from .vertex import *
+from .photon import *
 
 

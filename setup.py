@@ -23,7 +23,7 @@ def check_output(*popenargs, **kwargs):
         if cmd is None:
             cmd = popenargs[0]
         raise subprocess.CalledProcessError(retcode, cmd, output=output)
-    return output
+    return output.decode('utf-8') if type(output) != str else output
 
 geant4_cflags = check_output(['geant4-config','--cflags']).split()
 geant4_libs = check_output(['geant4-config','--libs']).split()
@@ -83,7 +83,7 @@ setup(
         ],
  
     setup_requires = ['pyublas'],
-    install_requires = ['uncertainties','pyzmq-static','spnav', 'pycuda', 
+    install_requires = ['uncertainties','pyzmq','spnav', 'pycuda', 
                         'numpy>=1.6', 'pygame', 'nose', 'sphinx'],
     #test_suite = 'nose.collector',
     

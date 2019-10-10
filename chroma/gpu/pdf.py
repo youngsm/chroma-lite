@@ -368,5 +368,5 @@ class GPUPDF(object):
 
         # PDFs with no stats got zero by default during array creation
         
-        print 'high_stats:', high_stats.sum(), 'low_stats', low_stats.sum()
+        print('high_stats:', high_stats.sum(), 'low_stats', low_stats.sum())
         return hitcount, pdf_value, pdf_value * pdf_frac_uncert

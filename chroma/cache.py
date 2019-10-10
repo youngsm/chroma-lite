@@ -9,7 +9,7 @@ process is present.
 '''
 
 import os
-import cPickle as pickle
+import pickle as pickle
 import copy
 
 from chroma.log import logger

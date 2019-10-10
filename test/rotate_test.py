@@ -9,7 +9,7 @@ from chroma.gpu.tools import to_float3
 from chroma.transform import rotate, normalize
 from chroma.cuda import srcdir as source_directory
 
-print 'device %s' % autoinit.device.name()
+print('device %s' % autoinit.device.name())
 
 current_directory = os.path.split(os.path.realpath(__file__))[0]
 source = open(current_directory + '/rotate_test.cu').read()
@@ -38,7 +38,7 @@ def test_rotate():
     autoinit.context.synchronize()
     elapsed = time.time() - t0;
 
-    print 'elapsed %f sec' % elapsed
+    print('elapsed %f sec' % elapsed)
 
     r = rotate(a,t,w)
 

@@ -34,7 +34,7 @@ def bvh_mesh(geometry, layer):
     mesh = make.box(dx, dy, dz, center)
 
     for center, dx, dy, dz in zip(np.mean([lower_bounds,upper_bounds],axis=0),
-                                  *zip(*upper_bounds-lower_bounds))[1:]:
+                                  *list(zip(*upper_bounds-lower_bounds)))[1:]:
         mesh += make.box(dx,dy,dz,center)
 
     return mesh
@@ -52,7 +52,7 @@ def encode_movie(dir):
 
     shutil.rmtree(dir)
 
-    print 'movie saved to %s.' % path
+    print('movie saved to %s.' % path)
 
 class Camera(multiprocessing.Process):
     "The camera class is used to render a Geometry object."
@@ -97,7 +97,7 @@ class Camera(multiprocessing.Process):
         
         try:
             if self.width == 640: # SECRET DOOM MODE!
-                print 'shotgun activated!'
+                print('shotgun activated!')
                 self.doom_hud = pygame.image.load('images/doomhud.png').convert_alpha()
                 rect = self.doom_hud.get_rect()
                 self.doom_rect = rect.move(0, self.height - rect.height)
@@ -257,7 +257,7 @@ class Camera(multiprocessing.Process):
             im = Image.frombuffer(mode,self.size,data,'raw',mode,0,1)
             im.save(path)
 
-        print 'image saved to %s' % path
+        print('image saved to %s' % path)
 
     def rotate(self, phi, n):
         if self.display3d:
@@ -680,7 +680,7 @@ class EventViewer(Camera):
         self.display_mode = EventViewer.CHARGE
         self.sum_mode = False
         self.photon_display_iter = itertools.cycle(['beg','end'])
-        self.photon_display_mode = self.photon_display_iter.next()
+        self.photon_display_mode = next(self.photon_display_iter)
 
     def render_particle_track(self):
         x = 10.0
@@ -705,7 +705,7 @@ class EventViewer(Camera):
         self.gpu_geometries = [self.gpu_geometry, gpu_geometry]
 
     def sum_events(self):
-        print 'Summing events in file...'
+        print('Summing events in file...')
         nchannels = self.geometry.num_channels()
         sum_hit = np.zeros(shape=nchannels, dtype=np.float)
         sum_t = np.zeros(shape=nchannels, dtype=np.float)
@@ -719,12 +719,12 @@ class EventViewer(Camera):
             sum_q[ev.channels.hit]   += ev.channels.q[ev.channels.hit]
             
             if i % (nevents / 100 + 1) == 0:
-                print >>sys.stderr, '.',
+                print('.', end=' ', file=sys.stderr)
 
         self.sum_hit = sum_hit
         self.sum_t   = sum_t / sum_hit
         self.sum_q   = sum_q / sum_hit
-        print 'Done.'
+        print('Done.')
 
     def color_hit_pmts(self):
         from chroma.color import map_to_color
@@ -747,17 +747,17 @@ class EventViewer(Camera):
         # Important: Compute range only with HIT channels
         if self.display_mode == EventViewer.CHARGE:
             channel_color = map_to_color(q, range=(q[select].min(),q[select].max()))
-            print 'charge'
+            print('charge')
         elif self.display_mode == EventViewer.TIME:
             if self.sum_mode:
                 crange = (t[select].min(), t[select].max())
             else:
                 crange = (t[select].min(), t[select].mean())
             channel_color = map_to_color(t, range=crange)
-            print 'time'#, crange
+            print('time')#, crange
         elif self.display_mode == EventViewer.HIT:
             channel_color = map_to_color(hit, range=(hit.min(), hit.max()))
-            print 'hit'#, hit.min(), hit.max()
+            print('hit')#, hit.min(), hit.max()
 
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
         solid_color = np.zeros(len(self.geometry.mesh.triangles), dtype=np.uint32)
@@ -770,13 +770,13 @@ class EventViewer(Camera):
     def process_event(self, event):
         if event.type == KEYDOWN:
             if event.key == K_t:
-                self.photon_display_mode = self.photon_display_iter.next()
+                self.photon_display_mode = next(self.photon_display_iter)
                 self.render_particle_track()
                 self.update()
 
             if event.key == K_PAGEUP and not self.sum_mode:
                 try:
-                    self.ev = self.rr.next()
+                    self.ev = next(self.rr)
                 except StopIteration:
                     pass
                 else:

@@ -4,7 +4,7 @@ from pycuda import gpuarray
 import numpy as np
 import ROOT
 import os
-from unittest_find import unittest
+from .unittest_find import unittest
 import chroma
 
 class TestSampling(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestSampling(unittest.TestCase):
 
         cdf_x[0] = xaxis.GetBinLowEdge(1)
         cdf_y[0] = 0.0
-        for i in xrange(1,len(cdf_x)):
+        for i in range(1,len(cdf_x)):
             cdf_y[i] = intg[i]
             cdf_x[i] = xaxis.GetBinUpEdge(i)
 
@@ -40,7 +40,7 @@ class TestSampling(unittest.TestCase):
                           xaxis.GetXmax())
         out_h.SetLineColor(ROOT.kGreen)
 
-        for i in xrange(reps):
+        for i in range(reps):
             self.test_sample_cdf(np.int32(i),
                                  np.int32(len(cdf_x_gpu)), 
                                  cdf_x_gpu, cdf_y_gpu, out_gpu, block=block, grid=grid)

@@ -1,4 +1,4 @@
-import g4gen
+from . import g4gen
 import multiprocessing
 import numpy as np
 import threading
@@ -48,7 +48,7 @@ def partition(num, partitions):
         800
     """
     step = num // partitions
-    for i in xrange(partitions):
+    for i in range(partitions):
         if i < partitions - 1:
             yield step
         else:
@@ -59,7 +59,7 @@ def vertex_sender(vertex_iterator, vertex_socket):
         vertex_socket.send_pyobj(vertex)
 
 def socket_iterator(nelements, socket):
-    for i in xrange(nelements):
+    for i in range(nelements):
         yield socket.recv_pyobj()
 
 class G4ParallelGenerator(object):
@@ -70,7 +70,7 @@ class G4ParallelGenerator(object):
         base_address = 'ipc:///tmp/chroma_'+str(uuid.uuid4())
         self.vertex_address = base_address + '.vertex'
         self.photon_address = base_address + '.photon'
-        self.processes = [ G4GeneratorProcess(i, material, self.vertex_address, self.photon_address, seed=base_seed + i) for i in xrange(nprocesses) ]
+        self.processes = [ G4GeneratorProcess(i, material, self.vertex_address, self.photon_address, seed=base_seed + i) for i in range(nprocesses) ]
 
         for p in self.processes:
             p.start()
@@ -87,7 +87,7 @@ class G4ParallelGenerator(object):
         if not self.processes_initialized:
             # Verify everyone is running and connected to avoid
             # sending all the events to one client.
-            for i in xrange(len(self.processes)):
+            for i in range(len(self.processes)):
                 msg = self.photon_socket.recv()
                 assert msg == 'READY'
             self.processes_initialized = True

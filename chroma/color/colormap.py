@@ -8,7 +8,7 @@ def map_to_color(a, range=None, map=cm.jet_r, weights=None):
 
     ax = (a - range[0])/(range[1]-range[0])
 
-    frgba = map(ax)
+    frgba = list(map(ax))
 
     if weights is not None:
         frgba[:,0] *= weights

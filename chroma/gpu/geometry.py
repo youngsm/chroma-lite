@@ -220,8 +220,8 @@ class GPUGeometry(object):
         return s
 
     def print_device_usage(self):
-        print self.device_usage_str()
-        print 
+        print(self.device_usage_str())
+        print() 
 
     def reset_colors(self):
         self.colors.set_async(self.geometry.colors.astype(np.uint32))

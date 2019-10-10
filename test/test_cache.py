@@ -1,4 +1,4 @@
-from unittest_find import unittest
+from .unittest_find import unittest
 import os
 import shutil
 import tempfile
@@ -95,13 +95,13 @@ class TestCacheGeometry(unittest.TestCase):
 
         self.cache.save_geometry('b', self.b)
         l = self.cache.list_geometry()
-        self.assertEquals(len(l), 2)
+        self.assertEqual(len(l), 2)
         self.assertIn('a', l)
         self.assertIn('b', l)
 
         self.cache.save_geometry('a', self.a)
         l = self.cache.list_geometry()
-        self.assertEquals(len(l), 2)
+        self.assertEqual(len(l), 2)
         self.assertIn('a', l)
         self.assertIn('b', l)
 

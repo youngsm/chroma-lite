@@ -2,8 +2,8 @@ import numpy as np
 import time
 import ROOT
 ROOT.gROOT.SetStyle('Plain')
-from histogram import Histogram
-from graph import Graph
+from .histogram import Histogram
+from .graph import Graph
 
 def rootify(obj, *pars, **kwargs):
     if type(obj) is Histogram:

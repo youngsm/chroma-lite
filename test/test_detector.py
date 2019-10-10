@@ -1,4 +1,4 @@
-from unittest_find import unittest
+from .unittest_find import unittest
 import numpy as np
 
 from chroma.geometry import Solid, Geometry, vacuum
@@ -42,7 +42,7 @@ class TestDetector(unittest.TestCase):
                           wavelengths=wavelengths)
 
         hit_times = []
-        for ev in self.sim.simulate(photons for i in xrange(1000)):
+        for ev in self.sim.simulate(photons for i in range(1000)):
             if ev.channels.hit[0]:
                 hit_times.append(ev.channels.t[0])
         hit_times = np.array(hit_times)
@@ -69,7 +69,7 @@ class TestDetector(unittest.TestCase):
                           wavelengths=wavelengths)
 
         hit_charges = []
-        for ev in self.sim.simulate(photons for i in xrange(1000)):
+        for ev in self.sim.simulate(photons for i in range(1000)):
             if ev.channels.hit[0]:
                 hit_charges.append(ev.channels.q[0])
         hit_charges = np.array(hit_charges)

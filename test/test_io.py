@@ -1,4 +1,4 @@
-from unittest_find import unittest
+from .unittest_find import unittest
 from chroma.io import root
 from chroma import event
 import numpy as np
@@ -43,14 +43,14 @@ class TestRootIO(unittest.TestCase):
 
         # Exercise the RootReader methods
         reader = root.RootReader(filename)
-        self.assertEquals(len(reader), 1)
+        self.assertEqual(len(reader), 1)
 
         self.assertRaises(StopIteration, reader.prev)
 
-        reader.next()
+        next(reader)
 
         self.assertEqual(reader.index(), 0)
-        self.assertRaises(StopIteration, reader.next)
+        self.assertRaises(StopIteration, reader.__next__)
         
         reader.jump_to(0)
 

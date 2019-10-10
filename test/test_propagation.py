@@ -1,4 +1,4 @@
-from unittest_find import unittest
+from .unittest_find import unittest
 import numpy as np
 
 from chroma.geometry import Solid, Geometry, vacuum
@@ -52,7 +52,7 @@ class TestPropagation(unittest.TestCase):
         photons_end = sim.simulate([photons], keep_photons_end=True,
                                    max_steps=10).next().photons_end
         aborted = (photons_end.flags & (1 << 31)) > 0
-        print 'aborted photons: %1.1f' % \
-            (float(count_nonzero(aborted)) / nphotons)
+        print('aborted photons: %1.1f' % \
+            (float(count_nonzero(aborted)) / nphotons))
         self.assertFalse(aborted.any())
         

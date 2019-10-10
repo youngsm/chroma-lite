@@ -12,12 +12,12 @@ def build_design_matrix(x, y):
     A = np.zeros(shape=(len(x),n))
 
     A[:,0] = 1.0 * y_invsigma
-    for i in xrange(dims):
+    for i in range(dims):
         A[:,1+i] = x[:,i] * y_invsigma
 
     col = 1 + dims
-    for j in xrange(dims):
-        for k in xrange(j,dims):
+    for j in range(dims):
+        for k in range(j,dims):
             A[:,col] = x[:,j] * x[:,k] * y_invsigma
             col += 1
     return A
@@ -42,7 +42,7 @@ def parabola_fit(points):
     inv_w[np.abs(w) < 1e-6] = 0.0
     # Numpy version of Eq 15.4.17 from Numerical Recipies (C edition)
     coeffs = np.zeros(A.shape[1])
-    for i in xrange(len(coeffs)):
+    for i in range(len(coeffs)):
         coeffs += (np.dot(U[:,i], B[:,0]) * inv_w[i]) * V[:,i]
 
     # Chi2 and probability for best fit and quadratic coefficents
@@ -62,8 +62,8 @@ def parabola_fit(points):
     b = ufloat_coeffs[1:dims+1]
     c = np.zeros(shape=(dims,dims), dtype=object)
     index = dims + 1
-    for i in xrange(dims):
-        for j in xrange(i, dims):
+    for i in range(dims):
+        for j in range(i, dims):
             c[i,j] = ufloat_coeffs[index]
             c[j,i] = ufloat_coeffs[index]
             if j != i:

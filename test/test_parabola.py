@@ -1,7 +1,7 @@
 import chroma.parabola as parabola
 import numpy
 from uncertainties import ufloat, unumpy
-from unittest_find import unittest
+from .unittest_find import unittest
 from numpy.testing import assert_almost_equal
 
 class Test1D(unittest.TestCase):
@@ -17,7 +17,7 @@ class Test1D(unittest.TestCase):
         assert_almost_equal(y, unumpy.nominal_values(self.y))
 
     def test_solve(self):
-        points = zip(self.x, self.y)
+        points = list(zip(self.x, self.y))
         a, b, c, chi2, prob = parabola.parabola_fit(points)
         
         assert_almost_equal(a.nominal_value, 1.0)
@@ -53,7 +53,7 @@ class Test2D(unittest.TestCase):
         assert_almost_equal(y, unumpy.nominal_values(self.y))
 
     def test_solve(self):
-        points = zip(self.x, self.y)
+        points = list(zip(self.x, self.y))
         a, b, c, chi2, prob = parabola.parabola_fit(points)
         assert_almost_equal(chi2, 0.0)
         assert_almost_equal(a.nominal_value, 1.0)

@@ -1,4 +1,4 @@
-from unittest_find import unittest
+from .unittest_find import unittest
 from chroma.bvh.bvh import BVH, BVHLayerSlice, WorldCoords, uint4, \
     OutOfRangeError, unpack_nodes
 import numpy as np

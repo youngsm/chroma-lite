@@ -1,5 +1,5 @@
 import pycuda.autoinit
-from unittest_find import unittest
+from .unittest_find import unittest
 from chroma.bvh import make_simple_bvh, BVH
 from chroma.bvh.bvh import node_areas
 import chroma.models
@@ -18,7 +18,7 @@ def build_simple_bvh(degree):
 
     for i, (layer_start, layer_end) in enumerate(zip(layer_bounds[:-1], 
                                                      layer_bounds[1:])):
-        print i, node_areas(nodes[layer_start:layer_end]).sum() * world_coords.world_scale**2
+        print(i, node_areas(nodes[layer_start:layer_end]).sum() * world_coords.world_scale**2)
     
 
     assert isinstance(bvh, BVH)

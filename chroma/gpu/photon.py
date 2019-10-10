@@ -153,7 +153,7 @@ class GPUPhotons(object):
     def iterate_copies(self):
         '''Returns an iterator that yields GPUPhotonsSlice objects
         corresponding to the event copies stored in ``self``.'''
-        for i in xrange(self.ncopies):
+        for i in range(self.ncopies):
             window = slice(self.true_nphotons*i, self.true_nphotons*(i+1))
             yield GPUPhotonsSlice(pos=self.pos[window],
                                   dir=self.dir[window],
@@ -183,7 +183,7 @@ class GPUPhotons(object):
         input_queue = np.empty(shape=nphotons+1, dtype=np.uint32)
         input_queue[0] = 0
         # Order photons initially in the queue to put the clones next to each other
-        for copy in xrange(self.ncopies):
+        for copy in range(self.ncopies):
             input_queue[1+copy::self.ncopies] = np.arange(self.true_nphotons, dtype=np.uint32) + copy * self.true_nphotons
         input_queue_gpu = ga.to_gpu(input_queue)
         output_queue = np.zeros(shape=nphotons+1, dtype=np.uint32)
@@ -214,7 +214,7 @@ class GPUPhotons(object):
                 nphotons = input_queue_gpu[:1].get()[0] - 1
 
         if ga.max(self.flags).get() & (1 << 31):
-            print >>sys.stderr, "WARNING: ABORTED PHOTONS"
+            print("WARNING: ABORTED PHOTONS", file=sys.stderr)
         cuda.Context.get_current().synchronize()
 
 

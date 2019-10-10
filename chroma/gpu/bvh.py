@@ -118,7 +118,7 @@ def collapse_chains(nodes, layer_bounds):
     
     gpu_nodes = ga.to_gpu(nodes)
 
-    bounds = zip(layer_bounds[:-1], layer_bounds[1:])[:-1]
+    bounds = list(zip(layer_bounds[:-1], layer_bounds[1:]))[:-1]
     bounds.reverse()
     nthreads_per_block = 256
     for start, end in bounds:
@@ -134,7 +134,7 @@ def area_sort_nodes(gpu_geometry, layer_bounds):
                                include_source_directory=True)
     bvh_funcs = GPUFuncs(bvh_module)
 
-    bounds = zip(layer_bounds[:-1], layer_bounds[1:])[:-1]
+    bounds = list(zip(layer_bounds[:-1], layer_bounds[1:]))[:-1]
     bounds.reverse()
     nthreads_per_block = 256
     for start, end in bounds:
@@ -192,7 +192,7 @@ def merge_nodes(nodes, degree, max_ratio=None):
                 #print i, 'Children: %e, Parent: %e' % (child_area, parent_area)
 
         extra_slots = round_up_to_multiple((degree - 1) * np.count_nonzero(excessive_area), 1)
-        print 'Extra slots:', extra_slots
+        print('Extra slots:', extra_slots)
         new_parent_nodes = np.zeros(shape=len(parent_nodes) + extra_slots,
                                     dtype=parent_nodes.dtype)
         new_parent_nodes[:len(parent_nodes)] = parent_nodes
@@ -215,7 +215,7 @@ def merge_nodes(nodes, degree, max_ratio=None):
             #print index, nchild, len(new_parent_nodes)
             new_parent_nodes[index+nchild:] = new_parent_nodes[index+1:-nchild+1]
             offset += nchild - 1
-            for sibling in xrange(nchild - 1):
+            for sibling in range(nchild - 1):
                 new_parent_index = index + 1 + sibling
                 new_parent_nodes[new_parent_index] = nodes[child_index + sibling + 1]
                 if new_parent_nodes['x'][new_parent_index] != 0:
@@ -227,8 +227,8 @@ def merge_nodes(nodes, degree, max_ratio=None):
 
 
             #print 'intermediate: %e' % node_areas(new_parent_nodes).max()
-        print 'old: %e' % node_areas(parent_nodes).max()
-        print 'new: %e' % node_areas(new_parent_nodes).max()
+        print('old: %e' % node_areas(parent_nodes).max())
+        print('new: %e' % node_areas(new_parent_nodes).max())
         if len(new_parent_nodes) < len(nodes):
             # Only adopt new set of parent nodes if it actually reduces the
             # total number of nodes at this level by 1.
@@ -241,7 +241,7 @@ def concatenate_layers(layers):
                                include_source_directory=True)
     bvh_funcs = GPUFuncs(bvh_module)
     # Put 0 at beginning of list
-    layer_bounds = np.insert(np.cumsum(map(len, layers)), 0, 0)
+    layer_bounds = np.insert(np.cumsum(list(map(len, layers))), 0, 0)
     nodes = ga.empty(shape=int(layer_bounds[-1]), dtype=ga.vec.uint4)
     nthreads_per_block = 256
 
@@ -302,8 +302,8 @@ def optimize_layer(orig_nodes):
                 
             areas_host = areas.get()
             #print nodes.get(), areas_host.astype(float)
-            print 'Area of parent layer so far (%d): %1.12e' % (i*2, areas_host.astype(float).sum())
-            print 'Skips: %d, Swaps: %d' % (skips, swaps)
+            print('Area of parent layer so far (%d): %1.12e' % (i*2, areas_host.astype(float).sum()))
+            print('Skips: %d, Swaps: %d' % (skips, swaps))
 
         test_index = i * 2
 
@@ -363,7 +363,7 @@ def optimize_layer(orig_nodes):
         
     areas_host = areas.get()
 
-    print 'Final area of parent layer: %1.12e' % areas_host.sum()
-    print 'Skips: %d, Swaps: %d' % (skips, swaps)
+    print('Final area of parent layer: %1.12e' % areas_host.sum())
+    print('Skips: %d, Swaps: %d' % (skips, swaps))
 
     return nodes.get()

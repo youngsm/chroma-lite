@@ -8,7 +8,7 @@ from pycuda import gpuarray
 
 float3 = gpuarray.vec.float3
 
-print 'device %s' % autoinit.device.name()
+print('device %s' % autoinit.device.name())
 
 current_directory = os.path.split(os.path.realpath(__file__))[0]
 
@@ -51,64 +51,64 @@ def test_matrix():
         dest = np.empty(1, dtype=np.float32)
         c = np.int32(np.random.random_sample())
 
-        print 'testing det...',
+        print('testing det...', end=' ')
 
         det(cuda.In(a), cuda.Out(dest), **size)
 
         if not np.allclose(np.float32(np.linalg.det(a.reshape(3,3))), dest[0]):
-            print 'fail'
-            print np.float32(np.linalg.det(a.reshape(3,3)))
-            print dest[0]
+            print('fail')
+            print(np.float32(np.linalg.det(a.reshape(3,3))))
+            print(dest[0])
         else:
-            print 'success'
+            print('success')
 
-        print 'testing inv...',
+        print('testing inv...', end=' ')
 
         dest = np.empty(9, dtype=np.float32)
 
         inv(cuda.In(a), cuda.Out(dest), **size)
 
         if not np.allclose(np.linalg.inv(a.reshape(3,3)).flatten().astype(np.float32), dest):
-            print 'fail'
-            print np.linalg.inv(a.reshape(3,3)).flatten().astype(np.float32)
-            print dest
+            print('fail')
+            print(np.linalg.inv(a.reshape(3,3)).flatten().astype(np.float32))
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixadd...',
+        print('testing matrixadd...', end=' ')
 
         matrixadd(cuda.In(a), cuda.In(b), cuda.Out(dest), **size)
 
         if not np.allclose(a+b, dest):
-            print 'fail'
-            print a+b
-            print dest
+            print('fail')
+            print(a+b)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixsub...',
+        print('testing matrixsub...', end=' ')
 
         matrixsub(cuda.In(a), cuda.In(b), cuda.Out(dest), **size)
 
         if not np.allclose(a-b, dest):
-            print 'fail'
-            print a-b
-            print dest
+            print('fail')
+            print(a-b)
+            print(dest)
         else:
-            print 'sucess'
+            print('sucess')
 
-        print 'testing matrixmul...',
+        print('testing matrixmul...', end=' ')
 
         matrixmul(cuda.In(a), cuda.In(b), cuda.Out(dest), **size)
 
         if not np.allclose(np.dot(a.reshape(3,3),b.reshape(3,3)).flatten(), dest):
-            print 'fail'
-            print np.dot(a.reshape(3,3),b.reshape(3,3)).flatten()
-            print dest
+            print('fail')
+            print(np.dot(a.reshape(3,3),b.reshape(3,3)).flatten())
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing multiply...',
+        print('testing multiply...', end=' ')
 
         x_cpu = np.random.random_sample(size=3).astype(np.float32)
         x_gpu = np.array((x_cpu[0], x_cpu[1], x_cpu[2]), dtype=float3)
@@ -122,185 +122,185 @@ def test_matrix():
         if not np.allclose(np.dot(x_cpu,m[0]), dest[0]['x']) or \
                 not np.allclose(np.dot(x_cpu,m[1]), dest[0]['y']) or \
                 not np.allclose(np.dot(x_cpu,m[2]), dest[0]['z']):
-            print 'fail'
-            print np.dot(x_cpu,m[0])
-            print np.dot(x_cpu,m[1])
-            print np.dot(x_cpu,m[2])
-            print dest[0]['x']
-            print dest[0]['y']
-            print dest[0]['z']
+            print('fail')
+            print(np.dot(x_cpu,m[0]))
+            print(np.dot(x_cpu,m[1]))
+            print(np.dot(x_cpu,m[2]))
+            print(dest[0]['x'])
+            print(dest[0]['y'])
+            print(dest[0]['z'])
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixaddfloat...',
+        print('testing matrixaddfloat...', end=' ')
 
         dest = np.empty(9, dtype=np.float32)
 
         matrixaddfloat(cuda.In(a), c, cuda.Out(dest), **size)
 
         if not np.allclose(a+c, dest):
-            print 'fail'
-            print a+c
-            print dest
+            print('fail')
+            print(a+c)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixsubfloat...',
+        print('testing matrixsubfloat...', end=' ')
 
         matrixsubfloat(cuda.In(a), c, cuda.Out(dest), **size)
 
         if not np.allclose(a-c, dest):
-            print 'fail'
-            print a-c
-            print dest
+            print('fail')
+            print(a-c)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixmulfloat...',
+        print('testing matrixmulfloat...', end=' ')
 
         matrixmulfloat(cuda.In(a), c, cuda.Out(dest), **size)
 
         if not np.allclose(a*c, dest):
-            print 'fail'
-            print a-c
-            print dest
+            print('fail')
+            print(a-c)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixdivfloat...',
+        print('testing matrixdivfloat...', end=' ')
 
         matrixdivfloat(cuda.In(a), c, cuda.Out(dest), **size)
 
         if not np.allclose(a/c, dest):
-            print 'fail'
-            print a/c
-            print dest
+            print('fail')
+            print(a/c)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing floataddmatrix...',
+        print('testing floataddmatrix...', end=' ')
 
         floataddmatrix(cuda.In(a), c, cuda.Out(dest), **size)
 
         if not np.allclose(c+a, dest):
-            print 'fail'
-            print c+a
-            print dest
+            print('fail')
+            print(c+a)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing floatsubmatrix...',
+        print('testing floatsubmatrix...', end=' ')
 
         floatsubmatrix(cuda.In(a), c, cuda.Out(dest), **size)
 
         if not np.allclose(c-a, dest):
-            print 'fail'
-            print c-a
-            print dest
+            print('fail')
+            print(c-a)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing floatmulmatrix...',
+        print('testing floatmulmatrix...', end=' ')
 
         floatmulmatrix(cuda.In(a), c, cuda.Out(dest), **size)
 
         if not np.allclose(c*a, dest):
-            print 'fail'
-            print c*a
-            print dest
+            print('fail')
+            print(c*a)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing floatdivmatrix...',
+        print('testing floatdivmatrix...', end=' ')
 
         floatdivmatrix(cuda.In(a), c, cuda.Out(dest), **size)
 
         if not np.allclose(c/a, dest):
-            print 'fail'
-            print c/a
-            print dest
+            print('fail')
+            print(c/a)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixaddequals...',
+        print('testing matrixaddequals...', end=' ')
 
         dest = np.copy(a)
 
         matrixaddequals(cuda.InOut(dest), cuda.In(b), **size)
 
         if not np.allclose(a+b, dest):
-            print 'fail'
-            print a+b
-            print dest
+            print('fail')
+            print(a+b)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixsubequals...',
+        print('testing matrixsubequals...', end=' ')
 
         dest = np.copy(a)
 
         matrixsubequals(cuda.InOut(dest), cuda.In(b), **size)
 
         if not np.allclose(a-b, dest):
-            print 'fail'
-            print a-b
-            print dest
+            print('fail')
+            print(a-b)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixaddequalsfloat...',
+        print('testing matrixaddequalsfloat...', end=' ')
 
         dest = np.copy(a)
 
         matrixaddequalsfloat(cuda.InOut(dest), c, **size)
 
         if not np.allclose(a+c, dest):
-            print 'fail'
-            print a+c
-            print dest
+            print('fail')
+            print(a+c)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixsubequalsfloat...',
+        print('testing matrixsubequalsfloat...', end=' ')
 
         dest = np.copy(a)
 
         matrixsubequalsfloat(cuda.InOut(dest), c, **size)
 
         if not np.allclose(a-c, dest):
-            print 'fail'
-            print a-c
-            print dest
+            print('fail')
+            print(a-c)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixmulequalsfloat...',
+        print('testing matrixmulequalsfloat...', end=' ')
 
         dest = np.copy(a)
 
         matrixmulequalsfloat(cuda.InOut(dest), c, **size)
 
         if not np.allclose(a*c, dest):
-            print 'fail'
-            print a*c
-            print dest
+            print('fail')
+            print(a*c)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing matrixdivequalsfloat...',
+        print('testing matrixdivequalsfloat...', end=' ')
 
         dest = np.copy(a)
 
         matrixdivequalsfloat(cuda.InOut(dest), c, **size)
 
         if not np.allclose(a/c, dest):
-            print 'fail'
-            print a*c
-            print dest
+            print('fail')
+            print(a*c)
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing outer...',
+        print('testing outer...', end=' ')
 
         x1_cpu = np.random.random_sample(size=3).astype(np.float32)
         x2_cpu = np.random.random_sample(size=3).astype(np.float32)
@@ -311,21 +311,21 @@ def test_matrix():
         outer(x1_gpu, x2_gpu, cuda.Out(dest), **size)
 
         if not np.allclose(np.outer(x1_cpu, x2_cpu).flatten(), dest):
-            print 'fail'
-            print np.outer(x1_cpu, x2_cpu).flatten()
-            print dest
+            print('fail')
+            print(np.outer(x1_cpu, x2_cpu).flatten())
+            print(dest)
         else:
-            print 'success'
+            print('success')
 
-        print 'testing minus matrix...',
+        print('testing minus matrix...', end=' ')
 
         dest = np.copy(a)
 
         minusmatrix(cuda.In(a), cuda.Out(dest), **size)
 
         if not np.allclose(-a, dest):
-            print 'fail'
-            print -a
-            print dest
+            print('fail')
+            print(-a)
+            print(dest)
         else:
-            print 'success'
+            print('success')

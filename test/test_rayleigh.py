@@ -1,4 +1,4 @@
-from unittest_find import unittest
+from .unittest_find import unittest
 import numpy as np
 
 from chroma.geometry import Solid, Geometry

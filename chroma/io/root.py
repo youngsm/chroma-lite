@@ -135,11 +135,11 @@ class RootReader(object):
         return self.T.GetEntries()
 
     def __iter__(self):
-        for i in xrange(self.T.GetEntries()):
+        for i in range(self.T.GetEntries()):
             self.T.GetEntry(i)
             yield root_event_to_python_event(self.T.ev)
 
-    def next(self):
+    def __next__(self):
         '''Return the next event in the file. Raises StopIteration
         when you get to the end.'''
         if self.i + 1 >= len(self):

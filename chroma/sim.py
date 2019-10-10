@@ -169,7 +169,7 @@ class Simulation(object):
                                           scatter_first=1,
                                           max_steps=5)
             nphotons = gpu_photons_no_scatter.true_nphotons # same for scatter
-            for i in xrange(gpu_photons_no_scatter.ncopies):
+            for i in range(gpu_photons_no_scatter.ncopies):
                 start_photon = i * nphotons
                 gpu_photon_no_scatter_slice = gpu_photons_no_scatter.select(event.SURFACE_DETECT,
                                                                             start_photon=start_photon,
@@ -177,14 +177,14 @@ class Simulation(object):
                 gpu_photon_scatter_slices = [gpu_photons_scatter.select(event.SURFACE_DETECT,
                                                                         start_photon=(nscatter*i+j)*nphotons,
                                                                         nphotons=nphotons)
-                                             for j in xrange(nscatter)]
+                                             for j in range(nscatter)]
                 
                 if len(gpu_photon_no_scatter_slice) == 0:
                     continue
 
                 #weights = gpu_photon_slice.weights.get()
                 #print 'weights', weights.min(), weights.max()
-                for j in xrange(ndaq_reps):
+                for j in range(ndaq_reps):
                     gpu_daq.begin_acquire()
                     gpu_daq.acquire(gpu_photon_no_scatter_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
                     for scatter_slice in gpu_photon_scatter_slices:
@@ -213,7 +213,7 @@ class Simulation(object):
                                   nthreads_per_block=self.nthreads_per_block,
                                   max_blocks=self.max_blocks)
             for gpu_photon_slice in gpu_photons.iterate_copies():
-                for idaq in xrange(ndaq):
+                for idaq in range(ndaq):
                     self.gpu_daq.begin_acquire()
                     self.gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
                     gpu_channels = self.gpu_daq.end_acquire()
@@ -246,7 +246,7 @@ class Simulation(object):
                                   nthreads_per_block=self.nthreads_per_block,
                                   max_blocks=self.max_blocks)
             for gpu_photon_slice in gpu_photons.iterate_copies():
-                for idaq in xrange(ndaq):
+                for idaq in range(ndaq):
                     self.gpu_daq.begin_acquire()
                     self.gpu_daq.acquire(gpu_photon_slice, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
                     gpu_channels = self.gpu_daq.end_acquire()

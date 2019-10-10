@@ -1,4 +1,4 @@
-from unittest_find import unittest
+from .unittest_find import unittest
 import chroma
 import numpy as np
 import os

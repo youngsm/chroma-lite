@@ -18,7 +18,7 @@ class GPUChannels(object):
             self.stride = stride
 
     def iterate_copies(self):
-        for i in xrange(self.ndaq):
+        for i in range(self.ndaq):
             yield GPUChannels(self.t[i*self.stride:(i+1)*self.stride],
                               self.q[i*self.stride:(i+1)*self.stride],
                               self.flags[i*self.stride:(i+1)*self.stride])

@@ -1,7 +1,7 @@
 import numpy as np
 from math import sqrt
 from uncertainties import ufloat, unumpy
-from itertools import islice, izip, repeat
+from itertools import islice, repeat
 from chroma.tools import profile_if_possible, count_nonzero
 
 class Likelihood(object):
@@ -76,7 +76,7 @@ class Likelihood(object):
         pdf_prob[bad_value] = pdf_floor
         pdf_prob_uncert[bad_value] = pdf_floor
 
-        print 'channels with no data:', (bad_value & self.event.channels.hit).astype(int).sum()
+        print('channels with no data:', (bad_value & self.event.channels.hit).astype(int).sum())
 
         return hit_prob, pdf_prob, pdf_prob_uncert
         
@@ -135,7 +135,7 @@ class Likelihood(object):
         mom0 = 0
         mom1 = 0.0
         mom2 = 0.0
-        for i in xrange(navg):
+        for i in range(navg):
             kernel_generator = islice(vertex_generator, nevals)
             hitcount, pdf_prob, pdf_prob_uncert = \
                 self.sim.eval_kernel(self.event.channels,
@@ -159,7 +159,7 @@ class Likelihood(object):
             pdf_prob[bad_value] = pdf_floor
             pdf_prob_uncert[bad_value] = pdf_floor
 
-            print 'channels with no data:', (bad_value & self.event.channels.hit).astype(int).sum()
+            print('channels with no data:', (bad_value & self.event.channels.hit).astype(int).sum())
 
             # NLL calculation: note that negation is at the end
             # Start with the probabilties of hitting (or not) the channels
@@ -169,7 +169,7 @@ class Likelihood(object):
             # Then include the probability densities of the observed
             # charges and times.
             log_likelihood += np.log(pdf_prob[self.event.channels.hit]).sum()
-            print 'll', log_likelihood
+            print('ll', log_likelihood)
             if np.isfinite(log_likelihood):
                 mom0 += 1
                 mom1 += log_likelihood
@@ -192,23 +192,23 @@ if __name__ == '__main__':
     detector = build_detector()
     sim = Simulation(detector, seed=0)
 
-    event = sim.simulate(islice(constant_particle_gun('e-',(0,0,0),(1,0,0),100.0), 1)).next()
+    event = next(sim.simulate(islice(constant_particle_gun('e-',(0,0,0),(1,0,0),100.0), 1)))
 
-    print 'nhit = %i' % count_nonzero(event.channels.hit)
+    print('nhit = %i' % count_nonzero(event.channels.hit))
 
     likelihood = Likelihood(sim, event)
 
     x = np.linspace(-10.0, 10.0, 100)
     l = []
 
-    for pos in izip(x, repeat(0), repeat(0)):
+    for pos in zip(x, repeat(0), repeat(0)):
         t0 = time.time()
         ev_vertex_iter = constant_particle_gun('e-',pos,(1,0,0),100.0)
         l.append(likelihood.eval(ev_vertex_iter, 1000))
         elapsed = time.time() - t0
 
-        print '(%.1f, %.1f, %.1f), %s (%1.1f sec)' % \
-            (pos[0], pos[1], pos[2], tools.ufloat_to_str(l[-1]), elapsed)
+        print('(%.1f, %.1f, %.1f), %s (%1.1f sec)' % \
+            (pos[0], pos[1], pos[2], tools.ufloat_to_str(l[-1]), elapsed))
 
     import matplotlib.pyplot as plt
 

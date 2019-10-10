@@ -23,15 +23,15 @@ def ufloat_to_str(x):
 def progress(seq):
     "Print progress while iterating over `seq`."
     n = len(seq)
-    print '[' + ' '*21 + ']\r[',
+    print('[' + ' '*21 + ']\r[', end=' ')
     sys.stdout.flush()
     update_interval = max(n // 10, 1)
     for i, item in enumerate(seq):
         if i % update_interval == 0:
-            print '.',
+            print('.', end=' ')
             sys.stdout.flush()
         yield item
-    print ']'
+    print(']')
     sys.stdout.flush()
 
 def debugger_hook(type, value, tb):
@@ -43,7 +43,7 @@ def debugger_hook(type, value, tb):
        import traceback, pdb
        # we are NOT in interactive mode, print the exception...
        traceback.print_exception(type, value, tb)
-       print
+       print()
        # ...then start the debugger in post-mortem mode.
        pdb.pm()
 
@@ -64,7 +64,7 @@ def timeit(func):
         t0 = time.time()
         retval = func(*args, **kwargs)
         elapsed = time.time() - t0
-        print '%s elapsed in %s().' % (datetime.timedelta(seconds=elapsed), func.__name__)
+        print('%s elapsed in %s().' % (datetime.timedelta(seconds=elapsed), func.__name__))
         return retval
     return f
 
@@ -137,8 +137,8 @@ def memoize_method_with_dictionary_arg(func):
 
         assert len(args) == 2
         # create hashable arguments by replacing dictionaries with tuples of items
-        dict_items = args[1].items()
-        dict_items.sort()
+        dict_items = list(args[1].items())
+        #dict_items.sort()
         hashable_args = (args[0], tuple(dict_items))
         try:
             return func._memoize_dic[hashable_args]
@@ -187,7 +187,7 @@ def argsort_direction(dir):
     phi = ((np.arctan2(dir[:,1], dir[:,0]) / np.pi / 2.0 + 0.5) * MAXINT).astype(np.uint32)
     
     morton = np.zeros(len(dir), dtype=np.uint32)
-    for i in xrange(bits):
+    for i in range(bits):
         morton |= (theta & 1 << i) << (i) | \
                   (phi & 1 << i) << (i+1)
     return np.argsort(morton)

@@ -1,6 +1,5 @@
 from chroma.generator.mute import *
 
-import pyublas
 import numpy as np
 from chroma.event import Photons, Vertex, Steps
 from chroma.tools import argsort_direction

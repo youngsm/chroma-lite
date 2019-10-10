@@ -2,7 +2,7 @@ import sys
 import os
 from itertools import chain
 from hashlib import md5
-import cPickle as pickle
+import pickle as pickle
 import gzip
 import numpy as np
 import time
@@ -100,6 +100,9 @@ class Mesh(object):
         checksum.update(self.triangles)
         return checksum.hexdigest()
 
+def silly_unique(arr):
+    return np.asarray(list(set(arr)))
+
 class Solid(object):
     """Solid object attaches materials, surfaces, and colors to each triangle
     in a Mesh object."""
@@ -135,9 +138,9 @@ class Solid(object):
             self.color = np.tile(color, len(self.mesh.triangles)).astype(np.uint32)
 
         self.unique_materials = \
-            np.unique(np.concatenate([self.material1, self.material2]))
+            silly_unique(np.concatenate([self.material1, self.material2]))
 
-        self.unique_surfaces = np.unique(self.surface)
+        self.unique_surfaces = silly_unique(self.surface)
 
     def __add__(self, other):
         return Solid(self.mesh + other.mesh, np.concatenate((self.material1, other.material1)), np.concatenate((self.material2, other.material2)), np.concatenate((self.surface, other.surface)), np.concatenate((self.color, other.color)))
@@ -158,7 +161,7 @@ class Solid(object):
 
         # find any triangles in other that also exist in self
         match = [np.where(points_other == x)[0] for x in points_self]
-        mask = np.array(map(lambda x: len(x)>0, match))
+        mask = np.array([len(x)>0 for x in match])
         if mask.sum() == 0:
             raise Exception('cannot weld solids with no shared triangles')
 
@@ -187,15 +190,15 @@ class Solid(object):
 
     @memoize_method_with_dictionary_arg
     def material1_indices(self, material_lookup):
-        return np.fromiter(imap(material_lookup.get, self.material1), dtype=np.int32, count=len(self.material1))
+        return np.fromiter(map(material_lookup.get, self.material1), dtype=np.int32, count=len(self.material1))
 
     @memoize_method_with_dictionary_arg
     def material2_indices(self, material_lookup):
-        return np.fromiter(imap(material_lookup.get, self.material2), dtype=np.int32, count=len(self.material2))
+        return np.fromiter(map(material_lookup.get, self.material2), dtype=np.int32, count=len(self.material2))
 
     @memoize_method_with_dictionary_arg
     def surface_indices(self, surface_lookup):
-        return np.fromiter(imap(surface_lookup.get, self.surface), dtype=np.int32, count=len(self.surface))
+        return np.fromiter(map(surface_lookup.get, self.surface), dtype=np.int32, count=len(self.surface))
 
 class Material(object):
     """Material optical properties."""
@@ -221,7 +224,7 @@ class Material(object):
         else:
             value = np.tile(value, len(wavelengths))
 
-        self.__dict__[name] = np.array(zip(wavelengths, value), dtype=np.float32)
+        self.__dict__[name] = np.array(list(zip(wavelengths, value)), dtype=np.float32)
 
 # Empty material
 vacuum = Material('vacuum')
@@ -261,7 +264,7 @@ class Surface(object):
         if (np.asarray(value) < 0.0).any():
             raise Exception('all probabilities must be >= 0.0')
 
-        self.__dict__[name] = np.array(zip(wavelengths, value), dtype=np.float32)
+        self.__dict__[name] = np.array(list(zip(wavelengths, value)), dtype=np.float32)
     def __repr__(self):
         return '<Surface %s>' % self.name
         
@@ -342,17 +345,17 @@ class Geometry(object):
 
         self.solid_id = np.concatenate([filled_array(i, shape=len(solid.mesh.triangles), dtype=np.uint32) for i, solid in enumerate(self.solids)])
 
-        self.unique_materials = list(np.unique(np.concatenate([solid.unique_materials for solid in self.solids])))
+        self.unique_materials = list(silly_unique(np.concatenate([solid.unique_materials for solid in self.solids])))
 
-        material_lookup = dict(zip(self.unique_materials, range(len(self.unique_materials))))
+        material_lookup = dict(list(zip(self.unique_materials, list(range(len(self.unique_materials))))))
 
         self.material1_index = np.concatenate([solid.material1_indices(material_lookup) for solid in self.solids])
 
         self.material2_index = np.concatenate([solid.material2_indices(material_lookup) for solid in self.solids])
 
-        self.unique_surfaces = list(np.unique(np.concatenate([solid.unique_surfaces for solid in self.solids])))
+        self.unique_surfaces = list(silly_unique(np.concatenate([solid.unique_surfaces for solid in self.solids])))
 
-        surface_lookup = dict(zip(self.unique_surfaces, range(len(self.unique_surfaces))))
+        surface_lookup = dict(list(zip(self.unique_surfaces, list(range(len(self.unique_surfaces))))))
 
         self.surface_index = np.concatenate([solid.surface_indices(surface_lookup) for solid in self.solids])
 

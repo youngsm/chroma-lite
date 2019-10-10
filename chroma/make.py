@@ -51,12 +51,12 @@ def linear_extrude(x1, y1, height, x2=None, y2=None, center=None, endcaps=True):
 
     n = len(x1)
 
-    vertex_iterators = [izip(x1,y1,repeat(-height/2.0,n)),
-                        izip(x2,y2,repeat(height/2.0,n))]
+    vertex_iterators = [zip(x1,y1,repeat(-height/2.0,n)),
+                        zip(x2,y2,repeat(height/2.0,n))]
     if endcaps:
-        vertex_iterators = [izip(repeat(0,n),repeat(0,n),repeat(-height/2.0,n))] \
+        vertex_iterators = [zip(repeat(0,n),repeat(0,n),repeat(-height/2.0,n))] \
             + vertex_iterators \
-            + [izip(repeat(0,n),repeat(0,n),repeat(height/2.0,n))]
+            + [zip(repeat(0,n),repeat(0,n),repeat(height/2.0,n))]
 
     vertices = np.fromiter(flatten(roundrobin(*vertex_iterators)), float)
     vertices = vertices.reshape((len(vertices)//3,3))

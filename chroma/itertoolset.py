@@ -31,7 +31,7 @@ def repeatcopy(object, times=None):
         while True:
             yield deepcopy(object)
     else:
-        for i in xrange(times):
+        for i in range(times):
             yield object
 
 def repeating_iterator(i, nreps):
@@ -47,18 +47,18 @@ def repeating_iterator(i, nreps):
         ['A', 'B', 'C', 'D']
     """
     for item in i:
-        for counter in xrange(nreps):
+        for counter in range(nreps):
             yield deepcopy(item)
 
 def grouper(n, iterable, fillvalue=None):
     "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
     args = [iter(iterable)] * n
-    return izip_longest(fillvalue=fillvalue, *args)
+    return zip_longest(fillvalue=fillvalue, *args)
 
 def roundrobin(*iterables):
     """roundrobin('ABC', 'D', 'EF') --> A D E B F C"""
     pending = len(iterables)
-    nexts = cycle(iter(it).next for it in iterables)
+    nexts = cycle(iter(it).__next__ for it in iterables)
     while pending:
         try:
             for next in nexts:
@@ -74,7 +74,7 @@ def unique_everseen(iterable, key=None):
     seen = set()
     seen_add = seen.add
     if key is None:
-        for element in ifilterfalse(seen.__contains__, iterable):
+        for element in filterfalse(seen.__contains__, iterable):
             seen_add(element)
             yield element
     else:

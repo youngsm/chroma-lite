@@ -7,7 +7,7 @@ from pycuda import gpuarray
 
 float3 = gpuarray.vec.float3
 
-print 'device %s' % autoinit.device.name()
+print('device %s' % autoinit.device.name())
 
 current_directory = os.path.split(os.path.realpath(__file__))[0]
 from chroma.cuda import srcdir as source_directory
@@ -193,8 +193,8 @@ def testcross():
         if not np.allclose(wdest['x'], w[0]) or \
                 not np.allclose(wdest['y'], w[1]) or \
                 not np.allclose(wdest['z'], w[2]):
-            print w
-            print wdest
+            print(w)
+            print(wdest)
             assert False
 
 def testnorm():
