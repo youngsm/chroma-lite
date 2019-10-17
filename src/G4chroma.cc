@@ -188,14 +188,15 @@ PhotonCopy(double,GetT0,t0[i])
 PhotonCopy(int,GetParentTrackID,parentTrackID[i])
 
 #include <boost/python.hpp>
-#include <pyublas/numpy.hpp>
+#include <boost/python/numpy.hpp>
 
-using namespace boost::python;
+namespace p = boost::python;
+namespace np = boost::python::numpy;
 
 #define PhotonAccessor(type,name,accessor) \
-pyublas::numpy_vector<type> PTA_##name(const TrackingAction *pta) { \
-    pyublas::numpy_vector<type> r(pta->GetNumPhotons()); \
-    pta->accessor(&r[0]); \
+np::ndarray PTA_##name(const TrackingAction *pta) { \
+    np::ndarray r = np::empty(p::make_tuple(pta->GetNumPhotons()),np::dtype::get_builtin<type>()); \
+    pta->accessor((type*)r.get_data()); \
     return r; \
 }
 
@@ -213,10 +214,10 @@ PhotonAccessor(double,GetT0,GetT0)
 PhotonAccessor(int,GetParentTrackID,GetParentTrackID)
 
 #define StepAccessor(type,name,stepvar) \
-pyublas::numpy_vector<type> PTA_##name(Track *pta) { \
+np::ndarray PTA_##name(Track *pta) { \
     const vector<Step> &steps = pta->getSteps(); \
     const size_t sz = steps.size(); \
-    pyublas::numpy_vector<type> r(sz); \
+    np::ndarray r = np::empty(p::make_tuple(sz),np::dtype::get_builtin<type>()); \
     for (size_t i = 0; i < sz; i++) r[i] = steps[i].stepvar; \
     return r; \
 }
@@ -231,6 +232,8 @@ StepAccessor(double,getStepPZ,pz)
 StepAccessor(double,getStepKE,ke)
 StepAccessor(double,getStepEDep,edep)
 //StepAccessor(std::string,getStepProcess,procname)
+
+using namespace boost::python;
 
 void export_Chroma()
 {

@@ -2,15 +2,19 @@ from setuptools import setup, find_packages, Extension
 import subprocess
 import os
 
-libraries = ['boost_python']
+libraries = ['boost_python','boost_numpy']
 extra_objects = []
 
 if 'VIRTUAL_ENV' in os.environ:
+    # use local copy of boost libs
     boost_lib = os.path.join(os.environ['VIRTUAL_ENV'],'lib','libboost_python.so')
     if os.path.exists(boost_lib):
-        # use local copy of boost
         extra_objects.append(boost_lib)
         libraries.remove('boost_python')
+    boost_lib = os.path.join(os.environ['VIRTUAL_ENV'],'lib','libboost_numpy.so')
+    if os.path.exists(boost_lib):
+        extra_objects.append(boost_lib)
+        libraries.remove('boost_numpy')
 
 def check_output(*popenargs, **kwargs):
     if 'stdout' in kwargs:
@@ -35,15 +39,6 @@ except OSError:
 
 
 include_dirs=['src']
-
-##### figure out location of pyublas headers
-try:
-    from imp import find_module
-    file, pathname, descr = find_module("pyublas")
-    from os.path import join
-    include_dirs.append(join(pathname, "include"))
-except:
-    pass  # Don't throw exceptions if prereqs not installed yet
 
 #####
 
@@ -82,7 +77,7 @@ setup(
                   libraries=libraries),
         ],
  
-    setup_requires = ['pyublas'],
+    setup_requires = [],
     install_requires = ['uncertainties','pyzmq','spnav', 'pycuda', 
                         'numpy>=1.6', 'pygame', 'nose', 'sphinx'],
     #test_suite = 'nose.collector',
