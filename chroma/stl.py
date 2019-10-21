@@ -10,21 +10,21 @@ def mesh_from_stl(filename):
         f = bz2.BZ2File(filename)
     else:
         f = open(filename)
-    buf = f.read(200)
-    f.close()
-
-    for char in buf:
-        if char not in string.printable:
-            return mesh_from_binary_stl(filename)
-
-    return mesh_from_ascii_stl(filename)
+    
+    try:
+        f.read(200) #fails on non-ascii characters
+        return mesh_from_ascii_stl(filename)
+    except:
+        return mesh_from_binary_stl(filename)
+    finally:
+        f.close()
 
 def mesh_from_ascii_stl(filename):
     "Return a mesh from an ascii stl file."
     if filename.endswith('.bz2'):
         f = bz2.BZ2File(filename)
     else:
-        f = open(filename)
+        f = open(filename,'r')
 
     vertices = []
     triangles = []
@@ -63,7 +63,7 @@ def mesh_from_binary_stl(filename):
     if filename.endswith('.bz2'):
         f = bz2.BZ2File(filename)
     else:
-        f = open(filename)
+        f = open(filename,'rb')
 
     vertices = []
     triangles = []
