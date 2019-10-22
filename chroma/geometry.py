@@ -232,6 +232,11 @@ vacuum.set('refractive_index', 1.0)
 vacuum.set('absorption_length', 1e6)
 vacuum.set('scattering_length', 1e6)
 
+class DichroicProps(object):
+    def __init__(self,angles,reflect,transmit):
+        self.angles = np.asarray(angles) #[angle]
+        self.dichroic_reflect = np.asarray(reflect) #[angle][point]
+        self.dichroic_transmit = np.asarray(transmit) #[angle][point]
 
 class Surface(object):
     """Surface optical properties."""
@@ -248,8 +253,8 @@ class Surface(object):
         self.set('eta', 0)
         self.set('k', 0)
         self.set('reemission_cdf', 0)
-        self.set('dichroic_reflect', 0)
-        self.set('dichroic_transmit', 0)
+        
+        self.dichroic_props = None
 
         self.thickness = 0.0
         self.transmissive = 0

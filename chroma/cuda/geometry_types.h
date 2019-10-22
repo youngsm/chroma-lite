@@ -15,6 +15,14 @@ struct Material
 
 enum { SURFACE_DEFAULT, SURFACE_COMPLEX, SURFACE_WLS, SURFACE_DICHROIC };
 
+struct DichroicProps
+{
+    float *angles;
+    float **dichroic_reflect;
+    float **dichroic_transmit;
+    unsigned int nangles;
+};
+
 struct Surface
 {
     float *detect;
@@ -25,9 +33,8 @@ struct Surface
     float *eta;
     float *k;
     float *reemission_cdf;
-    float *dichroic_reflect;
-    float *dichroic_transmit;
-
+    DichroicProps *dichroic_props;
+ 
     unsigned int model;
     unsigned int n;
     unsigned int transmissive;

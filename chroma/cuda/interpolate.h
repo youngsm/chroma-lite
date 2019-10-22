@@ -2,6 +2,34 @@
 #define __INTERPOLATE_H__
 
 __device__ float
+interp_idx(float x, int n, float *xp)
+{
+    int lower = 0;
+    int upper = n-1;
+
+    if (x <= xp[lower])
+	return lower;
+
+    if (x >= xp[upper])
+	return upper;
+
+    while (lower < upper-1)
+    {
+	int half = (lower+upper)/2;
+
+	if (x < xp[half])
+	    upper = half;
+	else
+	    lower = half;
+    }
+
+    float dx = xp[upper] - xp[lower];
+
+    return lower + 1.0*(x-xp[lower])/dx;
+}
+
+
+__device__ float
 interp(float x, int n, float *xp, float *fp)
 {
     int lower = 0;

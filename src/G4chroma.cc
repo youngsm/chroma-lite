@@ -294,5 +294,7 @@ void export_Chroma()
 
 BOOST_PYTHON_MODULE(_g4chroma)
 {
+  Py_Initialize();
+  np::initialize();
   export_Chroma();
 }

@@ -23,6 +23,7 @@ class GPUGeometry(object):
         geometry_source = get_cu_source('geometry_types.h')
         material_struct_size = characterize.sizeof('Material', geometry_source)
         surface_struct_size = characterize.sizeof('Surface', geometry_source)
+        dichroicprops_struct_size = characterize.sizeof('DichroicProps', geometry_source)
         geometry_struct_size = characterize.sizeof('Geometry', geometry_source)
 
         self.material_data = []
@@ -101,10 +102,34 @@ class GPUGeometry(object):
             k_gpu = ga.to_gpu(k)
             reemission_cdf = interp_material_property(wavelengths, surface.reemission_cdf)
             reemission_cdf_gpu = ga.to_gpu(reemission_cdf)
-            dichroic_reflect = interp_material_property(wavelengths, surface.dichroic_reflect)
-            dichroic_reflect_gpu = ga.to_gpu(dichroic_reflect)
-            dichroic_transmit = interp_material_property(wavelengths, surface.dichroic_transmit)
-            dichroic_transmit_gpu = ga.to_gpu(dichroic_transmit)
+            
+            if surface.dichroic_props:
+                props = surface.dichroic_props
+                transmit_pointers = []
+                reflect_pointers = []
+                angles_gpu = ga.to_gpu(np.asarray(props.angles,dtype=np.float32))
+                self.surface_data.append(angles_gpu)
+                
+                for i,angle in enumerate(props.angles):
+                    dichroic_reflect = interp_material_property(wavelengths, props.dichroic_reflect[i])
+                    dichroic_reflect_gpu = ga.to_gpu(dichroic_reflect)
+                    self.surface_data.append(dichroic_reflect_gpu)
+                    reflect_pointers.append(dichroic_reflect_gpu)
+                    
+                    dichroic_transmit = interp_material_property(wavelengths, props.dichroic_transmit[i])
+                    dichroic_transmit_gpu = ga.to_gpu(dichroic_transmit)
+                    self.surface_data.append(dichroic_transmit_gpu)
+                    transmit_pointers.append(dichroic_transmit_gpu)
+                
+                reflect_arr_gpu = make_gpu_struct(8*len(reflect_pointers),reflect_pointers)
+                self.surface_data.append(reflect_arr_gpu)
+                transmit_arr_gpu = make_gpu_struct(8*len(transmit_pointers), transmit_pointers)
+                self.surface_data.append(transmit_arr_gpu)
+                dichroic_props = make_gpu_struct(dichroicprops_struct_size,[angles_gpu,reflect_arr_gpu,transmit_arr_gpu,np.uint32(len(props.angles))])
+            else:
+                dichroic_props = np.uint64(0) #NULL
+            
+            
 
             self.surface_data.append(detect_gpu)
             self.surface_data.append(absorb_gpu)
@@ -113,15 +138,14 @@ class GPUGeometry(object):
             self.surface_data.append(reflect_specular_gpu)
             self.surface_data.append(eta_gpu)
             self.surface_data.append(k_gpu)
-            self.surface_data.append(dichroic_reflect_gpu)
-            self.surface_data.append(dichroic_transmit_gpu)
+            self.surface_data.append(dichroic_props)
             
             surface_gpu = \
                 make_gpu_struct(surface_struct_size,
                                 [detect_gpu, absorb_gpu, reemit_gpu,
                                  reflect_diffuse_gpu,reflect_specular_gpu,
                                  eta_gpu, k_gpu, reemission_cdf_gpu,
-                                 dichroic_reflect_gpu,dichroic_transmit_gpu,
+                                 dichroic_props,
                                  np.uint32(surface.model),
                                  np.uint32(len(wavelengths)),
                                  np.uint32(surface.transmissive),

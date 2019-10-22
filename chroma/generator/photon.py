@@ -26,7 +26,7 @@ class G4GeneratorProcess(multiprocessing.Process):
 
         # Signal with the photon socket that we are online
         # and ready for messages.
-        photon_socket.send('READY')
+        photon_socket.send(b'READY')
 
         while True:
             ev = vertex_socket.recv_pyobj()
@@ -89,7 +89,7 @@ class G4ParallelGenerator(object):
             # sending all the events to one client.
             for i in range(len(self.processes)):
                 msg = self.photon_socket.recv()
-                assert msg == 'READY'
+                assert msg == b'READY'
             self.processes_initialized = True
 
         # Doing this to avoid a deadlock caused by putting to one queue

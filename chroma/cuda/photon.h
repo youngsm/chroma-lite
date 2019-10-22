@@ -585,43 +585,25 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
 __noinline__ __device__ int
 propagate_at_dichroic(Photon &p, State &s, curandState &rng, Surface *surface, bool use_weights=false)
 {
-    float uniform_sample = curand_uniform(&rng);
-    float reflect_prob = interp_property(surface, p.wavelength, surface->dichroic_reflect);
-    float transmit_prob = interp_property(surface, p.wavelength, surface->dichroic_transmit);
+    float incident_angle = get_theta(s.surface_normal, -p.direction);
     
+    const DichroicProps *props = surface->dichroic_props;
+    float idx = interp_idx(incident_angle,props->nangles,props->angles);
+    unsigned int iidx = (int)idx;
+    
+    float reflect_prob_low = interp_property(surface, p.wavelength, props->dichroic_reflect[iidx]);
+    float reflect_prob_high = interp_property(surface, p.wavelength, props->dichroic_reflect[iidx+1]);
+    float transmit_prob_low = interp_property(surface, p.wavelength, props->dichroic_transmit[iidx]);
+    float transmit_prob_high = interp_property(surface, p.wavelength, props->dichroic_transmit[iidx+1]);
+    
+    float reflect_prob = reflect_prob_low + (reflect_prob_high-reflect_prob_low)*(idx-iidx);
+    float transmit_prob = transmit_prob_low + (transmit_prob_high-transmit_prob_low)*(idx-iidx);
+    
+    float uniform_sample = curand_uniform(&rng);
     if ((uniform_sample < reflect_prob)) {
         return propagate_at_specular_reflector(p, s);
     }
     else if (uniform_sample < transmit_prob+reflect_prob) {
-        /*
-        float incident_angle = get_theta(s.surface_normal,-p.direction);
-        float refracted_angle = asinf(sinf(incident_angle)*s.refractive_index1/s.refractive_index2);
-        float3 incident_plane_normal = cross(p.direction, s.surface_normal);
-        float incident_plane_normal_length = norm(incident_plane_normal);
-
-        // Photons at normal incidence do not have a unique plane of incidence,
-        // so we have to pick the plane normal to be the polarization vector
-        // to get the correct logic below
-        if (incident_plane_normal_length < 1e-5f)
-            incident_plane_normal = p.polarization;
-        else
-            incident_plane_normal /= incident_plane_normal_length;
-
-        float normal_coefficient = dot(p.polarization, incident_plane_normal);
-        float normal_probability = normal_coefficient*normal_coefficient;
-
-        if (curand_uniform(&rng) < normal_probability) {
-            p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
-            p.polarization = incident_plane_normal/incident_plane_normal_length;
-        }
-        else {
-            p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
-            p.polarization = cross(incident_plane_normal, p.direction);
-            p.polarization /= norm(p.polarization);
-        }
-        p.history |= SURFACE_TRANSMIT;
-        return CONTINUE;
-        */
         p.history |= SURFACE_TRANSMIT;
         return CONTINUE;
     }
@@ -630,7 +612,7 @@ propagate_at_dichroic(Photon &p, State &s, curandState &rng, Surface *surface, b
         return BREAK;
     }
 
-} // propagate_at_filter
+} // propagate_at_dichroic
 
 __device__ int
 propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,

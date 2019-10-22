@@ -89,7 +89,7 @@ class G4Generator(object):
         return g4material
 
     def _extract_photons_from_tracking_action(self, sort=True):
-        n = self.tracking_action.GetNumPhotons()        
+        n = self.tracking_action.GetNumPhotons()
         pos = np.zeros(shape=(n,3), dtype=np.float32)
         pos[:,0] = self.tracking_action.GetX()
         pos[:,1] = self.tracking_action.GetY()
@@ -124,7 +124,7 @@ class G4Generator(object):
         steps = Steps(track.getStepX(),track.getStepY(),track.getStepZ(),track.getStepT(),
                       track.getStepPX(),track.getStepPY(),track.getStepPZ(),track.getStepKE(),
                       track.getStepEDep())
-        children = [self._extract_vertex_from_stepping_action(track.getChildTrackID(id),steps) for id in xrange(track.getNumChildren())]
+        children = [self._extract_vertex_from_stepping_action(track.getChildTrackID(id),steps) for id in range(track.getNumChildren())]
         return Vertex(track.name, np.array([steps.x[0],steps.y[0],steps.z[0]]), 
                         np.array([steps.px[0],steps.py[0],steps.pz[0]]), 
                         steps.ke[0], steps.t[0], steps=steps, children=children, trackid=index, pdgcode=track.pdg_code)
