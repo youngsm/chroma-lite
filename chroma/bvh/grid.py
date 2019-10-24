@@ -8,7 +8,7 @@ MAX_CHILD = 2**(32 - CHILD_BITS) - 1
 def count_unique_in_sorted(a):
     return (np.ediff1d(a) > 0).sum() + 1
 
-def make_recursive_grid_bvh(mesh, target_degree=3):
+def make_recursive_grid_bvh(mesh, target_degree=3, verbose=False):
     '''Returns a BVH created using a 'recursive grid' method.
 
     This method is somewhat similar to the original Chroma BVH generator, 
@@ -50,7 +50,8 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
         # Expand groups that have too many children
         excess_children = np.argwhere(nchild > MAX_CHILD).flatten()
         if len(excess_children) > 0:
-            print('Expanding %d parent nodes' % len(excess_children))
+            if verbose:
+                print('Expanding %d parent nodes' % len(excess_children))
             parent_morton_parts = np.split(parent_morton_codes, excess_children)
             first_child_parts = np.split(first_child, excess_children)
             nchild_parts = np.split(nchild, excess_children)
@@ -78,7 +79,8 @@ def make_recursive_grid_bvh(mesh, target_degree=3):
             plural = 's'
         else:
             plural = ''
-        print('Merging %d nodes to %d parent%s' % (nnodes, nunique, plural))
+        if verbose:
+            print('Merging %d nodes to %d parent%s' % (nnodes, nunique, plural))
 
         assert (nchild > 0).all()
         assert (nchild <= MAX_CHILD).all()
