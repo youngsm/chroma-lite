@@ -27,17 +27,17 @@ def create_g4material(material):
     energy = list((2*pi*hbarc / (material.refractive_index[::-1,0] * nanometer)).astype(float))
     values = list(material.refractive_index[::-1, 1].astype(float))
     prop_table.AddProperty('RINDEX', energy, values)
-    if material.scintillation_light_yield:
+    if material.scintillation_light_yield  is not None:
         prop_table.AddConstProperty('LIGHT_YIELD',material.scintillation_light_yield)
-    if np.any(material.scintillation_spectrum):
+    if material.scintillation_spectrum  is not None:
         energy = list((2*pi*hbarc / (material.scintillation_spectrum[::-1,0] * nanometer)).astype(float))
         values = list(material.scintillation_spectrum[::-1, 1].astype(float))
         prop_table.AddProperty('SCINTILLATION', energy, values)
-    if np.any(material.scintillation_spectrum):
+    if material.scintillation_waveform is not None:
         energy = list(material.scintillation_waveform[:, 0].astype(float))
         values = list(material.scintillation_waveform[:, 1].astype(float))
         prop_table.AddProperty('SCINTWAVEFORM', energy, values)
-    if np.any(material.scintillation_mod):
+    if material.scintillation_mod is not None:
         energy = list(material.scintillation_mod[:, 0].astype(float))
         values = list(material.scintillation_mod[:, 1].astype(float))
         prop_table.AddProperty('SCINTMOD', energy, values)
@@ -68,12 +68,8 @@ class G4Generator(object):
         """
         if seed is not None:
             HepRandom.setTheSeed(seed)
-
-        g4py.NISTmaterials.Construct()
         
-        self.physics_list = _g4chroma.ChromaPhysicsList()
-        gRunManager.SetUserInitialization(self.physics_list)
-        self.particle_gun = g4py.ParticleGun.Construct()
+        g4py.NISTmaterials.Construct()
         
         if isinstance(material,geometry.Material):
         
@@ -90,7 +86,11 @@ class G4Generator(object):
         else:
             #material is really a function to build the geometry
             self.world = material()
-
+        
+        self.physics_list = _g4chroma.ChromaPhysicsList()
+        gRunManager.SetUserInitialization(self.physics_list)
+        self.particle_gun = g4py.ParticleGun.Construct()    
+            
         self.stepping_action = _g4chroma.SteppingAction()
         gRunManager.SetUserAction(self.stepping_action)
         self.tracking_action = _g4chroma.TrackingAction()

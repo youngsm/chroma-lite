@@ -49,7 +49,6 @@ SteppingAction::~SteppingAction()
 
 void SteppingAction::EnableScint(bool enabled) {
     scint = enabled;
-    cout << "Set scintillation to: " << enabled << endl;
 }
 
 void SteppingAction::UserSteppingAction(const G4Step *step) {
@@ -73,6 +72,7 @@ void SteppingAction::UserSteppingAction(const G4Step *step) {
         if (!pParticleChange) return;
              
         const size_t nsecondaries = pParticleChange->GetNumberOfSecondaries();
+        
         for (size_t i = 0; i < nsecondaries; i++) { 
             G4Track * tempSecondaryTrack = pParticleChange->GetSecondary(i);
             fpSteppingManager->GetfSecondary()->push_back( tempSecondaryTrack );
