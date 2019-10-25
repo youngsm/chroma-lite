@@ -69,31 +69,37 @@ class Simulation(object):
             iterable = self.photon_generator.generate_events(iterable)
 
         for ev in iterable:
-            gpu_photons = gpu.GPUPhotons(ev.photons_beg)
+            
+            ev.nphotons = len(ev.photons_beg)
+            
+            if len(ev.photons_beg) > 0:
+                
+                gpu_photons = gpu.GPUPhotons(ev.photons_beg)
 
-            gpu_photons.propagate(self.gpu_geometry, self.rng_states,
-                                  nthreads_per_block=self.nthreads_per_block,
-                                  max_blocks=self.max_blocks,
-                                  max_steps=max_steps)
+                gpu_photons.propagate(self.gpu_geometry, self.rng_states,
+                                      nthreads_per_block=self.nthreads_per_block,
+                                      max_blocks=self.max_blocks,
+                                      max_steps=max_steps)
 
-            ev.nphotons = len(ev.photons_beg.pos)
+                if keep_photons_end:
+                    ev.photons_end = gpu_photons.get()
+
+            
+                if hasattr(self.detector, 'num_channels') and keep_hits:
+                    ev.hits = gpu_photons.get_hits(self.gpu_geometry)
+
+                # Skip running DAQ if we don't have one
+                # Disabled by default because incredibly special-case
+                if hasattr(self, 'gpu_daq') and run_daq:
+                    self.gpu_daq.begin_acquire()
+                    self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+                    gpu_channels = self.gpu_daq.end_acquire()
+                    ev.channels = gpu_channels.get()
+            else:
+                ev.hits = {}
 
             if not keep_photons_beg:
                 ev.photons_beg = None
-
-            if keep_photons_end:
-                ev.photons_end = gpu_photons.get()
-            
-            if hasattr(self.detector, 'num_channels') and keep_hits:
-                ev.hits = gpu_photons.get_hits(self.gpu_geometry)
-                
-            # Skip running DAQ if we don't have one
-            # Disabled by default because incredibly special-case
-            if hasattr(self, 'gpu_daq') and run_daq:
-                self.gpu_daq.begin_acquire()
-                self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
-                gpu_channels = self.gpu_daq.end_acquire()
-                ev.channels = gpu_channels.get()
 
             yield ev
 

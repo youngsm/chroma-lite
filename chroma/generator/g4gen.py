@@ -11,6 +11,41 @@ import g4py.ezgeom
 import g4py.NISTmaterials
 import g4py.ParticleGun
 from chroma.generator import _g4chroma
+import chroma.geometry as geometry
+
+def create_g4material(material):
+    g4material = G4Material(material.name, material.density * g / cm3,
+                            len(material.composition))
+     # Add elements
+    for element_name, element_frac_by_weight in material.composition.items():
+        g4material.AddElement(G4Element.GetElement(element_name, True),
+                              element_frac_by_weight)
+     # Set index of refraction
+    prop_table = G4MaterialPropertiesTable()
+    # Reverse entries so they are in ascending energy order rather
+    # than wavelength
+    energy = list((2*pi*hbarc / (material.refractive_index[::-1,0] * nanometer)).astype(float))
+    values = list(material.refractive_index[::-1, 1].astype(float))
+    prop_table.AddProperty('RINDEX', energy, values)
+    if material.scintillation_light_yield:
+        prop_table.AddConstProperty('LIGHT_YIELD',material.scintillation_light_yield)
+    if np.any(material.scintillation_spectrum):
+        energy = list((2*pi*hbarc / (material.scintillation_spectrum[::-1,0] * nanometer)).astype(float))
+        values = list(material.scintillation_spectrum[::-1, 1].astype(float))
+        prop_table.AddProperty('SCINTILLATION', energy, values)
+    if np.any(material.scintillation_spectrum):
+        energy = list(material.scintillation_waveform[:, 0].astype(float))
+        values = list(material.scintillation_waveform[:, 1].astype(float))
+        prop_table.AddProperty('SCINTWAVEFORM', energy, values)
+    if np.any(material.scintillation_mod):
+        energy = list(material.scintillation_mod[:, 0].astype(float))
+        values = list(material.scintillation_mod[:, 1].astype(float))
+        prop_table.AddProperty('SCINTMOD', energy, values)
+
+    # Load properties
+    g4material.SetMaterialPropertiesTable(prop_table)
+    return g4material
+
 
 class G4Generator(object):
     def __init__(self, material, seed=None):
@@ -21,6 +56,11 @@ class G4Generator(object):
 
                      composition dictionary should be 
                         { element_symbol : fraction_by_weight, ... }.
+                        
+                     OR
+                     
+                     a callback function to build a geant4 geometry and
+                     return a list of things to persist with this object
 
            seed: int, *optional*
                Random number generator seed for HepRandom. If None, generator
@@ -30,18 +70,26 @@ class G4Generator(object):
             HepRandom.setTheSeed(seed)
 
         g4py.NISTmaterials.Construct()
-        self.world_material = self.create_g4material(material)
-        g4py.ezgeom.Construct()
+        
         self.physics_list = _g4chroma.ChromaPhysicsList()
         gRunManager.SetUserInitialization(self.physics_list)
         self.particle_gun = g4py.ParticleGun.Construct()
         
-        g4py.ezgeom.SetWorldMaterial(self.world_material)
-        g4py.ezgeom.ResizeWorld(100*m, 100*m, 100*m)
+        if isinstance(material,geometry.Material):
+        
+            self.world_material = create_g4material(material)
+            g4py.ezgeom.Construct()
+            
+            g4py.ezgeom.SetWorldMaterial(self.world_material)
+            g4py.ezgeom.ResizeWorld(100*m, 100*m, 100*m)
 
-        self.world = g4py.ezgeom.G4EzVolume('world')
-        self.world.CreateBoxVolume(self.world_material, 100*m, 100*m, 100*m)
-        self.world.PlaceIt(G4ThreeVector(0,0,0))
+            self.world = g4py.ezgeom.G4EzVolume('world')
+            self.world.CreateBoxVolume(self.world_material, 100*m, 100*m, 100*m)
+            self.world.PlaceIt(G4ThreeVector(0,0,0))
+            
+        else:
+            #material is really a function to build the geometry
+            self.world = material()
 
         self.stepping_action = _g4chroma.SteppingAction()
         gRunManager.SetUserAction(self.stepping_action)
@@ -53,41 +101,6 @@ class G4Generator(object):
         # preinitialize the process by running a simple event
         self.generate_photons([Vertex('e-', (0,0,0), (1,0,0), 0.5, 1.0)], mute=True)
         
-    def create_g4material(self, material):
-        g4material = G4Material('world_material', material.density * g / cm3,
-                                len(material.composition))
-
-        # Add elements
-        for element_name, element_frac_by_weight in material.composition.items():
-            g4material.AddElement(G4Element.GetElement(element_name, True),
-                                  element_frac_by_weight)
-
-        # Set index of refraction
-        prop_table = G4MaterialPropertiesTable()
-        # Reverse entries so they are in ascending energy order rather
-        # than wavelength
-        energy = list((2*pi*hbarc / (material.refractive_index[::-1,0] * nanometer)).astype(float))
-        values = list(material.refractive_index[::-1, 1].astype(float))
-        prop_table.AddProperty('RINDEX', energy, values)
-        if material.scintillation_light_yield:
-            prop_table.AddConstProperty('LIGHT_YIELD',material.scintillation_light_yield)
-        if np.any(material.scintillation_spectrum):
-            energy = list((2*pi*hbarc / (material.scintillation_spectrum[::-1,0] * nanometer)).astype(float))
-            values = list(material.scintillation_spectrum[::-1, 1].astype(float))
-            prop_table.AddProperty('SCINTILLATION', energy, values)
-        if np.any(material.scintillation_spectrum):
-            energy = list(material.scintillation_waveform[:, 0].astype(float))
-            values = list(material.scintillation_waveform[:, 1].astype(float))
-            prop_table.AddProperty('SCINTWAVEFORM', energy, values)
-        if np.any(material.scintillation_mod):
-            energy = list(material.scintillation_mod[:, 0].astype(float))
-            values = list(material.scintillation_mod[:, 1].astype(float))
-            prop_table.AddProperty('SCINTMOD', energy, values)
-
-        # Load properties
-        g4material.SetMaterialPropertiesTable(prop_table)
-        return g4material
-
     def _extract_photons_from_tracking_action(self, sort=True):
         n = self.tracking_action.GetNumPhotons()
         pos = np.zeros(shape=(n,3), dtype=np.float32)
@@ -130,7 +143,7 @@ class G4Generator(object):
                         steps.ke[0], steps.t[0], steps=steps, children=children, trackid=index, pdgcode=track.pdg_code)
         
 
-    def generate_photons(self, vertices, mute=False):
+    def generate_photons(self, vertices, mute=False, tracking=False):
         """Use GEANT4 to generate photons produced by propagating `vertices`.
            
         Args:
@@ -149,8 +162,8 @@ class G4Generator(object):
             pass
             #g4mute()
 
-        photons = None
-
+        photons = Photons()
+        
         try:
             tracked_vertices = []
             for vertex in vertices:
@@ -175,12 +188,11 @@ class G4Generator(object):
                 self.stepping_action.clearTracking()
                 gRunManager.BeamOn(1)
                 
-                tracked_vertices.append(self._extract_vertex_from_stepping_action())
-
-                if photons is None:
-                    photons = self._extract_photons_from_tracking_action()
+                if tracking:
+                    tracked_vertices.append(self._extract_vertex_from_stepping_action())
                 else:
-                    photons += self._extract_photons_from_tracking_action()
+                    tracked_vertices.append(vertex)
+                photons += self._extract_photons_from_tracking_action()
                 
         finally:
             if mute:

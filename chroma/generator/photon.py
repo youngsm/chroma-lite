@@ -31,7 +31,6 @@ class G4GeneratorProcess(multiprocessing.Process):
         while True:
             ev = vertex_socket.recv_pyobj()
             ev.vertices,ev.photons_beg = gen.generate_photons(ev.vertices)
-            #print 'type(ev.photons_beg) is %s' % type(ev.photons_beg)
             photon_socket.send_pyobj(ev)
 
 def partition(num, partitions):
@@ -54,13 +53,17 @@ def partition(num, partitions):
         else:
             yield step + (num % partitions)
 
-def vertex_sender(vertex_iterator, vertex_socket):
+def vertex_sender(vertex_iterator, zmq_context, vertex_address, semaphore):        
+    vertex_socket = zmq_context.socket(zmq.PUSH)
+    vertex_socket.bind(vertex_address)
     for vertex in vertex_iterator:
         vertex_socket.send_pyobj(vertex)
+        semaphore.acquire()
 
-def socket_iterator(nelements, socket):
+def socket_iterator(nelements, socket, semaphore):
     for i in range(nelements):
         yield socket.recv_pyobj()
+        semaphore.release()
 
 class G4ParallelGenerator(object):
     def __init__(self, nprocesses, material, base_seed=None):
@@ -71,13 +74,12 @@ class G4ParallelGenerator(object):
         self.vertex_address = base_address + '.vertex'
         self.photon_address = base_address + '.photon'
         self.processes = [ G4GeneratorProcess(i, material, self.vertex_address, self.photon_address, seed=base_seed + i) for i in range(nprocesses) ]
+        self.semaphore = threading.Semaphore(nprocesses*2)
 
         for p in self.processes:
             p.start()
 
         self.zmq_context = zmq.Context()
-        self.vertex_socket = self.zmq_context.socket(zmq.PUSH)
-        self.vertex_socket.bind(self.vertex_address)
         self.photon_socket = self.zmq_context.socket(zmq.PULL)
         self.photon_socket.bind(self.photon_address)
 
@@ -91,10 +93,10 @@ class G4ParallelGenerator(object):
                 msg = self.photon_socket.recv()
                 assert msg == b'READY'
             self.processes_initialized = True
-
+            
         # Doing this to avoid a deadlock caused by putting to one queue
         # while getting from another.
         vertex_list = list(vertex_iterator)
-        sender_thread = threading.Thread(target=vertex_sender, args=(vertex_list, self.vertex_socket))
+        sender_thread = threading.Thread(target=vertex_sender, args=(vertex_list, self.zmq_context, self.vertex_address, self.semaphore))
         sender_thread.start()
-        return socket_iterator(len(vertex_list), self.photon_socket)
+        return socket_iterator(len(vertex_list),self.photon_socket, self.semaphore)

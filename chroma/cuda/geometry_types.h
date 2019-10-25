@@ -4,10 +4,11 @@
 struct Material
 {
     float *refractive_index;
-    float *absorption_length;
-    float *scattering_length;
-    float *reemission_prob;
-    float *reemission_cdf;
+    float *absorption_length; //make ncomp absorption_length
+    float *scattering_length; 
+    float *reemission_prob; //make ncomp 
+    float *reemission_cdf; //make ncomp scintillation_spectrum 
+    //add reemission_time_cdf and time interpolation vars
     unsigned int n;
     float step;
     float wavelength0;
