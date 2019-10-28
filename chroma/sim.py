@@ -52,11 +52,12 @@ class Simulation(object):
 
         self.pdf_config = None
      
-    def _simulate_batch(self,batch_photons,batch_events,keep_photons_beg=False,keep_photons_end=False,keep_hits=True,run_daq=False, max_steps=100):
-        '''Assumes batch_photons is a single Photons instance with the evidx 
-           property giving an event index in the batch_events array.
+    def _simulate_batch(self,batch_events,keep_photons_beg=False,keep_photons_end=False,keep_hits=True,run_daq=False, max_steps=100):
+        '''Assumes batch_events is a list of Event objects with photons_beg having evidx set to the index in the array.
            
            Yields the fully formed events. Do not call directly.'''
+        
+        batch_photons = event.Photons.join([ev.photons_beg for ev in batch_events])
         
         #This copy to gpu has a _lot_ of overhead, want 100k photons at least, hence batches
         gpu_photons = gpu.GPUPhotons(batch_photons)
@@ -113,7 +114,6 @@ class Simulation(object):
             iterable = self.photon_generator.generate_events(iterable)
 
         nphotons = 0
-        batch_photons = event.Photons()
         batch_events = []
         
         for ev in iterable:
@@ -122,21 +122,19 @@ class Simulation(object):
             ev.photons_beg.evidx[:] = len(batch_events)
             
             nphotons += ev.nphotons
-            batch_photons += ev.photons_beg
             batch_events.append(ev)
             
             if nphotons >= photons_per_batch:
-                yield from self._simulate_batch(batch_photons,batch_events,
+                yield from self._simulate_batch(batch_events,
                                                 keep_photons_beg=keep_photons_beg,
                                                 keep_photons_end=keep_photons_end,
                                                 keep_hits=keep_hits,
                                                 run_daq=run_daq, max_steps=max_steps)
                 nphotons = 0
-                batch_photons = event.Photons()
                 batch_events = []
                 
         if len(batch_events) != 0:
-            yield from self._simulate_batch(batch_photons,batch_events,
+            yield from self._simulate_batch(batch_events,
                                             keep_photons_beg=keep_photons_beg,
                                             keep_photons_end=keep_photons_end,
                                             keep_hits=keep_hits,

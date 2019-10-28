@@ -128,6 +128,20 @@ class Photons(object):
             self.evidx = np.zeros(len(pos), dtype=np.uint32)
         else:
             self.evidx = np.asarray(evidx, dtype=np.uint32)
+            
+    def join(photon_list):
+        '''Concatenates many photon objects together efficiently'''
+        pos = np.concatenate([p.pos for p in photon_list])
+        dir = np.concatenate([p.dir for p in photon_list])
+        pol = np.concatenate([p.pol for p in photon_list])
+        wavelengths = np.concatenate([p.wavelengths for p in photon_list])
+        t = np.concatenate([p.t for p in photon_list])
+        last_hit_triangles = np.concatenate([p.last_hit_triangles for p in photon_list])
+        flags = np.concatenate([p.flags for p in photon_list])
+        weights = np.concatenate([p.weights for p in photon_list])
+        evidx = np.concatenate([p.evidx for p in photon_list])
+        return Photons(pos, dir, pol, wavelengths, t,
+                       last_hit_triangles, flags, weights, evidx)
 
     def __add__(self, other):
         '''Concatenate two Photons objects into one list of photons.
