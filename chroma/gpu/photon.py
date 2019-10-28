@@ -35,6 +35,7 @@ class GPUPhotons(object):
         self.last_hit_triangles = ga.empty(shape=nphotons*ncopies, dtype=np.int32)
         self.flags = ga.empty(shape=nphotons*ncopies, dtype=np.uint32)
         self.weights = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
+        self.evidx = ga.empty(shape=nphotons, dtype=np.uint32)
 
         # Assign the provided photons to the beginning (possibly
         # the entire array if ncopies is 1
@@ -46,6 +47,7 @@ class GPUPhotons(object):
         self.last_hit_triangles[:nphotons].set(photons.last_hit_triangles.astype(np.int32))
         self.flags[:nphotons].set(photons.flags.astype(np.uint32))
         self.weights[:nphotons].set(photons.weights.astype(np.float32))
+        self.evidx[:nphotons].set(photons.evidx.astype(np.uint32))
 
         module = get_cu_module('propagate.cu', options=cuda_options)
         self.gpu_funcs = GPUFuncs(module)
@@ -58,7 +60,7 @@ class GPUPhotons(object):
                     chunk_iterator(nphotons, nthreads_per_block, max_blocks):
                 self.gpu_funcs.photon_duplicate(np.int32(first_photon), np.int32(photons_this_round),
                                                 self.pos, self.dir, self.wavelengths, self.pol, self.t, 
-                                                self.flags, self.last_hit_triangles, self.weights,
+                                                self.flags, self.last_hit_triangles, self.weights, self.evidx,
                                                 np.int32(ncopies-1), 
                                                 np.int32(nphotons),
                                                 block=(nthreads_per_block,1,1), grid=(blocks, 1))
@@ -77,10 +79,11 @@ class GPUPhotons(object):
         last_hit_triangles = self.last_hit_triangles.get()
         flags = self.flags.get()
         weights = self.weights.get()
-        return event.Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights)
+        evidx = self.evidx.get()
+        return event.Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights, evidx)
         
     def get_hits(self, gpu_detector, target_flag=(0x1<<2), nthreads_per_block=64, max_blocks=1024,
-               start_photon=None, nphotons=None):
+               start_photon=None, nphotons=None, no_map=False):
         '''Return a map of GPUPhoton objects containing only photons that
         have a particular bit set in their history word and were detected by
         a channel.'''
@@ -116,6 +119,7 @@ class GPUPhotons(object):
         last_hit_triangles = ga.empty(shape=reduced_nphotons, dtype=np.int32)
         flags = ga.empty(shape=reduced_nphotons, dtype=np.uint32)
         weights = ga.empty(shape=reduced_nphotons, dtype=np.float32)
+        evidx = ga.empty(shape=reduced_nphotons, dtype=np.uint32)
         channels = ga.empty(shape=reduced_nphotons, dtype=np.int32)
 
         # And finaly copy hits, if there are any
@@ -129,8 +133,8 @@ class GPUPhotons(object):
                                             gpu_detector.solid_id_map,
                                             gpu_detector.detector_gpu,
                                             index_counter_gpu, 
-                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights,
-                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles, weights, channels,
+                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, self.evidx,
+                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles, weights, evidx, channels,
                                             block=(nthreads_per_block,1,1), 
                                             grid=(blocks, 1))
             assert index_counter_gpu.get()[0] == reduced_nphotons
@@ -143,11 +147,12 @@ class GPUPhotons(object):
         last_hit_triangles = last_hit_triangles.get()
         flags = flags.get()
         weights = weights.get()
+        evidx = evidx.get()
         channels = channels.get()
         hitmap = {}
         for chan in np.unique(channels):
             mask = (channels == chan).astype(bool)
-            hitmap[int(chan)] = event.Photons(pos[mask], dir[mask], pol[mask], wavelengths[mask], t[mask], last_hit_triangles[mask], flags[mask], weights[mask])
+            hitmap[int(chan)] = event.Photons(pos[mask], dir[mask], pol[mask], wavelengths[mask], t[mask], last_hit_triangles[mask], flags[mask], weights[mask], evidx[mask])
         return hitmap
 
     def iterate_copies(self):
@@ -162,7 +167,8 @@ class GPUPhotons(object):
                                   t=self.t[window],
                                   last_hit_triangles=self.last_hit_triangles[window],
                                   flags=self.flags[window],
-                                  weights=self.weights[window])
+                                  weights=self.weights[window],
+                                  evidx=self.evidx[window])
 
     @profile_if_possible
     def propagate(self, gpu_geometry, rng_states, nthreads_per_block=64,
@@ -199,7 +205,7 @@ class GPUPhotons(object):
 
             for first_photon, photons_this_round, blocks in \
                     chunk_iterator(nphotons, nthreads_per_block, max_blocks):
-                self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, np.int32(nsteps), np.int32(use_weights), np.int32(scatter_first), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
+                self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, self.evidx, np.int32(nsteps), np.int32(use_weights), np.int32(scatter_first), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
 
             step += nsteps
             scatter_first = 0 # Only allow non-zero in first pass
@@ -251,6 +257,7 @@ class GPUPhotons(object):
         last_hit_triangles = ga.empty(shape=reduced_nphotons, dtype=np.int32)
         flags = ga.empty(shape=reduced_nphotons, dtype=np.uint32)
         weights = ga.empty(shape=reduced_nphotons, dtype=np.float32)
+        evidx = ga.empty(shape=reduced_nphotons, dtype=np.uint32)
 
         # And finaly copy photons, if there are any
         if reduced_nphotons > 0:
@@ -261,12 +268,12 @@ class GPUPhotons(object):
                                             np.int32(photons_this_round), 
                                             np.uint32(target_flag),
                                             index_counter_gpu, 
-                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights,
-                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles, weights,
+                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, self.evidx,
+                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles, weights, evidx,
                                             block=(nthreads_per_block,1,1), 
                                             grid=(blocks, 1))
             assert index_counter_gpu.get()[0] == reduced_nphotons
-        return GPUPhotonsSlice(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights)
+        return GPUPhotonsSlice(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights, evidx)
 
     def __del__(self):
         del self.pos
@@ -290,7 +297,7 @@ class GPUPhotonsSlice(GPUPhotons):
 
     Returned by the GPUPhotons.iterate_copies() iterator.'''
     def __init__(self, pos, dir, pol, wavelengths, t, last_hit_triangles,
-                 flags, weights):
+                 flags, weights, evidx):
         '''Create new object using slices of GPUArrays from an instance
         of GPUPhotons.  NOTE THESE ARE NOT CPU ARRAYS!'''
         self.pos = pos
@@ -301,6 +308,7 @@ class GPUPhotonsSlice(GPUPhotons):
         self.last_hit_triangles = last_hit_triangles
         self.flags = flags
         self.weights = weights
+        self.evidx = evidx
 
         module = get_cu_module('propagate.cu', options=cuda_options)
         self.gpu_funcs = GPUFuncs(module)

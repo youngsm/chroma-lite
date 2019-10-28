@@ -25,6 +25,8 @@ struct Photon
     unsigned int history;
 
     int last_hit_triangle;
+    
+    unsigned int evidx;
 };
 
 struct State
@@ -577,7 +579,7 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
     }
     else {
         p.history |= SURFACE_TRANSMIT;
-        return CONTINUE;
+        return PASS;
     }
 } // propagate_at_wls
 
@@ -605,7 +607,7 @@ propagate_at_dichroic(Photon &p, State &s, curandState &rng, Surface *surface, b
     }
     else if (uniform_sample < transmit_prob+reflect_prob) {
         p.history |= SURFACE_TRANSMIT;
-        return CONTINUE;
+        return PASS;
     }
     else {
         p.history |= SURFACE_ABSORB;
@@ -669,8 +671,10 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
         }
         else if (uniform_sample < absorb + detect + reflect_diffuse)
             return propagate_at_diffuse_reflector(p, s, rng);
-        else
+        else if (uniform_sample < absorb + detect + reflect_diffuse + reflect_specular)
             return propagate_at_specular_reflector(p, s);
+        else
+            return PASS;
     }
 
 } // propagate_at_surface

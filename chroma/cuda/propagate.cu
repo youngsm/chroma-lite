@@ -15,7 +15,7 @@ photon_duplicate(int first_photon, int nthreads,
 		 float3 *positions, float3 *directions,
 		 float *wavelengths, float3 *polarizations,
 		 float *times, unsigned int *histories,
-		 int *last_hit_triangles, float *weights,
+		 int *last_hit_triangles, float *weights, unsigned int *evidx,
 		 int copies, int stride)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -34,6 +34,7 @@ photon_duplicate(int first_photon, int nthreads,
     p.last_hit_triangle = last_hit_triangles[photon_id];
     p.history = histories[photon_id];
     p.weight = weights[photon_id];
+    p.evidx = evidx[photon_id];
 
     for (int i=1; i <= copies; i++) {
       int target_photon_id = photon_id + stride * i;
@@ -46,6 +47,7 @@ photon_duplicate(int first_photon, int nthreads,
       last_hit_triangles[target_photon_id] = p.last_hit_triangle;
       histories[target_photon_id] = p.history;
       weights[target_photon_id] = p.weight;
+      evidx[target_photon_id] = p.evidx;
     }
 }
 
@@ -82,11 +84,11 @@ copy_photons(int first_photon, int nthreads, unsigned int target_flag,
 	     float3 *positions, float3 *directions,
 	     float *wavelengths, float3 *polarizations,
 	     float *times, unsigned int *histories,
-	     int *last_hit_triangles, float *weights,
+	     int *last_hit_triangles, float *weights, unsigned int *evidx,
 	     float3 *new_positions, float3 *new_directions,
 	     float *new_wavelengths, float3 *new_polarizations,
 	     float *new_times, unsigned int *new_histories,
-	     int *new_last_hit_triangles, float *new_weights)
+	     int *new_last_hit_triangles, float *new_weights, unsigned int *new_evidx)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -106,6 +108,8 @@ copy_photons(int first_photon, int nthreads, unsigned int target_flag,
 	new_histories[offset] = histories[photon_id];
 	new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
 	new_weights[offset] = weights[photon_id];
+	new_evidx[offset] = evidx[photon_id];
+	
     }
 }
 
@@ -144,11 +148,11 @@ copy_photon_hits(int first_photon, int nphotons, unsigned int detection_state,
             float3 *positions, float3 *directions,
             float *wavelengths, float3 *polarizations,
             float *times, unsigned int *histories,
-            int *last_hit_triangles, float *weights,
+            int *last_hit_triangles, float *weights, unsigned int *evidx,
             float3 *new_positions, float3 *new_directions,
             float *new_wavelengths, float3 *new_polarizations,
             float *new_times, unsigned int *new_histories,
-            int *new_last_hit_triangles, float *new_weights,
+            int *new_last_hit_triangles, float *new_weights, unsigned int *new_evidx,
             int *new_channels)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -170,6 +174,7 @@ copy_photon_hits(int first_photon, int nphotons, unsigned int detection_state,
 	                new_histories[offset] = histories[photon_id];
 	                new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
 	                new_weights[offset] = weights[photon_id];
+	                new_evidx[offset] = evidx[photon_id];
 	                new_channels[offset] = channel_index;
 	            }
 	        }
@@ -184,7 +189,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
 	  float3 *positions, float3 *directions,
 	  float *wavelengths, float3 *polarizations,
 	  float *times, unsigned int *histories,
-	  int *last_hit_triangles, float *weights,
+	  int *last_hit_triangles, float *weights, unsigned int *evidx,
 	  int max_steps, int use_weights, int scatter_first,
 	  Geometry *g)
 {
@@ -217,6 +222,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
     p.last_hit_triangle = last_hit_triangles[photon_id];
     p.history = histories[photon_id];
     p.weight = weights[photon_id];
+    p.evidx = evidx[photon_id];
 
     if (p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB | NAN_ABORT))
 	return;
@@ -272,6 +278,7 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
     histories[photon_id] = p.history;
     last_hit_triangles[photon_id] = p.last_hit_triangle;
     weights[photon_id] = p.weight;
+    evidx[photon_id] = p.evidx;
 
     // Not done, put photon in output queue
     if ((p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB | NAN_ABORT)) == 0) {

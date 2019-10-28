@@ -51,14 +51,58 @@ class Simulation(object):
         self.rng_states = gpu.get_rng_states(self.nthreads_per_block*self.max_blocks, seed=self.seed)
 
         self.pdf_config = None
+     
+    def _simulate_batch(self,batch_photons,batch_events,keep_photons_beg=False,keep_photons_end=False,keep_hits=True,run_daq=False, max_steps=100):
+        '''Assumes batch_photons is a single Photons instance with the evidx 
+           property giving an event index in the batch_events array.
+           
+           Yields the fully formed events. Do not call directly.'''
+        
+        #This copy to gpu has a _lot_ of overhead, want 100k photons at least, hence batches
+        gpu_photons = gpu.GPUPhotons(batch_photons)
+
+        gpu_photons.propagate(self.gpu_geometry, self.rng_states,
+                              nthreads_per_block=self.nthreads_per_block,
+                              max_blocks=self.max_blocks,
+                              max_steps=max_steps)
+
+        if keep_photons_end:
+            batch_photons_end = gpu_photons.get()
+            
+        if hasattr(self.detector, 'num_channels') and keep_hits:
+            batch_hits = gpu_photons.get_hits(self.gpu_geometry)
+
+        if hasattr(self, 'gpu_daq') and run_daq:
+            self.gpu_daq.begin_acquire()
+            self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
+            gpu_channels = self.gpu_daq.end_acquire()
+            batch_channels = gpu_channels.get()
+                
+        for i,batch_ev in enumerate(batch_events):
+                    
+            if not keep_photons_beg:
+                batch_ev.photons_beg = None
+                        
+            if keep_photons_end:
+                batch_mask = batch_photons_end.evidx == i
+                batch_ev.photons_end = batch_photons_end[batch_mask]
+                        
+            if hasattr(self.detector, 'num_channels') and keep_hits:
+                batch_ev.hits = {chan:batch_hits[chan][batch_hits[chan].evidx == i] for chan in batch_hits}
+                batch_ev.hits = {chan:batch_ev.hits[chan] for chan in batch_ev.hits if len(batch_ev.hits[chan]) > 0}
+                        
+            if hasattr(self, 'gpu_daq') and run_daq:
+                pass #fixme add channels eventually
+                    
+            yield batch_ev
 
     def simulate(self, iterable, keep_photons_beg=False,
-                 keep_photons_end=False, keep_hits=True, run_daq=False, max_steps=100):
+                 keep_photons_end=False, keep_hits=True, run_daq=False, max_steps=100,
+                 photons_per_batch=100000):
         if isinstance(iterable, event.Photons):
             first_element, iterable = iterable, [iterable]
         else:
             first_element, iterable = itertoolset.peek(iterable)
-        
 
         if isinstance(first_element, event.Event):
             iterable = self.photon_generator.generate_events(iterable)
@@ -68,40 +112,35 @@ class Simulation(object):
             iterable = (event.Event(vertices=[vertex]) for vertex in iterable)
             iterable = self.photon_generator.generate_events(iterable)
 
+        nphotons = 0
+        batch_photons = event.Photons()
+        batch_events = []
+        
         for ev in iterable:
             
             ev.nphotons = len(ev.photons_beg)
+            ev.photons_beg.evidx[:] = len(batch_events)
             
-            if len(ev.photons_beg) > 0:
+            nphotons += ev.nphotons
+            batch_photons += ev.photons_beg
+            batch_events.append(ev)
+            
+            if nphotons >= photons_per_batch:
+                yield from self._simulate_batch(batch_photons,batch_events,
+                                                keep_photons_beg=keep_photons_beg,
+                                                keep_photons_end=keep_photons_end,
+                                                keep_hits=keep_hits,
+                                                run_daq=run_daq, max_steps=max_steps)
+                nphotons = 0
+                batch_photons = event.Photons()
+                batch_events = []
                 
-                gpu_photons = gpu.GPUPhotons(ev.photons_beg)
-
-                gpu_photons.propagate(self.gpu_geometry, self.rng_states,
-                                      nthreads_per_block=self.nthreads_per_block,
-                                      max_blocks=self.max_blocks,
-                                      max_steps=max_steps)
-
-                if keep_photons_end:
-                    ev.photons_end = gpu_photons.get()
-
-            
-                if hasattr(self.detector, 'num_channels') and keep_hits:
-                    ev.hits = gpu_photons.get_hits(self.gpu_geometry)
-
-                # Skip running DAQ if we don't have one
-                # Disabled by default because incredibly special-case
-                if hasattr(self, 'gpu_daq') and run_daq:
-                    self.gpu_daq.begin_acquire()
-                    self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
-                    gpu_channels = self.gpu_daq.end_acquire()
-                    ev.channels = gpu_channels.get()
-            else:
-                ev.hits = {}
-
-            if not keep_photons_beg:
-                ev.photons_beg = None
-
-            yield ev
+        if len(batch_events) != 0:
+            yield from self._simulate_batch(batch_photons,batch_events,
+                                            keep_photons_beg=keep_photons_beg,
+                                            keep_photons_end=keep_photons_end,
+                                            keep_hits=keep_hits,
+                                            run_daq=run_daq, max_steps=max_steps)
 
     def create_pdf(self, iterable, tbins, trange, qbins, qrange, nreps=1):
         """Returns tuple: 1D array of channel hit counts, 3D array of

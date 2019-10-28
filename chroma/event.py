@@ -67,7 +67,7 @@ class Vertex(object):
     __repr__ = __str__
 
 class Photons(object):
-    def __init__(self, pos=np.empty((0,3)), dir=np.empty((0,3)), pol=np.empty((0,3)), wavelengths=np.empty((0)), t=None, last_hit_triangles=None, flags=None, weights=None):
+    def __init__(self, pos=np.empty((0,3)), dir=np.empty((0,3)), pol=np.empty((0,3)), wavelengths=np.empty((0)), t=None, last_hit_triangles=None, flags=None, weights=None, evidx=None):
         '''Create a new list of n photons.
 
             pos: numpy.ndarray(dtype=numpy.float32, shape=(n,3))
@@ -123,6 +123,11 @@ class Photons(object):
             self.weights = np.ones(len(pos), dtype=np.float32)
         else:
             self.weights = np.asarray(weights, dtype=np.float32)
+            
+        if evidx is None:
+            self.evidx = np.zeros(len(pos), dtype=np.uint32)
+        else:
+            self.evidx = np.asarray(evidx, dtype=np.uint32)
 
     def __add__(self, other):
         '''Concatenate two Photons objects into one list of photons.
@@ -140,8 +145,9 @@ class Photons(object):
         last_hit_triangles = np.concatenate((self.last_hit_triangles, other.last_hit_triangles))
         flags = np.concatenate((self.flags, other.flags))
         weights = np.concatenate((self.weights, other.weights))
+        evidx = np.concatenate((self.evidx, other.evidx))
         return Photons(pos, dir, pol, wavelengths, t,
-                       last_hit_triangles, flags, weights)
+                       last_hit_triangles, flags, weights, evidx)
 
     def __len__(self):
         '''Returns the number of photons in self.'''
@@ -167,7 +173,7 @@ class Photons(object):
         return Photons(self.pos[key], self.dir[key], self.pol[key],
                        self.wavelengths[key], self.t[key],
                        self.last_hit_triangles[key], self.flags[key],
-                       self.weights[key])
+                       self.weights[key],self.evidx[key])
 
     def reduced(self, reduction_factor=1.0):
         '''Return a new Photons object with approximately
@@ -178,7 +184,7 @@ class Photons(object):
         return self[choice]
 
 class Channels(object):
-    def __init__(self, hit, t, q, flags=None):
+    def __init__(self, hit, t, q, flags=None, evidx=None):
         '''Create a list of n channels.  All channels in the detector must 
         be included, regardless of whether they were hit.
 
@@ -196,6 +202,7 @@ class Channels(object):
         self.t = t
         self.q = q
         self.flags = flags
+        self.evidx = evidx
 
     def hit_channels(self):
         '''Extract a list of hit channels.
