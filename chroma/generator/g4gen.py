@@ -168,10 +168,9 @@ class G4Generator(object):
             tracked_vertices = []
             for vertex in vertices:
                 self.particle_gun.SetParticleByName(vertex.particle_name)
-                #FIXME validate this - Geant4 seems to call 'ParticleEnergy' KineticEnergy
-                #mass = G4ParticleTable.GetParticleTable().FindParticle(vertex.particle_name).GetPDGMass()
-                total_energy = vertex.ke*MeV# + mass
-                self.particle_gun.SetParticleEnergy(total_energy)
+                #Geant4 seems to call 'ParticleEnergy' KineticEnergy - see G4ParticleGun 
+                kinetic_energy = vertex.ke*MeV
+                self.particle_gun.SetParticleEnergy(kinetic_energy)
 
                 # Must be float type to call GEANT4 code
                 pos = np.asarray(vertex.pos, dtype=np.float64)

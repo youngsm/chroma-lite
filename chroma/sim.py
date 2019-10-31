@@ -98,8 +98,8 @@ class Simulation(object):
             yield batch_ev
 
     def simulate(self, iterable, keep_photons_beg=False,
-                 keep_photons_end=False, keep_hits=True, run_daq=False, max_steps=100,
-                 photons_per_batch=100000):
+                 keep_photons_end=False, keep_hits=True, run_daq=False, max_steps=1000,
+                 photons_per_batch=1000000):
         if isinstance(iterable, event.Photons):
             first_element, iterable = iterable, [iterable]
         else:
