@@ -51,7 +51,7 @@ r7081hqe_photocathode.set('reflect_diffuse', 1.0 - r7081hqe_photocathode.detect[
 glass = Material('glass')
 glass.set('refractive_index', 1.49)
 glass.absorption_length = \
-    np.array([(200, 0.1e-6), (300, 0.1e-6), (330, 1000.0), (500, 2000.0), (600, 1000.0), (770, 500.0), (800, 0.1e-6)])
+    np.array([(200, 0.1e-6), (300, 0.1e-6), (330, 1000.0), (500, 2000.0), (600, 1000.0), (770, 500.0), (800, 0.1e-6), (1000, 0.1e-6)])
 glass.set('scattering_length', 1e6)
 
 # From WCSim
