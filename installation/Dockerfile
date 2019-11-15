@@ -20,6 +20,7 @@ RUN apt-get update
 RUN apt-get install -y wget git
 RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libxerces-c-dev libxmu-dev libxi-dev libboost-numpy-dev libboost-python-dev
 COPY chroma_env.sh /etc/profile.d/
+SHELL ["/bin/bash", "-l", "-c"] 
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
 
 WORKDIR /opt/
@@ -41,6 +42,7 @@ RUN apt-get update
 RUN apt-get install -y wget git
 RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libxerces-c-dev libxmu-dev libxi-dev libboost-numpy-dev libboost-python-dev
 COPY chroma_env.sh /etc/profile.d/
+SHELL ["/bin/bash", "-l", "-c"] 
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
 COPY --from=build-root /opt/root /opt/root
 RUN apt-get install -y freeglut3-dev
@@ -50,7 +52,7 @@ RUN wget https://geant4-data.web.cern.ch/geant4-data/releases/geant4.10.05.p01.t
 RUN tar xf geant4.10.05.p01.tar.gz
 RUN rm geant4.10.05.p01.tar.gz
 WORKDIR /opt/geant4.10.05.p01/build-g4
-RUN cmake -DCMAKE_BUILD_TYPE=Release -DGEANT4_INSTALL_DATA=ON -DCMAKE_INSTALL_PREFIX=/opt/geant4 -DGEANT4_USE_GDML=ON -DGEANT4_USE_OPENGL_X11=ON -DGEANT4_USE_XM=OFF /opt/geant4.10.05.p01
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DGEANT4_INSTALL_DATA=OFF -DCMAKE_INSTALL_PREFIX=/opt/geant4 -DGEANT4_USE_GDML=ON -DGEANT4_USE_OPENGL_X11=ON -DGEANT4_USE_XM=OFF /opt/geant4.10.05.p01
 RUN make -j12
 RUN make install
 WORKDIR /opt/geant4.10.05.p01
@@ -74,6 +76,7 @@ RUN apt-get update
 RUN apt-get install -y wget git
 RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libxerces-c-dev libxmu-dev libxi-dev libboost-numpy-dev libboost-python-dev
 COPY chroma_env.sh /etc/profile.d/
+SHELL ["/bin/bash", "-l", "-c"] 
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
 COPY --from=build-root /opt/root /opt/root
 RUN apt-get install -y freeglut3-dev
@@ -87,4 +90,4 @@ WORKDIR /opt/chroma/
 RUN sed -i 's/boost_python/boost_python3/g;s/boost_numpy/boost_numpy3/g' setup.py
 RUN python setup.py develop
 
-CMD ["/bin/bash"]
+CMD ["/bin/bash","-l"]
