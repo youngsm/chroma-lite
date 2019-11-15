@@ -10,7 +10,7 @@ This repository contains a modified version of Chroma that is updated for Python
 
 ## Installation
 
-The `installation` directory contains a `Dockerfile` to build an ubuntu-derived image containing Chroma. There is also an `ubuntu_install.sh` script that will perform an analogous installation on an ubuntu host, and may be a useful reference for other systems. 
+The `installation` directory contains a `Dockerfile` to build an ubuntu-derived image containing Chroma. There is also an `ubuntu_install.sh` script that will perform an analogous installation on an ubuntu host, and may be a useful reference for other systems. Note that properly linking to boost_python and boost_numpy is nontrivial.
 
 ## Usage
 
