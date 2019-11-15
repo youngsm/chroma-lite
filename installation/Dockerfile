@@ -3,10 +3,10 @@ MAINTAINER Benjamin Land <benland100@gmail.com>
 
 USER root
 RUN apt-get update 
-RUN apt-get install -y wget git
+RUN apt-get install -y curl git
 
 WORKDIR /opt/
-RUN wget https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-x86_64.sh
+RUN curl -O https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-x86_64.sh
 RUN chmod +x Anaconda3-2019.10-Linux-x86_64.sh
 RUN ./Anaconda3-2019.10-Linux-x86_64.sh -b -p /opt/anaconda3
 RUN rm Anaconda3-2019.10-Linux-x86_64.sh
@@ -17,14 +17,14 @@ MAINTAINER Benjamin Land <benland100@gmail.com>
 
 USER root
 RUN apt-get update 
-RUN apt-get install -y wget git
-RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libxerces-c-dev libxmu-dev libxi-dev libboost-numpy-dev libboost-python-dev
+RUN apt-get install -y curl git
 COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
+RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev 
 
 WORKDIR /opt/
-RUN wget https://root.cern/download/root_v6.18.04.source.tar.gz
+RUN curl -O https://root.cern/download/root_v6.18.04.source.tar.gz
 RUN tar xf root_v6.18.04.source.tar.gz
 RUN rm root_v6.18.04.source.tar.gz
 WORKDIR /opt/root-6.18.04/build-root
@@ -39,13 +39,16 @@ MAINTAINER Benjamin Land <benland100@gmail.com>
 
 USER root
 RUN apt-get update 
-RUN apt-get install -y wget git
-RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libxerces-c-dev libxmu-dev libxi-dev libboost-numpy-dev libboost-python-dev
+RUN apt-get install -y curl git
 COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
+RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev 
 COPY --from=build-root /opt/root /opt/root
-RUN apt-get install -y freeglut3-dev
+RUN apt-get install -y libxerces-c-dev libxmu-dev libxi-dev libboost-numpy-dev libboost-python-dev freeglut3-dev
+#Force linking to python3 boost modules
+RUN cp -P /usr/lib/x86_64-linux-gnu/libboost_numpy3.so /usr/lib/x86_64-linux-gnu/libboost_numpy.so
+RUN cp -P /usr/lib/x86_64-linux-gnu/libboost_python3.so /usr/lib/x86_64-linux-gnu/libboost_python.so
 
 WORKDIR /opt/
 RUN wget https://geant4-data.web.cern.ch/geant4-data/releases/geant4.10.05.p01.tar.gz
@@ -71,15 +74,19 @@ RUN rm -rf /opt/geant4.10.05.p01
 FROM ubuntu:20.04
 MAINTAINER Benjamin Land <benland100@gmail.com>
 
+
 USER root
 RUN apt-get update 
-RUN apt-get install -y wget git
-RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libxerces-c-dev libxmu-dev libxi-dev libboost-numpy-dev libboost-python-dev
+RUN apt-get install -y curl git
 COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
+RUN apt-get install -y cmake dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev 
 COPY --from=build-root /opt/root /opt/root
-RUN apt-get install -y freeglut3-dev
+RUN apt-get install -y libxerces-c-dev libxmu-dev libxi-dev libboost-numpy-dev libboost-python-dev freeglut3-dev
+#Force linking to python3 boost modules
+RUN cp -P /usr/lib/x86_64-linux-gnu/libboost_numpy3.so /usr/lib/x86_64-linux-gnu/libboost_numpy.so
+RUN cp -P /usr/lib/x86_64-linux-gnu/libboost_python3.so /usr/lib/x86_64-linux-gnu/libboost_python.so
 COPY --from=build-geant4 /opt/geant4 /opt/geant4
 RUN apt-get install -y nvidia-cuda-toolkit
 
@@ -87,7 +94,6 @@ WORKDIR /opt/
 ADD https://api.github.com/repos/BenLand100/chroma/git/refs/heads/master /opt/chroma_version.json
 RUN git clone https://github.com/BenLand100/chroma
 WORKDIR /opt/chroma/
-RUN sed -i 's/boost_python/boost_python3/g;s/boost_numpy/boost_numpy3/g' setup.py
 RUN python setup.py develop
 
 CMD ["/bin/bash","-l"]
