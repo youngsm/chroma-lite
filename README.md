@@ -12,10 +12,24 @@ This repository contains a modified version of Chroma that is updated for Python
 
 The `installation` directory contains a `Dockerfile` to build an ubuntu-derived image containing Chroma. This may be a useful reference for other systems. Note that properly linking to boost_python and boost_numpy is nontrivial on systems with both python2 and python3.
 
+Containers are great for packaging dependencies, but CUDA throws an additional constraint that the nvidia-driver version inside the container must match the host nvidia-driver version that created nvidia device nodes. This is because the device nodes created by the host are passed directly to the container. Because of this, likely an image will need to be built for each possible driver version. The included `Dockerfile` targets nvidia-drivers-440.
+
+With the `Dockerfile` configured to your liking, build the image from the `installation` directory. This will take some time, consider grabbing lunch.
+
+`docker build -t chroma3:latest .`
+
 Geant4 data is not included in this image. You should mount some host directory to /opt/geant4/share/Geant4-10.5.1/data/ when launching a container, and run `geant4-config --install-datasets` to download the data on the first run. 
 
 `docker run -v /path/to/host/data:/opt/geant4/share/Geant4-10.5.1/data/ chroma3 geant4-config --install-datasets`
 
 ## Usage
 
-Coming soon!
+To use CUDA within a container, the host's nvidia device nodes must be passed to the container. To see these devices run `grep /dev/*nvidia*`. Each must be passed to docker with the `--device` flag as shown with `for dev in /dev/*nvidia*; do echo --device $dev:$dev; done`
+
+On my machine, this results in a very concise docker run command:
+
+`docker run -v /home/benland100/research/chroma_test/geant4.10.05.p01/share/Geant4-10.5.1/data/:/opt/geant4/share/Geant4-10.5.1/data/ --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl -it chroma3`
+
+To do something useful, you should mount some host directory containing your analysis code and/or data storage to the container with additional `-v host_path:container_path` flags, and work within those directories. Paths not mounted from the host will not be saved when the container exits.
+
+More coming soon!
