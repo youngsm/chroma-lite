@@ -1,11 +1,6 @@
 if [ -e /opt/anaconda3/bin/conda ]; then
     eval "$(/opt/anaconda3/bin/conda shell.bash hook)"
-    export LD_LIBRARY_PATH="/opt/anaconda3/lib:$LD_LIBRARY_PATH"
-fi
-if [ -e /opt/boost ]; then
-    export LD_LIBRARY_PATH="/opt/boost/lib:$LD_LIBRARY_PATH"
-    export PATH="/opt/boost/bin:$PATH"
-    export BOOST_ROOT="/opt/boost"
+    export BOOST_ROOT=/opt/anaconda3
 fi
 if [ -e /opt/root/bin/thisroot.sh ]; then
     source /opt/root/bin/thisroot.sh

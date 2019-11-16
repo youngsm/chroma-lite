@@ -10,7 +10,11 @@ This repository contains a modified version of Chroma that is updated for Python
 
 ## Installation
 
-The `installation` directory contains a `Dockerfile` to build an ubuntu-derived image containing Chroma. There is also an `ubuntu_install.sh` script that will perform an analogous installation on an ubuntu host, and may be a useful reference for other systems. Note that properly linking to boost_python and boost_numpy is nontrivial.
+The `installation` directory contains a `Dockerfile` to build an ubuntu-derived image containing Chroma. This may be a useful reference for other systems. Note that properly linking to boost_python and boost_numpy is nontrivial on systems with both python2 and python3.
+
+Geant4 data is not included in this image. You should mount some host directory to /opt/geant4/share/Geant4-10.5.1/data/ when launching a container, and run `geant4-config --install-datasets` to download the data on the first run. 
+
+`docker run -v /path/to/host/data:/opt/geant4/share/Geant4-10.5.1/data/ chroma3 geant4-config --install-datasets`
 
 ## Usage
 
