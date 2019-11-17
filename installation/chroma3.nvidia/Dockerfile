@@ -30,7 +30,7 @@ RUN curl -O https://root.cern/download/root_v6.18.04.source.tar.gz
 RUN tar xf root_v6.18.04.source.tar.gz
 RUN rm root_v6.18.04.source.tar.gz
 WORKDIR /opt/root-6.18.04/build-root
-RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/root -Dminuit2=ON -Droofit=ON /opt/root-6.18.04
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/root -Ddavix=OFF -Dminuit2=ON -Droofit=ON /opt/root-6.18.04
 RUN make -j12
 RUN make install
 RUN rm -rf /opt/root-6.18.04
@@ -91,7 +91,7 @@ RUN sed -i 's/VIRTUAL_ENV/CONDA_PREFIX/g' setup.py #use anaconda env instead
 RUN python setup.py develop
 
 #Only needed for runtime, confuses the build process
-RUN echo export LD_LIBRARY_PATH=\\"$LD_LIBRARY_PATH:/opt/anaconda3/lib\\" >> /etc/profile.d/chroma_env.sh
+RUN echo 'export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/anaconda3/lib"' >> /etc/profile.d/chroma_env.sh
 
 #For jupyter
 EXPOSE 8888
