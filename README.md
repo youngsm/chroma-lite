@@ -66,3 +66,10 @@ Running this image is straightforward, just remember to mount the Geant4 data. Y
 
 Visualization with OpenGL and simulation with CUDA will work in this container.
 
+### Test drive
+
+After deploying a Singularity container to a GPU-enabled host locally or via SSH with XForwarding enabled, you should be able to run the container and execute 
+
+`chroma-cam @chroma.models.lionsolid`
+
+which should display a GPU-rendered visualization, ensuring everything is working properly.
