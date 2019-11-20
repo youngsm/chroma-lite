@@ -37,7 +37,7 @@ extern "C"
 __global__ void
 render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
        unsigned int alpha_depth, unsigned int *pixels, float *_dx,
-       unsigned int *dxlen, float4 *_color)
+       unsigned int *dxlen, float4 *_color, unsigned int bg_color)
 {
     __shared__ Geometry sg;
 
@@ -50,7 +50,7 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
 	
     if (id >= nthreads)
 	return;
-
+    
     g = &sg;
 
     float3 origin = _origin[id];
@@ -65,7 +65,7 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
     float3 inv_dir = 1.0f / direction;
 
     if (n < 1 && !intersect_node(neg_origin_inv_dir, inv_dir, g, root)) {
-	pixels[id] = 0;
+	pixels[id] = bg_color;
 	return;
     }
 
@@ -142,16 +142,16 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
     
 
     if (n < 1) {
-	pixels[id] = 0;
+	pixels[id] = bg_color;
 	return;
     }
 
     dxlen[id] = n;
 
     float scale = 1.0f;
-    float fr = 0.0f;
-    float fg = 0.0f;
-    float fb = 0.0f;
+    float fr = 0.0;
+    float fg = 0.0;
+    float fb = 0.0;
     for (int i=0; i < n; i++) {
 	float alpha = color_a[i].w;
 	
@@ -161,12 +161,18 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
 	
 	scale *= (1.0f-alpha);
     }
+    float alpha = ((float)((bg_color & 0xFF000000) >> 24))/255.0;
+    fr += scale*((float)((bg_color & 0xFF0000) >> 16))*alpha;
+    fg += scale*((float)((bg_color & 0xFF00) >> 8))*alpha;
+    fb += scale*((float)(bg_color & 0xFF))*alpha;
+    scale *= (1.0f-alpha);
+    
     unsigned int a;
     if (n < alpha_depth)
 	a = floorf(255*(1.0f-scale));
     else
     	a = 255;
-
+    	
     unsigned int red = floorf(fr/(1.0f-scale));
     unsigned int green = floorf(fg/(1.0f-scale));
     unsigned int blue = floorf(fb/(1.0f-scale));

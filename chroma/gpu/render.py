@@ -41,7 +41,7 @@ class GPURays(object):
         self.transform_funcs.translate(np.int32(self.pos.size), self.pos, ga.vec.make_float3(*v), block=(self.nblocks,1,1), grid=(self.pos.size//self.nblocks+1,1))
 
     def render(self, gpu_geometry, pixels, alpha_depth=10,
-               keep_last_render=False):
+               keep_last_render=False,bg_color=0x00000000):
         """Render `gpu_geometry` and fill the GPU array `pixels` with pixel
         colors."""
         if not keep_last_render:
@@ -56,7 +56,7 @@ class GPURays(object):
         if pixels.size != self.pos.size:
             raise ValueError('`pixels`.size != number of rays')
 
-        self.render_funcs.render(np.int32(self.pos.size), self.pos, self.dir, gpu_geometry.gpudata, np.uint32(alpha_depth), pixels, self.dx, self.dxlen, self.color, block=(self.nblocks,1,1), grid=(self.pos.size//self.nblocks+1,1))
+        self.render_funcs.render(np.int32(self.pos.size), self.pos, self.dir, gpu_geometry.gpudata, np.uint32(alpha_depth), pixels, self.dx, self.dxlen, self.color,np.uint32(bg_color), block=(self.nblocks,1,1), grid=(self.pos.size//self.nblocks+1,1))
 
     def snapshot(self, gpu_geometry, alpha_depth=10):
         "Render `gpu_geometry` and return a numpy array of pixel colors."

@@ -115,7 +115,7 @@ class Camera(multiprocessing.Process):
 
         self.nblocks = 64
 
-        self.point = np.array([0, -self.mesh_diagonal_norm,
+        self.point = np.array([(lower_bound[0]+upper_bound[0])/2, -self.mesh_diagonal_norm,
                                (lower_bound[2]+upper_bound[2])/2])
 
         self.axis1 = np.array([0,0,1], float)
@@ -125,9 +125,9 @@ class Camera(multiprocessing.Process):
 
         pos, dir = from_film(self.point, axis1=self.axis1, axis2=self.axis2,
                              size=self.size, width=self.film_width)
-
+                            
         self.rays = gpu.GPURays(pos, dir, max_alpha_depth=self.max_alpha_depth)
-
+        
         self.pixels_gpu = ga.empty(self.npixels, dtype=np.uint32)
 
         self.movie = False
