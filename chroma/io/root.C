@@ -17,7 +17,7 @@ struct Vertex {
   int pdgcode;
   
   std::vector<Vertex> children;
-  std::vector<double> x,y,z,t,px,py,pz,ke,edep;
+  std::vector<double> x,y,z,t,px,py,pz,child_ke,edep;
 
   ClassDef(Vertex, 1);
 };
