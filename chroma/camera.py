@@ -22,6 +22,8 @@ from chroma.loader import create_geometry_from_obj
 import pygame
 from pygame.locals import *
 
+from timeit import default_timer as timer
+
 def bvh_mesh(geometry, layer):
     lower_bounds, upper_bounds = geometry.bvh.get_layer(layer).get_bounds()
 
@@ -383,17 +385,24 @@ class Camera(multiprocessing.Process):
     def update(self):
         if self.display3d:
             self.update_viewing_angle()
-
+                
+        start = timer()
+        
         n = len(self.gpu_geometries)
         for i, gpu_geometry in enumerate(self.gpu_geometries):
             if i == 0:
                 self.update_pixels(gpu_geometry)
             else:
                 self.update_pixels(gpu_geometry, keep_last_render=True)
+        
+        end = timer()
+        #print('render',end-start)
 
+        start = timer()
+        
         if self.display3d:
-            pixels1 = self.pixels1_gpu.get()
-            pixels2 = self.pixels2_gpu.get()
+            pixels1 = self.pixels1_gpu.get(pagelocked=True)
+            pixels2 = self.pixels2_gpu.get(pagelocked=True)
 
             if self.green_magenta:
                 pixels = (pixels1 & 0x00ff00) | (pixels2 & 0xff00ff)
@@ -404,7 +413,10 @@ class Camera(multiprocessing.Process):
 
             pixels |= (alpha << 24)
         else:
-            pixels = self.pixels_gpu.get()
+            pixels = self.pixels_gpu.get(pagelocked=True)
+            
+        end = timer()
+        #print('get',end-start)
 
         pygame.surfarray.blit_array(self.screen, pixels.reshape(self.size))
         if self.doom_mode:
@@ -626,9 +638,11 @@ class Camera(multiprocessing.Process):
         self.window = pygame.display.set_mode(self.size)
         self.screen = pygame.Surface(self.size, pygame.SRCALPHA)
         pygame.display.set_caption('')
-
+        
         self.init_gpu()
-
+        #makes things significantly faster somehow
+        self.rotate(0.001,[1/np.sqrt(2),0,1/np.sqrt(2)])
+        
         if self.spnav:
             try:
                 wm_info = pygame.display.get_wm_info()
