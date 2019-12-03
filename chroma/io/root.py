@@ -23,7 +23,8 @@ if not hasattr(ROOT, 'Vertex') or not hasattr(ROOT, 'Channel'):
         shutil.copy2(src=package_root_C, dst=home_root_C)
     # ACLiC problem with ROOT
     # see http://root.cern.ch/phpBB3/viewtopic.php?f=3&t=14280&start=15
-    ROOT.gSystem.Load('libCint')
+    # no longer an issue for root 6+
+    # ROOT.gSystem.Load('libCint')
     # Import this C file for access to data structure
     ROOT.gROOT.ProcessLine('.L '+home_root_C+'+')
 

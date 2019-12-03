@@ -684,6 +684,7 @@ class EventViewer(Camera):
     CHARGE = 0
     TIME = 1
     HIT = 2
+    EVENODD = 3
 
     def __init__(self, geometry, filename, **kwargs):
         Camera.__init__(self, geometry, **kwargs)
@@ -691,6 +692,7 @@ class EventViewer(Camera):
         # avoid slowing down the import of this module
         from chroma.io.root import RootReader
         self.rr = RootReader(filename)
+        self.ev = None
         self.display_mode = EventViewer.CHARGE
         self.sum_mode = False
         self.photon_display_iter = itertools.cycle(['beg','end'])
@@ -744,7 +746,7 @@ class EventViewer(Camera):
         from chroma.color import map_to_color
         self.gpu_geometry.reset_colors()
 
-        if self.ev.channels is None:
+        if self.ev is None or self.ev.channels is None:
             return
 
         if self.sum_mode:
@@ -772,6 +774,12 @@ class EventViewer(Camera):
         elif self.display_mode == EventViewer.HIT:
             channel_color = map_to_color(hit, range=(hit.min(), hit.max()))
             print('hit')#, hit.min(), hit.max()
+        elif self.display_mode == EventViewer.EVENODD:
+            channel_color = np.zeros_like(hit,dtype=np.uint32)
+            channel_color[::2] |= np.asarray(np.where(hit[::2],0x0000ff,0),dtype=np.uint32)
+            channel_color[::2] |= np.asarray(np.where(hit[1::2],0xff0000,0),dtype=np.uint32)
+            print(np.unique(channel_color))
+            print('evenodd')#, hit.min(), hit.max()
 
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
         solid_color = np.zeros(len(self.geometry.mesh.triangles), dtype=np.uint32)
@@ -816,10 +824,10 @@ class EventViewer(Camera):
                     self.update()
                 return
             elif event.key == K_PERIOD:
-                self.display_mode = (self.display_mode + 1) % 3
+                self.display_mode = (self.display_mode + 1) % 4
                 self.color_hit_pmts()
 
-                if not self.sum_mode and self.ev.photons_beg is not None:
+                if not self.sum_mode and self.ev is not None and self.ev.photons_beg is not None:
                     self.render_particle_track()
 
                 self.update()
