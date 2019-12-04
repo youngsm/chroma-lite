@@ -33,13 +33,15 @@ def bvh_mesh(geometry, layer):
     dx, dy, dz = upper_bounds[0] - lower_bounds[0]
     center = np.mean([upper_bounds[0],lower_bounds[0]], axis=0)
 
-    mesh = make.box(dx, dy, dz, center)
+    geometry = Geometry()
+    
+    geometry.add_solid(Solid(make.box(dx,dy,dz,center), vacuum, vacuum, color=0x33ffffff))
 
-    for center, dx, dy, dz in zip(np.mean([lower_bounds,upper_bounds],axis=0),
-                                  *list(zip(*upper_bounds-lower_bounds)))[1:]:
-        mesh += make.box(dx,dy,dz,center)
-
-    return mesh
+    for center, dx, dy, dz in list(zip(np.mean([lower_bounds,upper_bounds],axis=0),
+                                  *list(zip(*upper_bounds-lower_bounds))))[1:]:
+        geometry.add_solid(Solid(make.box(dx,dy,dz,center), vacuum, vacuum, color=0x33ffffff))
+    
+    return create_geometry_from_obj(geometry)
 
 def encode_movie(dir):
     root, ext = 'movie', 'avi'
@@ -58,11 +60,15 @@ def encode_movie(dir):
 
 class Camera(multiprocessing.Process):
     "The camera class is used to render a Geometry object."
-    def __init__(self, geometry, size=(800,600), device_id=None):
+    def __init__(self, geometry, size=(800,600), device_id=None, background=0x00000000):
+        '''
+        background is a 0xAARRGGBB 32bit color to use for points at infinity. alpha=255 is opaque
+        '''
         super(Camera, self).__init__()
         self.geometry = geometry
         self.device_id = device_id
         self.size = size
+        self.background = background
 
         self.bvh_layer_count = len(self.geometry.bvh.layer_offsets)
         self.currentlayer = None
@@ -329,12 +335,15 @@ class Camera(multiprocessing.Process):
         else:
             if self.display3d:
                 self.rays1.render(gpu_geometry, self.pixels1_gpu,
-                                  self.alpha_depth, keep_last_render)
+                                  self.alpha_depth, keep_last_render, 
+                                  bg_color=self.background)
                 self.rays2.render(gpu_geometry, self.pixels2_gpu,
-                                  self.alpha_depth, keep_last_render)
+                                  self.alpha_depth, keep_last_render, 
+                                  bg_color=self.background)
             else:
                 self.rays.render(gpu_geometry, self.pixels_gpu,
-                                 self.alpha_depth, keep_last_render)
+                                 self.alpha_depth, keep_last_render, 
+                                  bg_color=self.background)
 
     def update_viewing_angle(self):
         if self.display3d:
@@ -436,7 +445,7 @@ class Camera(multiprocessing.Process):
             try:
                 gpu_geometry = self.bvh_layers[layer]
             except KeyError:
-                geometry = create_geometry_from_obj(bvh_mesh(self.geometry, layer))
+                geometry = bvh_mesh(self.geometry, layer)
                 gpu_geometry = gpu.GPUGeometry(geometry, print_usage=False)
                 self.bvh_layers[layer] = gpu_geometry
 
@@ -527,7 +536,7 @@ class Camera(multiprocessing.Process):
 
             elif event.key == K_PAGEDOWN:
                 if self.currentlayer is None:
-                    self.currentlayer = self.bvh_layer_count - 1
+                    self.currentlayer = None
                 else:
                     if self.currentlayer > 0:
                         self.currentlayer -= 1
@@ -776,9 +785,8 @@ class EventViewer(Camera):
             print('hit')#, hit.min(), hit.max()
         elif self.display_mode == EventViewer.EVENODD:
             channel_color = np.zeros_like(hit,dtype=np.uint32)
-            channel_color[::2] |= np.asarray(np.where(hit[::2],0x0000ff,0),dtype=np.uint32)
-            channel_color[::2] |= np.asarray(np.where(hit[1::2],0xff0000,0),dtype=np.uint32)
-            print(np.unique(channel_color))
+            channel_color[::2] |= (255*hit[::2]/np.max(hit[::2])).astype(np.uint32)
+            channel_color[::2] |= (255*hit[1::2]/np.max(hit[1::2])).astype(np.uint32)<<16
             print('evenodd')#, hit.min(), hit.max()
 
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
@@ -796,7 +804,7 @@ class EventViewer(Camera):
                 self.render_particle_track()
                 self.update()
 
-            if event.key == K_PAGEUP and not self.sum_mode:
+            if event.key == K_RIGHT and not self.sum_mode:
                 try:
                     self.ev = next(self.rr)
                 except StopIteration:
@@ -810,7 +818,7 @@ class EventViewer(Camera):
                     self.update()
                 return
 
-            elif event.key == K_PAGEDOWN and not self.sum_mode:
+            elif event.key == K_LEFT and not self.sum_mode:
                 try:
                     self.ev = self.rr.prev()
                 except StopIteration:

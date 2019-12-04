@@ -26,10 +26,9 @@ class Detector(Geometry):
         Geometry.__init__(self, detector_material=detector_material)
 
         # Using numpy arrays here to allow for fancy indexing
-        self.solid_id_to_channel_index = np.zeros(0, dtype=np.int32)
-        self.channel_index_to_solid_id = np.zeros(0, dtype=np.int32)
-
-        self.channel_index_to_channel_id = np.zeros(0, dtype=np.int32)
+        self.solid_id_to_channel_index = []
+        self.channel_index_to_solid_id = []
+        self.channel_index_to_channel_id = []
 
         # If the ID numbers are arbitrary, we can't treat them
         # as array indices, so have to use a dictionary
@@ -47,8 +46,7 @@ class Detector(Geometry):
         """
         solid_id = Geometry.add_solid(self, solid=solid, rotation=rotation, 
                                       displacement=displacement)
-        self.solid_id_to_channel_index.resize(solid_id+1)
-        self.solid_id_to_channel_index[solid_id] = -1 # solid maps to no channel
+        self.solid_id_to_channel_index.append(-1) # solid maps to no channel
         return solid_id
 
     def add_pmt(self, pmt, rotation=None, displacement=None, channel_id=None):
@@ -86,11 +84,8 @@ class Detector(Geometry):
         # add_solid resized this array already
         self.solid_id_to_channel_index[solid_id] = channel_index
 
-        # resize channel_index arrays before filling
-        self.channel_index_to_solid_id.resize(channel_index+1)
-        self.channel_index_to_solid_id[channel_index] = solid_id
-        self.channel_index_to_channel_id.resize(channel_index+1)
-        self.channel_index_to_channel_id[channel_index] = channel_id
+        self.channel_index_to_solid_id.append(solid_id)
+        self.channel_index_to_channel_id.append(channel_id)
 
         # dictionary does not need resizing
         self.channel_id_to_channel_index[channel_id] = channel_index
@@ -139,3 +134,10 @@ class Detector(Geometry):
 
     def num_channels(self):
         return len(self.channel_index_to_channel_id)
+        
+    def flatten(self):
+        self.solid_id_to_channel_index = np.asarray(self.solid_id_to_channel_index, dtype=np.int32)
+        self.channel_index_to_solid_id = np.asarray(self.channel_index_to_solid_id, dtype=np.int32)
+        self.channel_index_to_channel_id = np.asarray(self.channel_index_to_channel_id, dtype=np.int32)
+        Geometry.flatten(self)
+        
