@@ -2,7 +2,7 @@ FROM benland100/chroma3:deps
 MAINTAINER Benjamin Land <benland100@gmail.com>
 
 USER root
-RUN apt-get install -y nvidia-cuda-toolkit
+RUN apt-get update && apt-get install -y nvidia-cuda-toolkit
 
 WORKDIR /opt/
 ADD https://api.github.com/repos/BenLand100/chroma/git/refs/heads/master /opt/chroma_version.json

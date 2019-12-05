@@ -3,8 +3,7 @@ MAINTAINER Benjamin Land <benland100@gmail.com>
 
 COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
-RUN apt-get update 
-RUN apt-get install -y curl git
+RUN apt-get update && apt-get install -y curl git
 
 WORKDIR /opt/
 RUN curl -O https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-x86_64.sh
@@ -20,10 +19,9 @@ MAINTAINER Benjamin Land <benland100@gmail.com>
 USER root
 COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
-RUN apt-get update 
-RUN apt-get install -y curl git
+RUN apt-get update && apt-get install -y curl git
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
-RUN apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
+RUN apt-get update && apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
 
 WORKDIR /opt/
 RUN curl -O https://root.cern/download/root_v6.18.04.source.tar.gz
@@ -41,12 +39,11 @@ MAINTAINER Benjamin Land <benland100@gmail.com>
 USER root
 COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
-RUN apt-get update 
-RUN apt-get install -y curl git
+RUN apt-get update && apt-get install -y curl git
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
-RUN apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
+RUN apt-get update && apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
 COPY --from=build-root /opt/root /opt/root
-RUN apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev
+RUN apt-get update && apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev
 
 WORKDIR /opt/
 RUN curl -O https://geant4-data.web.cern.ch/geant4-data/releases/geant4.10.05.p01.tar.gz
@@ -75,12 +72,11 @@ MAINTAINER Benjamin Land <benland100@gmail.com>
 USER root
 COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
-RUN apt-get update 
-RUN apt-get install -y curl git
+RUN apt-get update && apt-get install -y curl git
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
-RUN apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
+RUN apt-get update && apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
 COPY --from=build-root /opt/root /opt/root
-RUN apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev
+RUN apt-get update && apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev
 COPY --from=build-geant4 /opt/geant4 /opt/geant4
 
 CMD ["/bin/bash","-l"]
