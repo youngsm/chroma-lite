@@ -11,6 +11,8 @@ from chroma.tools import profile_if_possible
 
 import pycuda.driver as cuda
 
+from timeit import default_timer as timer
+
 def pick_seed():
     """Returns a seed for a random number generator selected using
     a mixture of the current time and the current process ID."""
@@ -52,48 +54,67 @@ class Simulation(object):
 
         self.pdf_config = None
      
-    def _simulate_batch(self,batch_events,keep_photons_beg=False,keep_photons_end=False,keep_hits=True,run_daq=False, max_steps=100):
+    def _simulate_batch(self,batch_events,keep_photons_beg=False,keep_photons_end=False,keep_hits=True,run_daq=False, max_steps=100, verbose=False):
         '''Assumes batch_events is a list of Event objects with photons_beg having evidx set to the index in the array.
            
            Yields the fully formed events. Do not call directly.'''
         
+        t_start = timer()
+        
+        #Idea: allocate memory on gpu and copy photons into it, instead of concatenating on CPU?
         batch_photons = event.Photons.join([ev.photons_beg for ev in batch_events])
+        batch_bounds = np.concatenate([[0],np.where(batch_photons.evidx[1:] != batch_photons.evidx[:-1])[0]+1,[len(batch_photons.evidx)]])
         
         #This copy to gpu has a _lot_ of overhead, want 100k photons at least, hence batches
-        gpu_photons = gpu.GPUPhotons(batch_photons)
-
+        #Assume flags, triangles, and weights are unimportant to copy to GPU
+        t_copy_start = timer()
+        gpu_photons = gpu.GPUPhotons(batch_photons,copy_flags=False,copy_triangles=False,copy_weights=False)
+        t_copy_end = timer()
+        if verbose:
+            print('GPU copy took %0.2f s' % (t_copy_end-t_copy_start))
+        
+        t_prop_start = timer()
         gpu_photons.propagate(self.gpu_geometry, self.rng_states,
                               nthreads_per_block=self.nthreads_per_block,
                               max_blocks=self.max_blocks,
                               max_steps=max_steps)
+        t_prop_end = timer()
+        if verbose:
+            print('GPU propagate took %0.2f s' % (t_prop_end-t_prop_start))
+                              
+        t_end = timer()
+        if verbose:
+            print('Batch took %0.2f s' % (t_end-t_start))
 
         if keep_photons_end:
             batch_photons_end = gpu_photons.get()
             
         if hasattr(self.detector, 'num_channels') and keep_hits:
             batch_hits = gpu_photons.get_hits(self.gpu_geometry)
-
-        if hasattr(self, 'gpu_daq') and run_daq:
-            self.gpu_daq.begin_acquire()
-            self.gpu_daq.acquire(gpu_photons, self.rng_states, nthreads_per_block=self.nthreads_per_block, max_blocks=self.max_blocks)
-            gpu_channels = self.gpu_daq.end_acquire()
-            batch_channels = gpu_channels.get()
                 
-        for i,batch_ev in enumerate(batch_events):
+        for i,(batch_ev,(start_photon,end_photon)) in enumerate(zip(batch_events,zip(batch_bounds[:-1],batch_bounds[1:]))):
                     
             if not keep_photons_beg:
                 batch_ev.photons_beg = None
                         
             if keep_photons_end:
-                batch_mask = batch_photons_end.evidx == i
-                batch_ev.photons_end = batch_photons_end[batch_mask]
+                batch_ev.photons_end = batch_photons_end[start_photon:end_photon]
                         
             if hasattr(self.detector, 'num_channels') and keep_hits:
+                #Thought: this is kind of expensive computationally, but keep_hits is for diagnostics
                 batch_ev.hits = {chan:batch_hits[chan][batch_hits[chan].evidx == i] for chan in batch_hits}
                 batch_ev.hits = {chan:batch_ev.hits[chan] for chan in batch_ev.hits if len(batch_ev.hits[chan]) > 0}
                         
             if hasattr(self, 'gpu_daq') and run_daq:
-                pass #fixme add channels eventually
+                #Must run DAQ per event, or design a much more complicated daq algorithm
+                self.gpu_daq.begin_acquire()
+                self.gpu_daq.acquire(gpu_photons, self.rng_states, 
+                                     start_photon=start_photon, 
+                                     nphotons=(end_photon-start_photon),
+                                     nthreads_per_block=self.nthreads_per_block, 
+                                     max_blocks=self.max_blocks)
+                gpu_channels = self.gpu_daq.end_acquire()
+                batch_ev.channels = gpu_channels.get()
                     
             yield batch_ev
 

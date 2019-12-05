@@ -11,7 +11,7 @@ from chroma.gpu.tools import get_cu_module, cuda_options, GPUFuncs, \
 
 
 class GPUPhotons(object):
-    def __init__(self, photons, ncopies=1):
+    def __init__(self, photons, ncopies=1, copy_flags=True, copy_triangles=True, copy_weights=True):
         """Load ``photons`` onto the GPU, replicating as requested.
 
            Args:
@@ -33,8 +33,16 @@ class GPUPhotons(object):
         self.wavelengths = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
         self.t = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
         self.last_hit_triangles = ga.empty(shape=nphotons*ncopies, dtype=np.int32)
-        self.flags = ga.empty(shape=nphotons*ncopies, dtype=np.uint32)
-        self.weights = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
+        if not copy_triangles:
+            self.last_hit_triangles.fill(-1)
+        if not copy_flags:
+            self.flags = ga.zeros(shape=nphotons*ncopies, dtype=np.uint32)
+        else:
+            self.flags = ga.empty(shape=nphotons*ncopies, dtype=np.uint32)
+        if not copy_weights:
+            self.weights = ga.ones_like(self.last_hit_triangles, dtype=np.float32)
+        else:
+            self.weights = ga.empty(shape=nphotons*ncopies, dtype=np.float32)
         self.evidx = ga.empty(shape=nphotons, dtype=np.uint32)
 
         # Assign the provided photons to the beginning (possibly
@@ -44,9 +52,12 @@ class GPUPhotons(object):
         self.pol[:nphotons].set(to_float3(photons.pol))
         self.wavelengths[:nphotons].set(photons.wavelengths.astype(np.float32))
         self.t[:nphotons].set(photons.t.astype(np.float32))
-        self.last_hit_triangles[:nphotons].set(photons.last_hit_triangles.astype(np.int32))
-        self.flags[:nphotons].set(photons.flags.astype(np.uint32))
-        self.weights[:nphotons].set(photons.weights.astype(np.float32))
+        if copy_triangles:
+            self.last_hit_triangles[:nphotons].set(photons.last_hit_triangles.astype(np.int32))
+        if copy_flags:
+            self.flags[:nphotons].set(photons.flags.astype(np.uint32))
+        if copy_weights:
+            self.weights[:nphotons].set(photons.weights.astype(np.float32))
         self.evidx[:nphotons].set(photons.evidx.astype(np.uint32))
 
         module = get_cu_module('propagate.cu', options=cuda_options)
