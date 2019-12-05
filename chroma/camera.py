@@ -767,7 +767,7 @@ class EventViewer(Camera):
             hit = self.ev.channels.hit
             t = self.ev.channels.t
             q = self.ev.channels.q
-            select = hit
+            select = hit[:]
 
         # Important: Compute range only with HIT channels
         if self.display_mode == EventViewer.CHARGE:
@@ -787,12 +787,17 @@ class EventViewer(Camera):
             channel_color = np.zeros_like(hit,dtype=np.uint32)
             channel_color[::2] |= (255*hit[::2]/np.max(hit[::2])).astype(np.uint32)
             channel_color[::2] |= (255*hit[1::2]/np.max(hit[1::2])).astype(np.uint32)<<16
+            select[1::2] = 0
             print('evenodd')#, hit.min(), hit.max()
 
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
         solid_color = np.zeros(len(self.geometry.mesh.triangles), dtype=np.uint32)
 
-        solid_hit[self.geometry.channel_index_to_solid_id] = select
+        #solid_hit[self.geometry.channel_index_to_solid_id] = select
+        #all but hit PMTs transparent
+        solid_hit[:] = True 
+        solid_color[:] = 0xFF000000
+        channel_color[np.logical_not(select)] = 0xFF000000
         solid_color[self.geometry.channel_index_to_solid_id] = channel_color
 
         self.gpu_geometry.color_solids(solid_hit, solid_color)
