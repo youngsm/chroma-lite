@@ -13,7 +13,9 @@ done
 
 for sing in chroma3.*/Singularity; do
     dir=$(dirname $sing)
-    image="$dir.simg"
+    cd $dir
+    image="../$dir.simg"
     echo $image
-    singularity build $image $dir
+    singularity build $image Singularity
+    cd ..
 done

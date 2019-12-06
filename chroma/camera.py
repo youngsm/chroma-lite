@@ -767,7 +767,7 @@ class EventViewer(Camera):
             hit = self.ev.channels.hit
             t = self.ev.channels.t
             q = self.ev.channels.q
-            select = hit[:]
+            select = hit.copy()
 
         # Important: Compute range only with HIT channels
         if self.display_mode == EventViewer.CHARGE:
