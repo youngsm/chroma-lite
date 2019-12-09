@@ -7,6 +7,8 @@
 #include <G4TrajectoryContainer.hh>
 #include "G4SystemOfUnits.hh"
 #include "G4PhysicalConstants.hh"
+#include <G4Alpha.hh>
+#include <G4Neutron.hh>
 
 #include <iostream>
 
@@ -24,7 +26,11 @@ ChromaPhysicsList::ChromaPhysicsList():  G4VModularPhysicsList()
   opticalPhysics->Configure(kScintillation,false);
   RegisterPhysics( opticalPhysics );
   // Scintillation (handled by stepping!)
-  new GLG4Scint();
+  new GLG4Scint(); 
+  double neutronMass = G4Neutron::Neutron()->GetPDGMass();
+  new GLG4Scint("neutron", 0.9*neutronMass);
+  double alphaMass = G4Alpha::Alpha()->GetPDGMass();
+  new GLG4Scint("alpha", 0.9*alphaMass);
 }
 
 ChromaPhysicsList::~ChromaPhysicsList()

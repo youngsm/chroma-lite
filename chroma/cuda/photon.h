@@ -128,8 +128,6 @@ fill_state(State &s, Photon &p, Geometry *g)
                                           material1->absorption_length);
     s.scattering_length = interp_property(material1, p.wavelength,
                                           material1->scattering_length);
-    s.reemission_prob = interp_property(material1, p.wavelength,
-                                        material1->reemission_prob);
 
     s.material1 = material1;
 } // fill_state
@@ -197,7 +195,7 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
     float absorption_distance = -s.absorption_length*logf(curand_uniform(&rng));
     float scattering_distance = -s.scattering_length*logf(curand_uniform(&rng));
 
-    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD && s.reemission_prob == 0) // Prevent absorption
+    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD) // Prevent absorption
         absorption_distance = 1e30;
     else
         use_weights = false;
@@ -235,13 +233,33 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
         if (absorption_distance <= s.distance_to_boundary) {
             p.time += absorption_distance/(SPEED_OF_LIGHT/s.refractive_index1);
             p.position += absorption_distance*p.direction;
-
+            
+            if (s.material1->num_comp == 0) {
+                p.last_hit_triangle = -1;
+                p.history |= BULK_ABSORB;
+                return BREAK;
+            }
+            
+            float uniform_sample_comp = curand_uniform(&rng);
+            float prob = 0.0f;
+            int comp;
+            for (comp = 0; ; comp++) {
+                float comp_abs = interp_property(s.material1, p.wavelength, s.material1->comp_absorption_length[comp]);
+                prob += s.absorption_length/comp_abs;
+                if (uniform_sample_comp < prob or comp+1 == s.material1->num_comp) break;
+            }
+            
             float uniform_sample_reemit = curand_uniform(&rng);
-            if (uniform_sample_reemit < s.reemission_prob) {
-                p.wavelength = sample_cdf(&rng, s.material1->n, 
-                                          s.material1->wavelength0,
-                                          s.material1->step,
-                                          s.material1->reemission_cdf);
+            float comp_reemit_prob = interp_property(s.material1, p.wavelength, s.material1->comp_reemission_prob[comp]);
+            if (uniform_sample_reemit < comp_reemit_prob) {
+                p.wavelength = sample_cdf(&rng, s.material1->wavelength_n, 
+                                          s.material1->wavelength_start,
+                                          s.material1->wavelength_step,
+                                          s.material1->comp_reemission_wvl_cdf[comp]);
+                p.time += sample_cdf(&rng, s.material1->time_n, 
+                                          s.material1->time_start,
+                                          s.material1->time_step,
+                                          s.material1->comp_reemission_time_cdf[comp]);
                 p.direction = uniform_sphere(&rng);
                 p.polarization = cross(uniform_sphere(&rng), p.direction);
                 p.polarization /= norm(p.polarization);
@@ -559,7 +577,7 @@ propagate_at_wls(Photon &p, State &s, curandState &rng, Surface *surface, bool u
         float uniform_sample_reemit = curand_uniform(&rng);
         if (uniform_sample_reemit < reemit) {
             p.history |= SURFACE_REEMIT;
-            p.wavelength = sample_cdf(&rng, surface->n, surface->wavelength0, surface->step, surface->reemission_cdf);
+            p.wavelength = sample_cdf(&rng, surface->wavelength_n, surface->wavelength_start, surface->wavelength_step, surface->reemission_cdf);
             p.direction = uniform_sphere(&rng);
             p.polarization = cross(uniform_sphere(&rng), p.direction);
             p.polarization /= norm(p.polarization);

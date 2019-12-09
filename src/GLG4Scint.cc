@@ -110,12 +110,9 @@ G4double GLG4Scint::totEdep_time            = 0.0;
 G4ThreeVector GLG4Scint::scintCentroidSum(0.0, 0.0, 0.0);
 G4double GLG4Scint::QuenchingFactor = 1.0;
 G4bool   GLG4Scint::UserQF          = false;
-G4String GLG4Scint::fPrimaryName    = G4String();
-G4double GLG4Scint::fPrimaryEnergy  = 0;
 DummyProcess GLG4Scint::scintProcess("Scintillation", fUserDefined);
 DummyProcess GLG4Scint::reemissionProcess("Reemission", fUserDefined);
 std::vector<DummyProcess *> GLG4Scint::reemissionProcessVector;
-G4int GLG4Scint::fPhotonCount;
 
 // ///////////////
 // Constructors

@@ -212,8 +212,11 @@ class Material(object):
         self.scintillation_light_yield = None
         self.scintillation_waveform = None
         self.scintillation_mod = None
-        self.set('reemission_prob', 0)
-        self.set('reemission_cdf', 0)
+        self.comp_reemission_prob = []
+        self.comp_reemission_wvl_cdf = []
+        self.comp_reemission_times = []
+        self.comp_reemission_time_cdf = []
+        self.comp_absorption_length = []
         self.density = 0.0 # g/cm^3
         self.composition = {} # by mass
 

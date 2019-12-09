@@ -63,15 +63,15 @@ template <class T>
 __device__ float
 interp_property(T *m, const float &x, const float *fp)
 {
-    if (x < m->wavelength0)
+    if (x < m->wavelength_start)
 	return fp[0];
 
-    if (x > (m->wavelength0 + (m->n-1)*m->step))
-	return fp[m->n-1];
+    if (x > (m->wavelength_start + (m->wavelength_n-1)*m->wavelength_step))
+	return fp[m->wavelength_n-1];
 
-    int jl = (x-m->wavelength0)/m->step;
+    int jl = (x-m->wavelength_start)/m->wavelength_step;
 
-    return fp[jl] + (x-(m->wavelength0 + jl*m->step))*(fp[jl+1]-fp[jl])/m->step;
+    return fp[jl] + (x-(m->wavelength_start + jl*m->wavelength_step))*(fp[jl+1]-fp[jl])/m->wavelength_step;
 }
 
 #endif

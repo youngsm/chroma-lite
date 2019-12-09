@@ -688,12 +688,19 @@ class Camera(multiprocessing.Process):
 
         self.context.pop()
 
+def gen_rot(a,b):
+    '''Construct a matrix to rotate vector a to vector b'''
+    a = a/np.linalg.norm(a)
+    b = b/np.linalg.norm(b)
+    if (a==b).all():
+        return np.diag([1.,1.,1.])
+    if (a==-b).all():
+        return np.diag([-1.,-1.,-1.])
+    v = np.cross(a,b)
+    c = np.arccos(-np.dot(a,b))
+    return transform.make_rotation_matrix(c,v)
+    
 class EventViewer(Camera):
-    # Constants for display_mode
-    CHARGE = 0
-    TIME = 1
-    HIT = 2
-    EVENODD = 3
 
     def __init__(self, geometry, filename, **kwargs):
         Camera.__init__(self, geometry, **kwargs)
@@ -702,9 +709,10 @@ class EventViewer(Camera):
         from chroma.io.root import RootReader
         self.rr = RootReader(filename)
         self.ev = None
-        self.display_mode = EventViewer.CHARGE
+        self.display_mode_iter = itertools.cycle(['charge','time','hit','dichroicon'])
+        self.display_mode = next(self.display_mode_iter)
         self.sum_mode = False
-        self.photon_display_iter = itertools.cycle(['beg','end'])
+        self.photon_display_iter = itertools.cycle(['none','beg','end'])
         self.photon_display_mode = next(self.photon_display_iter)
 
     def render_particle_track(self):
@@ -713,16 +721,25 @@ class EventViewer(Camera):
         pyramid = make.linear_extrude([-x/2,0,x/2], [-h/2,h/2,-h/2], h,
                                       [0]*3, [0]*3)
         marker = Solid(pyramid, vacuum, vacuum)
-
-        if self.photon_display_mode == 'beg':
+        
+        if self.ev is None:
+            return
+        
+        if self.photon_display_mode == 'none':
+            return
+        elif self.photon_display_mode == 'beg':
             photons = self.ev.photons_beg
         else:
             photons = self.ev.photons_end
-
+        
+        if photons is None:
+            return
+        
         geometry = Geometry()
-        sample_factor = max(1, len(photons.pos) / 10000)
-        for pos in photons.pos[::sample_factor]:
-            geometry.add_solid(marker, displacement=pos, rotation=make_rotation_matrix(np.random.uniform(0,2*np.pi), uniform_sphere()))
+        sample_factor = max(1, len(photons.pos) // 10000)
+        subset = photons[::sample_factor]
+        for p,d,w in zip(subset.pos,subset.dir,subset.wavelengths):
+            geometry.add_solid(marker, displacement=p, rotation=gen_rot([0,1,0],d))
 
         geometry = create_geometry_from_obj(geometry)
         gpu_geometry = gpu.GPUGeometry(geometry)
@@ -770,26 +787,22 @@ class EventViewer(Camera):
             select = hit.copy()
 
         # Important: Compute range only with HIT channels
-        if self.display_mode == EventViewer.CHARGE:
+        if self.display_mode == 'charge':
             channel_color = map_to_color(q, range=(q[select].min(),q[select].max()))
-            print('charge')
-        elif self.display_mode == EventViewer.TIME:
+        elif self.display_mode == 'time':
             if self.sum_mode:
                 crange = (t[select].min(), t[select].max())
             else:
                 crange = (t[select].min(), t[select].mean())
             channel_color = map_to_color(t, range=crange)
-            print('time')#, crange
-        elif self.display_mode == EventViewer.HIT:
+        elif self.display_mode == 'hit':
             channel_color = map_to_color(hit, range=(hit.min(), hit.max()))
-            print('hit')#, hit.min(), hit.max()
-        elif self.display_mode == EventViewer.EVENODD:
+        elif self.display_mode == 'dichroicon':
             channel_color = np.zeros_like(hit,dtype=np.uint32)
             channel_color[::2] |= (255*hit[::2]/np.max(hit[::2])).astype(np.uint32)
             channel_color[::2] |= (255*hit[1::2]/np.max(hit[1::2])).astype(np.uint32)<<16
             select[1::2] = 0
-            print('evenodd')#, hit.min(), hit.max()
-
+            
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
         solid_color = np.zeros(len(self.geometry.mesh.triangles), dtype=np.uint32)
 
@@ -805,7 +818,7 @@ class EventViewer(Camera):
     def process_event(self, event):
         if event.type == KEYDOWN:
             if event.key == K_t:
-                self.photon_display_mode = next(self.photon_display_iter)
+                self.photon_display_mode = next(self.display_mode_iter)
                 self.render_particle_track()
                 self.update()
 
@@ -837,12 +850,9 @@ class EventViewer(Camera):
                     self.update()
                 return
             elif event.key == K_PERIOD:
-                self.display_mode = (self.display_mode + 1) % 4
+                self.display_mode = next(self.display_mode_iter)
                 self.color_hit_pmts()
-
-                if not self.sum_mode and self.ev is not None and self.ev.photons_beg is not None:
-                    self.render_particle_track()
-
+                self.render_particle_track()
                 self.update()
                 return
             elif event.key == K_s:

@@ -299,11 +299,8 @@ protected:
     // User-given (constant) quenching factor flag
     static G4bool UserQF;
 
-    static G4String fPrimaryName;
-    static G4double fPrimaryEnergy;
     static std::vector<DummyProcess *> reemissionProcessVector;
-    static G4int fPhotonCount;
-
+    
     // precision goal for the iterative time delay
     static double TimePrecGoal;
 

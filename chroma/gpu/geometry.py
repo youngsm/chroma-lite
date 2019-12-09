@@ -11,7 +11,7 @@ from chroma.gpu.tools import get_cu_module, get_cu_source, cuda_options, \
 from chroma.log import logger
 
 class GPUGeometry(object):
-    def __init__(self, geometry, wavelengths=None, print_usage=False, min_free_gpu_mem=300e6):
+    def __init__(self, geometry, wavelengths=None, times=None, print_usage=False, min_free_gpu_mem=300e6):
         if wavelengths is None:
             wavelengths = standard_wavelengths
 
@@ -19,6 +19,15 @@ class GPUGeometry(object):
             wavelength_step = np.unique(np.diff(wavelengths)).item()
         except ValueError:
             raise ValueError('wavelengths must be equally spaced apart.')
+            
+        if times is None:
+            time_step = 0.05
+            times = np.arange(0,1000,time_step)
+        else:
+            try:
+                time_step = np.unique(np.diff(times)).item()
+            except ValueError:
+                raise ValueError('times must be equally spaced apart.')
 
         geometry_source = get_cu_source('geometry_types.h')
         material_struct_size = characterize.sizeof('Material', geometry_source)
@@ -47,26 +56,46 @@ class GPUGeometry(object):
             absorption_length_gpu = ga.to_gpu(absorption_length)
             scattering_length = interp_material_property(wavelengths, material.scattering_length)
             scattering_length_gpu = ga.to_gpu(scattering_length)
-            reemission_prob = interp_material_property(wavelengths, material.reemission_prob)
-            reemission_prob_gpu = ga.to_gpu(reemission_prob)
-            reemission_cdf = interp_material_property(wavelengths, material.reemission_cdf)
-            reemission_cdf_gpu = ga.to_gpu(reemission_cdf)
+            num_comp = len(material.comp_reemission_prob)
+            comp_reemission_prob_gpu = [ga.to_gpu(interp_material_property(wavelengths, component)) for component in material.comp_reemission_prob]
+            self.material_data.append(comp_reemission_prob_gpu)
+            comp_reemission_prob_gpu = np.uint64(0) if len(comp_reemission_prob_gpu) == 0 else make_gpu_struct(8*len(comp_reemission_prob_gpu), comp_reemission_prob_gpu)
+            assert num_comp == len(material.comp_reemission_wvl_cdf), 'component arrays must be same length'
+            comp_reemission_wvl_cdf_gpu = [ga.to_gpu(interp_material_property(wavelengths, component)) for component in material.comp_reemission_wvl_cdf]
+            self.material_data.append(comp_reemission_wvl_cdf_gpu)
+            comp_reemission_wvl_cdf_gpu = np.uint64(0) if len(comp_reemission_wvl_cdf_gpu) == 0 else make_gpu_struct(8*len(comp_reemission_wvl_cdf_gpu), comp_reemission_wvl_cdf_gpu)
+            assert num_comp == len(material.comp_reemission_time_cdf), 'component arrays must be same length'
+            comp_reemission_time_cdf_gpu = [ga.to_gpu(interp_material_property(times, component)) for component in material.comp_reemission_time_cdf]
+            self.material_data.append(comp_reemission_time_cdf_gpu)
+            comp_reemission_time_cdf_gpu = np.uint64(0) if len(comp_reemission_time_cdf_gpu) == 0 else make_gpu_struct(8*len(comp_reemission_time_cdf_gpu), comp_reemission_time_cdf_gpu)
+            assert num_comp == len(material.comp_absorption_length), 'component arrays must be same length'
+            comp_absorption_length_gpu = [ga.to_gpu(interp_material_property(wavelengths, component)) for component in material.comp_absorption_length]
+            self.material_data.append(comp_absorption_length_gpu)
+            comp_absorption_length_gpu = np.uint64(0) if len(comp_absorption_length_gpu) == 0 else make_gpu_struct(8*len(comp_absorption_length_gpu), comp_absorption_length_gpu)
 
             self.material_data.append(refractive_index_gpu)
             self.material_data.append(absorption_length_gpu)
             self.material_data.append(scattering_length_gpu)
-            self.material_data.append(reemission_prob_gpu)
-            self.material_data.append(reemission_cdf_gpu)
+            self.material_data.append(comp_reemission_prob_gpu)
+            self.material_data.append(comp_reemission_wvl_cdf_gpu)
+            self.material_data.append(comp_reemission_time_cdf_gpu)
+            self.material_data.append(comp_absorption_length_gpu)
 
             material_gpu = \
                 make_gpu_struct(material_struct_size,
                                 [refractive_index_gpu, absorption_length_gpu,
                                  scattering_length_gpu,
-                                 reemission_prob_gpu,
-                                 reemission_cdf_gpu,
+                                 comp_reemission_prob_gpu,
+                                 comp_reemission_wvl_cdf_gpu,
+                                 comp_reemission_time_cdf_gpu,
+                                 comp_absorption_length_gpu,
+                                 np.uint32(num_comp),
                                  np.uint32(len(wavelengths)),
                                  np.float32(wavelength_step),
-                                 np.float32(wavelengths[0])])
+                                 np.float32(wavelengths[0]),
+                                 np.uint32(len(times)),
+                                 np.float32(time_step),
+                                 np.float32(times[0])])
 
             self.material_ptrs.append(material_gpu)
 

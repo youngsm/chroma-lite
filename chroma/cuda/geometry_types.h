@@ -4,14 +4,19 @@
 struct Material
 {
     float *refractive_index;
-    float *absorption_length; //make ncomp absorption_length
+    float *absorption_length; 
     float *scattering_length; 
-    float *reemission_prob; //make ncomp 
-    float *reemission_cdf; //make ncomp scintillation_spectrum 
-    //add reemission_time_cdf and time interpolation vars
-    unsigned int n;
-    float step;
-    float wavelength0;
+    float **comp_reemission_prob; 
+    float **comp_reemission_wvl_cdf;
+    float **comp_reemission_time_cdf;
+    float **comp_absorption_length;
+    unsigned int num_comp;
+    unsigned int wavelength_n;
+    float wavelength_step;
+    float wavelength_start;
+    unsigned int time_n;
+    float time_step;
+    float time_start;
 };
 
 enum { SURFACE_DEFAULT, SURFACE_COMPLEX, SURFACE_WLS, SURFACE_DICHROIC };
@@ -37,10 +42,10 @@ struct Surface
     DichroicProps *dichroic_props;
  
     unsigned int model;
-    unsigned int n;
+    unsigned int wavelength_n;
     unsigned int transmissive;
-    float step;
-    float wavelength0;
+    float wavelength_step;
+    float wavelength_start;
     float thickness;
 };
 
