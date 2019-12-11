@@ -621,10 +621,13 @@ void GLG4Scint::MyPhysicsTable::Entry::Build(
         aMaterialPropertiesTable->GetProperty(property_string.str().c_str());
 
     if (theScintillationLightVector && !theReemissionLightVector) {
+        /*
+        //Chroma handles reemission, no need to warn
         G4cout << "\nWarning! Found a scintillator without Re-emission spectrum";
         G4cout << " (probably a scintillator without WLS)" << G4endl;
         G4cout << "I will assume that for this material this spectrum is equal ";
         G4cout << "to the primary scintillation spectrum..." << G4endl;
+        */
         theReemissionLightVector = theScintillationLightVector;
     }
 

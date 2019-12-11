@@ -52,7 +52,7 @@ public:
     inline int getNumChildren() { return children.size(); }
     inline int getChildTrackID(int i) { return children[i]; }
     
-    inline int addChild(int trackid) { children.push_back(trackid); }
+    inline void addChild(int trackid) { children.push_back(trackid); }
     
 private:
     std::vector<Step> steps;
@@ -66,10 +66,11 @@ public:
   virtual ~SteppingAction();
   
   void EnableScint(bool enabled);
+  void EnableTracking(bool enabled);
   
   void UserSteppingAction(const G4Step* aStep);
   
-  void clearTracking();
+  void ClearTracking();
   Track& getTrack(int id);
   
 private:
@@ -77,6 +78,7 @@ private:
     
     void appendStep(std::vector<Step> &track, const G4StepPoint* point, const G4Step* step, const bool initial);
     
+    bool tracking;
     bool children_mapped;
     void mapChildren();
     std::map<int,Track> trackmap;

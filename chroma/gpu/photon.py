@@ -184,7 +184,7 @@ class GPUPhotons(object):
     @profile_if_possible
     def propagate(self, gpu_geometry, rng_states, nthreads_per_block=64,
                   max_blocks=1024, max_steps=10, use_weights=False,
-                  scatter_first=0):
+                  scatter_first=0, track=False):
         """Propagate photons on GPU to termination or max_steps, whichever
         comes first.
 
@@ -206,10 +206,14 @@ class GPUPhotons(object):
         output_queue = np.zeros(shape=nphotons+1, dtype=np.uint32)
         output_queue[0] = 1
         output_queue_gpu = ga.to_gpu(output_queue)
+        
+        if track:
+            step_photon_ids = []
+            step_photons = []
 
         while step < max_steps:
-            # Just finish the rest of the steps if the # of photons is low
-            if nphotons < nthreads_per_block * 16 * 8 or use_weights:
+            # Just finish the rest of the steps if the # of photons is low and not tracking
+            if not track and (nphotons < nthreads_per_block * 16 * 8 or use_weights):
                 nsteps = max_steps - step
             else:
                 nsteps = 1
@@ -217,7 +221,11 @@ class GPUPhotons(object):
             for first_photon, photons_this_round, blocks in \
                     chunk_iterator(nphotons, nthreads_per_block, max_blocks):
                 self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, self.evidx, np.int32(nsteps), np.int32(use_weights), np.int32(scatter_first), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
-
+            
+            if track: #save the next step for all photons in the input queue
+                step_photon_ids.append(input_queue_gpu[1:nphotons+1].get())
+                step_photons.append(self.copy_queue(input_queue_gpu[1:],nphotons).get())
+            
             step += nsteps
             scatter_first = 0 # Only allow non-zero in first pass
 
@@ -229,12 +237,43 @@ class GPUPhotons(object):
                 # warning from PyCUDA about setting array with different strides/storage orders.
                 output_queue_gpu[:1].set(np.ones(shape=1, dtype=np.uint32))
                 nphotons = input_queue_gpu[:1].get()[0] - 1
+                if nphotons == 0:
+                    break
 
         if ga.max(self.flags).get() & (1 << 31):
             print("WARNING: ABORTED PHOTONS", file=sys.stderr)
         cuda.Context.get_current().synchronize()
+        
+        if track:
+            return step_photon_ids,step_photons
 
+    @profile_if_possible
+    def copy_queue(self, queue_gpu, nphotons, nthreads_per_block=64, max_blocks=1024,
+               start_photon=0):
+               
+        # Allocate new storage space
+        pos = ga.empty(shape=nphotons, dtype=ga.vec.float3)
+        dir = ga.empty(shape=nphotons, dtype=ga.vec.float3)
+        pol = ga.empty(shape=nphotons, dtype=ga.vec.float3)
+        wavelengths = ga.empty(shape=nphotons, dtype=np.float32)
+        t = ga.empty(shape=nphotons, dtype=np.float32)
+        last_hit_triangles = ga.empty(shape=nphotons, dtype=np.int32)
+        flags = ga.empty(shape=nphotons, dtype=np.uint32)
+        weights = ga.empty(shape=nphotons, dtype=np.float32)
+        evidx = ga.empty(shape=nphotons, dtype=np.uint32)
 
+        # And finaly copy photons, if there are any
+        if nphotons > 0:
+            for first_photon, photons_this_round, blocks in chunk_iterator(nphotons, nthreads_per_block, max_blocks):
+                self.gpu_funcs.copy_photon_queue(np.int32(start_photon+first_photon), 
+                                            np.int32(photons_this_round), 
+                                            queue_gpu, 
+                                            self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, self.evidx,
+                                            pos, dir, wavelengths, pol, t, flags, last_hit_triangles, weights, evidx,
+                                            block=(nthreads_per_block,1,1), 
+                                            grid=(blocks, 1))
+        return GPUPhotonsSlice(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights, evidx)
+        
     @profile_if_possible
     def select(self, target_flag, nthreads_per_block=64, max_blocks=1024,
                start_photon=None, nphotons=None):

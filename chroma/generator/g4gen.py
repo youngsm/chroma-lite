@@ -110,7 +110,7 @@ class G4Generator(object):
         # preinitialize the process by running a simple event
         self.generate_photons([Vertex('e-', (0,0,0), (1,0,0), 0.5, 1.0)], mute=True)
         
-    def _extract_photons_from_tracking_action(self, sort=True):
+    def _extract_photons_from_tracking_action(self, sort=False):
         n = self.tracking_action.GetNumPhotons()
         pos = np.zeros(shape=(n,3), dtype=np.float32)
         pos[:,0] = self.tracking_action.GetX()
@@ -131,7 +131,10 @@ class G4Generator(object):
 
         t0 = self.tracking_action.GetT0().astype(np.float32)
 
-        if sort:
+        #should call self.tracking_action.GetParentTrackID to associate photons
+        #with geant4 tracking info  if tracking
+
+        if sort: #why would you ever do this
             reorder = argsort_direction(dir)
             pos = pos[reorder]
             dir = dir[reorder]
@@ -141,12 +144,12 @@ class G4Generator(object):
 
         return Photons(pos, dir, pol, wavelengths, t0)
     
-    def _extract_vertex_from_stepping_action(self, index=1, tracks=True):
+    def _extract_vertex_from_stepping_action(self, index=1):
         track = self.stepping_action.getTrack(index)
         steps = Steps(track.getStepX(),track.getStepY(),track.getStepZ(),track.getStepT(),
                       track.getStepPX(),track.getStepPY(),track.getStepPZ(),track.getStepKE(),
                       track.getStepEDep())
-        children = [self._extract_vertex_from_stepping_action(track.getChildTrackID(id),steps) for id in range(track.getNumChildren())]
+        children = [self._extract_vertex_from_stepping_action(track.getChildTrackID(id)) for id in range(track.getNumChildren())]
         return Vertex(track.name, np.array([steps.x[0],steps.y[0],steps.z[0]]), 
                         np.array([steps.px[0],steps.py[0],steps.pz[0]]), 
                         steps.ke[0], steps.t[0], steps=steps, children=children, trackid=index, pdgcode=track.pdg_code)
@@ -170,6 +173,8 @@ class G4Generator(object):
         if mute:
             pass
             #g4mute()
+            
+        self.stepping_action.EnableTracking(tracking);
 
         photons = Photons()
         
@@ -193,7 +198,7 @@ class G4Generator(object):
                     self.particle_gun.SetParticlePolarization(G4ThreeVector(*vertex.pol).unit())
 
                 self.tracking_action.Clear()
-                self.stepping_action.clearTracking()
+                self.stepping_action.ClearTracking()
                 gRunManager.BeamOn(1)
                 
                 if tracking:

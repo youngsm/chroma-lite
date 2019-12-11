@@ -114,6 +114,37 @@ copy_photons(int first_photon, int nthreads, unsigned int target_flag,
 }
 
 __global__ void
+copy_photon_queue(int first_photon, int nthreads, unsigned int *queue,
+	     float3 *positions, float3 *directions,
+	     float *wavelengths, float3 *polarizations,
+	     float *times, unsigned int *histories,
+	     int *last_hit_triangles, float *weights, unsigned int *evidx,
+	     float3 *new_positions, float3 *new_directions,
+	     float *new_wavelengths, float3 *new_polarizations,
+	     float *new_times, unsigned int *new_histories,
+	     int *new_last_hit_triangles, float *new_weights, unsigned int *new_evidx)
+{
+    int id = blockIdx.x*blockDim.x + threadIdx.x;
+    
+    if (id >= nthreads)
+	return;
+    
+    int offset = first_photon + id;
+    int photon_id = queue[offset];
+
+    new_positions[offset] = positions[photon_id];
+    new_directions[offset] = directions[photon_id];
+    new_polarizations[offset] = polarizations[photon_id];
+    new_wavelengths[offset] = wavelengths[photon_id];
+    new_times[offset] = times[photon_id];
+    new_histories[offset] = histories[photon_id];
+    new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
+    new_weights[offset] = weights[photon_id];
+    new_evidx[offset] = evidx[photon_id];
+}
+
+
+__global__ void
 count_photon_hits(int first_photon, int nphotons, unsigned int detection_state,
             unsigned int *histories, int *solid_map, int *last_hit_triangles,
             Detector *detector, unsigned int *index_counter)

@@ -46,6 +46,7 @@ void ChromaPhysicsList::SetCuts(){
 SteppingAction::SteppingAction()
 {
     scint = true;
+    tracking = false;
     children_mapped = false;
 }
 
@@ -57,20 +58,30 @@ void SteppingAction::EnableScint(bool enabled) {
     scint = enabled;
 }
 
+
+void SteppingAction::EnableTracking(bool enabled) {
+    tracking = enabled;
+}
+
+
 void SteppingAction::UserSteppingAction(const G4Step *step) {
     
-    const G4Track *g4track = step->GetTrack();
-    const int trackid = g4track->GetTrackID();
-    Track &track = trackmap[trackid];
-    if (track.id == -1) {
-        track.id = trackid;
-        track.parent_id = g4track->GetParentID();
-        track.pdg_code = g4track->GetDefinition()->GetPDGEncoding();
-        track.weight = g4track->GetWeight();
-        track.name = g4track->GetDefinition()->GetParticleName();
-        track.appendStepPoint(step->GetPreStepPoint(), step, true);
+    if (tracking) {
+        
+        const G4Track *g4track = step->GetTrack();
+        const int trackid = g4track->GetTrackID();
+        Track &track = trackmap[trackid];
+        if (track.id == -1) {
+            track.id = trackid;
+            track.parent_id = g4track->GetParentID();
+            track.pdg_code = g4track->GetDefinition()->GetPDGEncoding();
+            track.weight = g4track->GetWeight();
+            track.name = g4track->GetDefinition()->GetParticleName();
+            track.appendStepPoint(step->GetPreStepPoint(), step, true);
+        }
+        track.appendStepPoint(step->GetPostStepPoint(), step);
+        
     }
-    track.appendStepPoint(step->GetPostStepPoint(), step);
 
     if (scint) {
         
@@ -91,7 +102,7 @@ void SteppingAction::UserSteppingAction(const G4Step *step) {
 }
 
 
-void SteppingAction::clearTracking() {
+void SteppingAction::ClearTracking() {
     trackmap.clear();    
     children_mapped = false;
 }
@@ -274,7 +285,8 @@ void export_Chroma()
 	 boost::noncopyable > ("SteppingAction", "Stepping action for hacking purposes")
     .def(init<>())
     .def("EnableScint",&SteppingAction::EnableScint)
-    .def("clearTracking",&SteppingAction::clearTracking)
+    .def("EnableTracking",&SteppingAction::EnableTracking)
+    .def("ClearTracking",&SteppingAction::ClearTracking)
     .def("getTrack",&SteppingAction::getTrack,return_value_policy<reference_existing_object>())
     ;  
   

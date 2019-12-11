@@ -6,7 +6,7 @@ import zmq
 import uuid
 
 class G4GeneratorProcess(multiprocessing.Process):
-    def __init__(self, idnum, material, vertex_socket_address, photon_socket_address, seed=None):
+    def __init__(self, idnum, material, vertex_socket_address, photon_socket_address, seed=None, tracking=False):
         multiprocessing.Process.__init__(self)
 
         self.idnum = idnum
@@ -14,6 +14,7 @@ class G4GeneratorProcess(multiprocessing.Process):
         self.vertex_socket_address = vertex_socket_address
         self.photon_socket_address = photon_socket_address
         self.seed = seed
+        self.tracking = tracking
         self.daemon = True
 
     def run(self):
@@ -30,7 +31,7 @@ class G4GeneratorProcess(multiprocessing.Process):
 
         while True:
             ev = vertex_socket.recv_pyobj()
-            ev.vertices,ev.photons_beg = gen.generate_photons(ev.vertices)
+            ev.vertices,ev.photons_beg = gen.generate_photons(ev.vertices,tracking=self.tracking)
             photon_socket.send_pyobj(ev)
 
 def partition(num, partitions):
@@ -53,29 +54,26 @@ def partition(num, partitions):
         else:
             yield step + (num % partitions)
 
-def vertex_sender(vertex_iterator, zmq_context, vertex_address, semaphore):        
+def vertex_sender(vertex_iterator, zmq_context, vertex_address):        
     vertex_socket = zmq_context.socket(zmq.PUSH)
     vertex_socket.bind(vertex_address)
     for vertex in vertex_iterator:
         vertex_socket.send_pyobj(vertex)
-        semaphore.acquire()
 
-def socket_iterator(nelements, socket, semaphore):
+def socket_iterator(nelements, socket):
     for i in range(nelements):
         yield socket.recv_pyobj()
-        semaphore.release()
 
 class G4ParallelGenerator(object):
-    def __init__(self, nprocesses, material, base_seed=None):
+    def __init__(self, nprocesses, material, base_seed=None, tracking=False):
         self.material = material
         if base_seed is None:
             base_seed = np.random.randint(100000000)
         base_address = 'ipc:///tmp/chroma_'+str(uuid.uuid4())
         self.vertex_address = base_address + '.vertex'
         self.photon_address = base_address + '.photon'
-        self.processes = [ G4GeneratorProcess(i, material, self.vertex_address, self.photon_address, seed=base_seed + i) for i in range(nprocesses) ]
-        self.semaphore = threading.Semaphore(nprocesses*2)
-
+        self.processes = [ G4GeneratorProcess(i, material, self.vertex_address, self.photon_address, seed=base_seed + i, tracking=tracking) for i in range(nprocesses) ]
+        
         for p in self.processes:
             p.start()
 
@@ -97,6 +95,6 @@ class G4ParallelGenerator(object):
         # Doing this to avoid a deadlock caused by putting to one queue
         # while getting from another.
         vertex_list = list(vertex_iterator)
-        sender_thread = threading.Thread(target=vertex_sender, args=(vertex_list, self.zmq_context, self.vertex_address, self.semaphore))
+        sender_thread = threading.Thread(target=vertex_sender, args=(vertex_list, self.zmq_context, self.vertex_address))
         sender_thread.start()
-        return socket_iterator(len(vertex_list),self.photon_socket, self.semaphore)
+        return socket_iterator(len(vertex_list),self.photon_socket)

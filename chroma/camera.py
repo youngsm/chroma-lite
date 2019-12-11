@@ -698,7 +698,7 @@ def gen_rot(a,b):
         return np.diag([-1.,-1.,-1.])
     v = np.cross(a,b)
     c = np.arccos(-np.dot(a,b))
-    return transform.make_rotation_matrix(c,v)
+    return make_rotation_matrix(c,v)
     
 class EventViewer(Camera):
 
@@ -712,10 +712,14 @@ class EventViewer(Camera):
         self.display_mode_iter = itertools.cycle(['charge','time','hit','dichroicon'])
         self.display_mode = next(self.display_mode_iter)
         self.sum_mode = False
-        self.photon_display_iter = itertools.cycle(['none','beg','end'])
-        self.photon_display_mode = next(self.photon_display_iter)
+        self.photon_display_mode_iter = itertools.cycle(['none','beg','end'])
+        self.photon_display_mode = next(self.photon_display_mode_iter)
 
     def render_particle_track(self):
+        #need to render vertex tracking info if available
+        #need to render photon tracking info if available
+        #the following is marginal at best
+    
         x = 10.0
         h = x*np.sqrt(3)/2
         pyramid = make.linear_extrude([-x/2,0,x/2], [-h/2,h/2,-h/2], h,
@@ -726,14 +730,14 @@ class EventViewer(Camera):
             return
         
         if self.photon_display_mode == 'none':
-            return
+            self.gpu_geometries = [self.gpu_geometry]
         elif self.photon_display_mode == 'beg':
             photons = self.ev.photons_beg
         else:
             photons = self.ev.photons_end
         
         if photons is None:
-            return
+            self.gpu_geometries = [self.gpu_geometry]
         
         geometry = Geometry()
         sample_factor = max(1, len(photons.pos) // 10000)
@@ -818,7 +822,8 @@ class EventViewer(Camera):
     def process_event(self, event):
         if event.type == KEYDOWN:
             if event.key == K_t:
-                self.photon_display_mode = next(self.display_mode_iter)
+                self.photon_display_mode = next(self.photon_display_mode_iter)
+                print(self.photon_display_mode)
                 self.render_particle_track()
                 self.update()
 

@@ -19,12 +19,13 @@ def pick_seed():
     return int(time.time()) ^ (os.getpid() << 16)
 
 class Simulation(object):
-    def __init__(self, detector, seed=None, cuda_device=None,
+    def __init__(self, detector, seed=None, cuda_device=None, particle_tracking=False, photon_tracking=False,
                  geant4_processes=4, nthreads_per_block=64, max_blocks=1024):
         self.detector = detector
 
         self.nthreads_per_block = nthreads_per_block
         self.max_blocks = max_blocks
+        self.photon_tracking = photon_tracking
 
         if seed is None:
             self.seed = pick_seed()
@@ -36,7 +37,7 @@ class Simulation(object):
         np.random.seed(self.seed)
 
         if geant4_processes > 0:
-            self.photon_generator = generator.photon.G4ParallelGenerator(geant4_processes, detector.detector_material, base_seed=self.seed)
+            self.photon_generator = generator.photon.G4ParallelGenerator(geant4_processes, detector.detector_material, base_seed=self.seed, tracking=particle_tracking)
         else:
             self.photon_generator = None
 
@@ -74,10 +75,11 @@ class Simulation(object):
             print('GPU copy took %0.2f s' % (t_copy_end-t_copy_start))
         
         t_prop_start = timer()
-        gpu_photons.propagate(self.gpu_geometry, self.rng_states,
+        tracking = gpu_photons.propagate(self.gpu_geometry, self.rng_states,
                               nthreads_per_block=self.nthreads_per_block,
                               max_blocks=self.max_blocks,
-                              max_steps=max_steps)
+                              max_steps=max_steps,track=self.photon_tracking)
+            
         t_prop_end = timer()
         if verbose:
             print('GPU propagate took %0.2f s' % (t_prop_end-t_prop_start))
@@ -96,6 +98,16 @@ class Simulation(object):
                     
             if not keep_photons_beg:
                 batch_ev.photons_beg = None
+                
+            if self.photon_tracking:
+                photon_ids,photons = [],[]
+                for step_ids,step_photons in zip(*tracking):
+                    mask = np.logical_and(step_ids >= start_photon,step_ids<end_photon)
+                    if np.count_nonzero(mask) == 0:
+                        break
+                    photon_ids.append(step_ids[mask]-start_photon)
+                    photons.append(step_photons[mask])
+                print('Must add photon tracking to event')
                         
             if keep_photons_end:
                 batch_ev.photons_end = batch_photons_end[start_photon:end_photon]
