@@ -176,7 +176,17 @@ void TrackingAction::Clear() {
 void TrackingAction::PreUserTrackingAction(const G4Track *track) {
     G4ParticleDefinition *particle = track->GetDefinition();
     if (particle->GetParticleName() == "opticalphoton") {
-        std::cout << track->GetCreatorProcess()->GetProcessName() << std::endl;
+        uint32_t flag = 0;
+        G4String process = track->GetCreatorProcess()->GetProcessName();
+        switch (process[0]) {
+            case 'S':
+                flag |= 1 << 11; //see chroma/cuda/photons.h
+                break;
+            case 'C':
+                flag |= 1 << 10; //see chroma/cuda/photons.h
+                break;
+        }
+        flags.push_back(flag);
         pos.push_back(track->GetPosition()/mm);
         dir.push_back(track->GetMomentumDirection());
         pol.push_back(track->GetPolarization());
@@ -203,6 +213,7 @@ PhotonCopy(double,GetPolY,pol[i].y())
 PhotonCopy(double,GetPolZ,pol[i].z())
 PhotonCopy(double,GetWavelength,wavelength[i])
 PhotonCopy(double,GetT0,t0[i])
+PhotonCopy(uint32_t,GetFlags,flags[i])
 PhotonCopy(int,GetParentTrackID,parentTrackID[i])
 
 #include <boost/python.hpp>
@@ -229,6 +240,7 @@ PhotonAccessor(double,GetPolY,GetPolY)
 PhotonAccessor(double,GetPolZ,GetPolZ)
 PhotonAccessor(double,GetWave,GetWavelength)
 PhotonAccessor(double,GetT0,GetT0)
+PhotonAccessor(uint32_t,GetFlags,GetFlags)
 PhotonAccessor(int,GetParentTrackID,GetParentTrackID)
 
 #define StepAccessor(type,name,stepvar) \
@@ -308,6 +320,7 @@ void export_Chroma()
     .def("GetWavelength", PTA_GetWave)
     .def("GetT0", PTA_GetT0)
     .def("GetParentTrackID", PTA_GetParentTrackID)
+    .def("GetFlags", PTA_GetFlags)
     ;
 }
 

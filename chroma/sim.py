@@ -67,9 +67,9 @@ class Simulation(object):
         batch_bounds = np.concatenate([[0],np.where(batch_photons.evidx[1:] != batch_photons.evidx[:-1])[0]+1,[len(batch_photons.evidx)]])
         
         #This copy to gpu has a _lot_ of overhead, want 100k photons at least, hence batches
-        #Assume flags, triangles, and weights are unimportant to copy to GPU
+        #Assume triangles, and weights are unimportant to copy to GPU
         t_copy_start = timer()
-        gpu_photons = gpu.GPUPhotons(batch_photons,copy_flags=False,copy_triangles=False,copy_weights=False)
+        gpu_photons = gpu.GPUPhotons(batch_photons,copy_triangles=False,copy_weights=False)
         t_copy_end = timer()
         if verbose:
             print('GPU copy took %0.2f s' % (t_copy_end-t_copy_start))

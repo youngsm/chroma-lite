@@ -11,6 +11,8 @@ REFLECT_SPECULAR = 0x1 << 6
 SURFACE_REEMIT   = 0x1 << 7
 SURFACE_TRANSMIT = 0x1 << 8
 BULK_REEMIT      = 0x1 << 9
+CHERENKOV        = 0x1 << 10
+SCINTILLATION    = 0x1 << 11
 NAN_ABORT        = 0x1 << 31
 
 class Steps(object):

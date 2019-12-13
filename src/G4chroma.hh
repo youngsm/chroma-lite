@@ -108,6 +108,7 @@ public:
   void GetT0(double *t) const;
   
   void GetParentTrackID(int *t) const;
+  void GetFlags(uint32_t *flags) const;
 
   virtual void PreUserTrackingAction(const G4Track *);
 
@@ -116,6 +117,7 @@ protected:
   std::vector<G4ThreeVector> dir;
   std::vector<G4ThreeVector> pol;
   std::vector<int> parentTrackID;
+  std::vector<uint32_t> flags;
   std::vector<double> wavelength;
   std::vector<double> t0;
 };

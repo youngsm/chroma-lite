@@ -131,8 +131,7 @@ class G4Generator(object):
 
         t0 = self.tracking_action.GetT0().astype(np.float32)
 
-        #should call self.tracking_action.GetParentTrackID to associate photons
-        #with geant4 tracking info  if tracking
+        flags = self.tracking_action.GetFlags().astype(np.uint32)
 
         if sort: #why would you ever do this
             reorder = argsort_direction(dir)
@@ -141,8 +140,9 @@ class G4Generator(object):
             pol = pol[reorder]
             wavelengths = wavelengths[reorder]
             t0 = t0[reorder]
+            flags = flags[reorder]
 
-        return Photons(pos, dir, pol, wavelengths, t0)
+        return Photons(pos, dir, pol, wavelengths, t0, flags=flags)
     
     def _extract_vertex_from_stepping_action(self, index=1):
         track = self.stepping_action.getTrack(index)
