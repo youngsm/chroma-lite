@@ -103,7 +103,6 @@ G4UIdirectory *GLG4Scint::GLG4ScintDir      = NULL;
 G4int GLG4Scint::maxTracksPerStep           = 180000;
 G4double GLG4Scint::meanPhotonsPerSecondary = 1.0;
 G4bool   GLG4Scint::doScintillation         = true;
-G4bool   GLG4Scint::doReemission            = true;
 G4double GLG4Scint::totEdep                 = 0.0;
 G4double GLG4Scint::totEdep_quenched        = 0.0;
 G4double GLG4Scint::totEdep_time            = 0.0;
@@ -111,8 +110,6 @@ G4ThreeVector GLG4Scint::scintCentroidSum(0.0, 0.0, 0.0);
 G4double GLG4Scint::QuenchingFactor = 1.0;
 G4bool   GLG4Scint::UserQF          = false;
 DummyProcess GLG4Scint::scintProcess("Scintillation", fUserDefined);
-DummyProcess GLG4Scint::reemissionProcess("Reemission", fUserDefined);
-std::vector<DummyProcess *> GLG4Scint::reemissionProcessVector;
 
 // ///////////////
 // Constructors
@@ -151,8 +148,6 @@ GLG4Scint::GLG4Scint(const G4String& tablename, G4double lowerMassLimit) {
         cmd->SetGuidance("Turn on scintillation");
         cmd = new G4UIcommand("/glg4scint/off", this);
         cmd->SetGuidance("Turn off scintillation");
-        cmd = new G4UIcommand("/glg4scint/reemission", this);
-        cmd->SetGuidance("Turn on/off reemission of absorbed opticalphotons");
         cmd->SetParameter(new G4UIparameter("status", 's', false));
         cmd = new G4UIcommand("/glg4scint/maxTracksPerStep", this);
         cmd->SetGuidance("Set maximum number of opticalphoton tracks per step\n (If more real photons are needed, weight of tracked particles is increased.)\n");
@@ -488,11 +483,6 @@ void GLG4Scint::MyPhysicsTable::Dump() const {
         if (data[i].spectrumIntegral) (data[i].spectrumIntegral)->DumpValues();
         else G4cout << "NULL" << G4endl;
 
-        G4cout << "   reemissionIntegral=";
-
-        if (data[i].reemissionIntegral) (data[i].reemissionIntegral)->DumpValues();
-        else G4cout << "NULL" << G4endl;
-
         G4cout << "   timeIntegral=";
 
         if (data[i].timeIntegral) (data[i].timeIntegral)->DumpValues();
@@ -558,7 +548,6 @@ void GLG4Scint::MyPhysicsTable::Build(const G4String& newname) {
 
 // Constructor for Entry
 GLG4Scint::MyPhysicsTable::Entry::Entry() {
-    spectrumIntegral       = reemissionIntegral = timeIntegral = NULL;
     I_own_spectrumIntegral = I_own_timeIntegral = false;
     resolutionScale        = 1.0;
     light_yield            = 0.0;
@@ -570,7 +559,6 @@ GLG4Scint::MyPhysicsTable::Entry::Entry() {
 GLG4Scint::MyPhysicsTable::Entry::~Entry() {
     if (I_own_spectrumIntegral) {
         delete spectrumIntegral;
-        delete reemissionIntegral;
     }
 
     if (I_own_timeIntegral) delete timeIntegral;
@@ -586,7 +574,6 @@ void GLG4Scint::MyPhysicsTable::Entry::Build(
     // Delete old data
     if (I_own_spectrumIntegral) {
         delete spectrumIntegral;
-        delete reemissionIntegral;
     }
 
     if (I_own_timeIntegral) {
@@ -594,7 +581,7 @@ void GLG4Scint::MyPhysicsTable::Entry::Build(
     }
 
     // Set defaults
-    spectrumIntegral = reemissionIntegral = timeIntegral = NULL;
+    spectrumIntegral = timeIntegral = NULL;
     resolutionScale  = 1.0;
     birksConstant    = ref_dE_dx = 0.0;
     light_yield      = 0.0;
@@ -615,22 +602,6 @@ void GLG4Scint::MyPhysicsTable::Entry::Build(
     G4MaterialPropertyVector *theScintillationLightVector =
         aMaterialPropertiesTable->GetProperty(property_string.str().c_str());
 
-    property_string.str("");
-    property_string << "SCINTILLATION_WLS" << _name;
-    G4MaterialPropertyVector *theReemissionLightVector =
-        aMaterialPropertiesTable->GetProperty(property_string.str().c_str());
-
-    if (theScintillationLightVector && !theReemissionLightVector) {
-        /*
-        //Chroma handles reemission, no need to warn
-        G4cout << "\nWarning! Found a scintillator without Re-emission spectrum";
-        G4cout << " (probably a scintillator without WLS)" << G4endl;
-        G4cout << "I will assume that for this material this spectrum is equal ";
-        G4cout << "to the primary scintillation spectrum..." << G4endl;
-        */
-        theReemissionLightVector = theScintillationLightVector;
-    }
-
     if (theScintillationLightVector) {
         if (aMaterialPropertiesTable->ConstPropertyExists("LIGHT_YIELD")) light_yield = aMaterialPropertiesTable->GetConstProperty("LIGHT_YIELD");
         else {
@@ -643,13 +614,11 @@ void GLG4Scint::MyPhysicsTable::Entry::Build(
         if (theScintillationLightVector == NULL) spectrumIntegral = NULL;
         else spectrumIntegral = Integrate_MPV_to_POFV(theScintillationLightVector);
 
-        reemissionIntegral     = Integrate_MPV_to_POFV(theReemissionLightVector);
         I_own_spectrumIntegral = true;
     }
     else {
         // Use default integral (possibly null)
         spectrumIntegral       = MyPhysicsTable::GetDefault()->GetEntry(i)->spectrumIntegral;
-        reemissionIntegral     = spectrumIntegral;
         I_own_spectrumIntegral = false;
     }
 
@@ -778,28 +747,6 @@ void GLG4Scint::SetNewValue(G4UIcommand *command, G4String newValues) {
     else if (commandName == "off") {
         doScintillation = false;
     }
-    else if (commandName == "reemission") {
-        char *endptr;
-        G4int i = strtol((const char *)newValues, &endptr, 0);
-
-        if (*endptr != '\0') { // non-numerical argument
-            if (!(i = strcmp((const char *)newValues, "on"))) {
-                doReemission = true;
-            }
-            else if (!(i = strcmp((const char *)newValues, "off"))) {
-                doReemission = false;
-            }
-            else {
-                G4cerr << "Command /glg4scint/reemission given unknown parameter "
-                       << '\"' << newValues << '\"' << G4endl
-                       << "  old value unchanged: "
-                       << (doReemission ? "on" : "off") << G4endl;
-            }
-        }
-        else {
-            doReemission = (i != 0);
-        }
-    }
     else if (commandName == "maxTracksPerStep") {
         G4int i = strtol((const char *)newValues, NULL, 0);
 
@@ -853,9 +800,6 @@ G4String GLG4Scint::GetCurrentValue(G4UIcommand *command) {
 
     if ((commandName == "on") || (commandName == "off")) {
         return doScintillation ? "on" : "off";
-    }
-    else if (commandName == "reemission") {
-        return doReemission ? "1" : "0";
     }
     else if (commandName == "maxTracksPerStep") {
         char outbuff[64];

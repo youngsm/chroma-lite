@@ -48,7 +48,7 @@ class G4UIdirectory;
    process, so much so that it's not even a G4Process anymore!
    Features include arbitrary scintillation light time profile and
    spectra, Birks' law, particle-dependent specification of all
-   parameters, and reemission of optical photons killed by other processes.
+   parameters.
 
     - Has a GenericPostPostStepDoIt() function (note two "Post"s)
       instead of a PostStepDoIt() function.  GenericPostPostStepDoIt()
@@ -137,7 +137,6 @@ public:
                        G4MaterialPropertiesTable *matprops);
 
             G4PhysicsOrderedFreeVector *spectrumIntegral;
-            G4PhysicsOrderedFreeVector *reemissionIntegral;
             G4PhysicsOrderedFreeVector *timeIntegral;
             bool I_own_spectrumIntegral, I_own_timeIntegral;
             bool HaveTimeConsts;
@@ -280,9 +279,6 @@ protected:
     // universal on/off flag
     static G4bool doScintillation;
 
-    // on/off flag for absorbed opticalphoton reemission
-    static G4bool doReemission;
-
     // total real energy deposited and total quenched energy deposited
     static G4double totEdep;
     static G4double totEdep_quenched;
@@ -291,7 +287,6 @@ protected:
 
     // Bogus processes used to tag photons created in GLG4Scint
     static DummyProcess scintProcess;
-    static DummyProcess reemissionProcess;
 
     // Quenching Factor
     static G4double QuenchingFactor;
@@ -299,8 +294,6 @@ protected:
     // User-given (constant) quenching factor flag
     static G4bool UserQF;
 
-    static std::vector<DummyProcess *> reemissionProcessVector;
-    
     // precision goal for the iterative time delay
     static double TimePrecGoal;
 

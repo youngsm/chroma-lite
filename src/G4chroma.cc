@@ -176,6 +176,7 @@ void TrackingAction::Clear() {
 void TrackingAction::PreUserTrackingAction(const G4Track *track) {
     G4ParticleDefinition *particle = track->GetDefinition();
     if (particle->GetParticleName() == "opticalphoton") {
+        std::cout << track->GetCreatorProcess()->GetProcessName() << std::endl;
         pos.push_back(track->GetPosition()/mm);
         dir.push_back(track->GetMomentumDirection());
         pol.push_back(track->GetPolarization());
