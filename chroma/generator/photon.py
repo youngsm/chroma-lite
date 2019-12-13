@@ -31,7 +31,10 @@ class G4GeneratorProcess(multiprocessing.Process):
 
         while True:
             ev = vertex_socket.recv_pyobj()
-            ev.vertices,ev.photons_beg = gen.generate_photons(ev.vertices,tracking=self.tracking)
+            if self.tracking:
+                ev.vertices,ev.photons_beg,ev.photon_parent_trackids = gen.generate_photons(ev.vertices,tracking=self.tracking)
+            else:
+                ev.vertices,ev.photons_beg = gen.generate_photons(ev.vertices,tracking=self.tracking)
             photon_socket.send_pyobj(ev)
 
 def partition(num, partitions):

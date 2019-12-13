@@ -129,19 +129,32 @@ class Photons(object):
         else:
             self.evidx = np.asarray(evidx, dtype=np.uint32)
             
-    def join(photon_list):
+    def join(photon_list,concatenate=True):
         '''Concatenates many photon objects together efficiently'''
-        pos = np.concatenate([p.pos for p in photon_list])
-        dir = np.concatenate([p.dir for p in photon_list])
-        pol = np.concatenate([p.pol for p in photon_list])
-        wavelengths = np.concatenate([p.wavelengths for p in photon_list])
-        t = np.concatenate([p.t for p in photon_list])
-        last_hit_triangles = np.concatenate([p.last_hit_triangles for p in photon_list])
-        flags = np.concatenate([p.flags for p in photon_list])
-        weights = np.concatenate([p.weights for p in photon_list])
-        evidx = np.concatenate([p.evidx for p in photon_list])
-        return Photons(pos, dir, pol, wavelengths, t,
-                       last_hit_triangles, flags, weights, evidx)
+        if concatenate: #internally lists
+            pos = np.concatenate([p.pos for p in photon_list])
+            dir = np.concatenate([p.dir for p in photon_list])
+            pol = np.concatenate([p.pol for p in photon_list])
+            wavelengths = np.concatenate([p.wavelengths for p in photon_list])
+            t = np.concatenate([p.t for p in photon_list])
+            last_hit_triangles = np.concatenate([p.last_hit_triangles for p in photon_list])
+            flags = np.concatenate([p.flags for p in photon_list])
+            weights = np.concatenate([p.weights for p in photon_list])
+            evidx = np.concatenate([p.evidx for p in photon_list])
+            return Photons(pos, dir, pol, wavelengths, t,
+                           last_hit_triangles, flags, weights, evidx)
+        else: #internally scalars
+            pos = np.asarray([p.pos for p in photon_list])
+            dir = np.asarray([p.dir for p in photon_list])
+            pol = np.asarray([p.pol for p in photon_list])
+            wavelengths = np.asarray([p.wavelengths for p in photon_list])
+            t = np.asarray([p.t for p in photon_list])
+            last_hit_triangles = np.asarray([p.last_hit_triangles for p in photon_list])
+            flags = np.asarray([p.flags for p in photon_list])
+            weights = np.asarray([p.weights for p in photon_list])
+            evidx = np.asarray([p.evidx for p in photon_list])
+            return Photons(pos, dir, pol, wavelengths, t,
+                           last_hit_triangles, flags, weights, evidx)
 
     def __add__(self, other):
         '''Concatenate two Photons objects into one list of photons.
@@ -226,7 +239,7 @@ class Channels(object):
         return self.hit.nonzero(), self.t[self.hit], self.q[self.hit]
 
 class Event(object):
-    def __init__(self, id=0, vertices=None, photons_beg=None, photons_end=None, hits=None, channels=None):
+    def __init__(self, id=0, vertices=None, photons_beg=None, photons_end=None, photon_tracks=None, photon_parent_trackids=None, hits=None, channels=None):
         '''Create an event.
 
             id: int
@@ -243,6 +256,9 @@ class Event(object):
 
             photons_end: chroma.event.Photons
               Set of final photon vertices in this event
+              
+            photon_tracks: a python list where each index is a chroma.event.Photons
+              object that gives the state of the photon at each step or None
 
             channels: chroma.event.Channels
               Electronics channel readout information.  Every channel
@@ -263,5 +279,7 @@ class Event(object):
         
         self.photons_beg = photons_beg
         self.photons_end = photons_end
+        self.photon_tracks = photon_tracks
+        self.photon_parent_trackids = photon_parent_trackids
         self.hits = hits
         self.channels = channels

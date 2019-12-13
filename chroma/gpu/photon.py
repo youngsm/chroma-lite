@@ -210,6 +210,9 @@ class GPUPhotons(object):
         if track:
             step_photon_ids = []
             step_photons = []
+            #save the first step for all photons in the input queue
+            step_photon_ids.append(input_queue_gpu[1:nphotons+1].get())
+            step_photons.append(self.copy_queue(input_queue_gpu[1:],nphotons).get())
 
         while step < max_steps:
             # Just finish the rest of the steps if the # of photons is low and not tracking

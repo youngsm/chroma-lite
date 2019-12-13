@@ -177,6 +177,8 @@ class G4Generator(object):
         self.stepping_action.EnableTracking(tracking);
 
         photons = Photons()
+        if tracking:
+            photon_parent_tracks = []
         
         try:
             tracked_vertices = []
@@ -203,13 +205,20 @@ class G4Generator(object):
                 
                 if tracking:
                     tracked_vertices.append(self._extract_vertex_from_stepping_action())
+                    photon_parent_tracks.append(self.tracking_action.GetParentTrackID().astype(np.int32))
                 else:
                     tracked_vertices.append(vertex)
                 photons += self._extract_photons_from_tracking_action()
+            if tracking:    
+                photon_parent_tracks = [track for track in photon_parent_tracks if len(track)>0]
+                photon_parent_tracks = np.concatenate(photon_parent_tracks) if len(photon_parent_tracks) > 0 else []
                 
         finally:
             if mute:
                 pass
                 #g4unmute()
-
-        return (tracked_vertices,photons)
+        
+        if tracking:
+            return (tracked_vertices,photons,photon_parent_tracks)
+        else:
+            return (tracked_vertices,photons)

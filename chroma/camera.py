@@ -76,7 +76,7 @@ class Camera(multiprocessing.Process):
 
         self.display3d = False
         self.green_magenta = False
-        self.max_alpha_depth = 10
+        self.max_alpha_depth = 50
         self.alpha_depth = 10
 
         try: 
@@ -708,47 +708,125 @@ class EventViewer(Camera):
         # avoid slowing down the import of this module
         from chroma.io.root import RootReader
         self.rr = RootReader(filename)
-        self.ev = None
-        self.display_mode_iter = itertools.cycle(['charge','time','hit','dichroicon'])
+        self.ev = next(self.rr)
+        self.display_mode_iter = itertools.cycle(['geo','charge','time','hit','dichroicon'])
         self.display_mode = next(self.display_mode_iter)
         self.sum_mode = False
         self.photon_display_mode_iter = itertools.cycle(['none','beg','end'])
         self.photon_display_mode = next(self.photon_display_mode_iter)
+        self.track_display_mode_iter = itertools.cycle(['none','geant4','chroma','both'])
+        self.track_display_mode = next(self.track_display_mode_iter)
 
-    def render_particle_track(self):
-        #need to render vertex tracking info if available
-        #need to render photon tracking info if available
-        #the following is marginal at best
-    
+    def render_photon_track(self,geometry,photon_track,sz=1.0):
+        origin = photon_track.pos[:-1]
+        extent = photon_track.pos[1:]-photon_track.pos[:-1]
+        perp1 = np.cross(origin,extent)
+        perp1 = np.inner(sz/2.0/np.linalg.norm(perp1,axis=1),perp1.T).T
+        perp2 = np.cross(perp1,extent)
+        perp2 = np.inner(sz/2.0/np.linalg.norm(perp2,axis=1),perp2.T).T
+        verts = [perp1+perp2,-perp1+perp2,perp1-perp2,-perp1-perp2]
+        bot = [vert+origin for vert in verts]
+        top = [vert+origin+extent for vert in verts]
+        vertices = [origin,origin+extent,bot[0],top[0],bot[1],top[1],bot[2],top[2],bot[3],top[3]]
+        vertices = np.transpose(np.asarray(vertices,np.float32),(1,0,2))
+        triangles = np.asarray([[1, 3, 5], [1, 5, 7], [1, 7, 9], [1, 9, 3], [3, 2, 4], [5, 4, 6], [7, 6, 8], [9, 8, 2], [2, 0, 0], [4, 0, 0], [6, 0, 0], [8, 0, 0],
+                                [1, 5, 1], [1, 7, 1], [1, 9, 1], [1, 3, 1], [3, 4, 5], [5, 6, 7], [7, 8, 9], [9, 2, 3], [2, 0, 4], [4, 0, 6], [6, 0, 8], [8, 0, 2]],
+                                dtype=np.int32)
+        r = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[0,0,255]),dtype=np.uint32)
+        g = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[0,255,0]),dtype=np.uint32)
+        b = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[255,0,0]),dtype=np.uint32)
+        colors = np.bitwise_or(b,np.bitwise_or(np.left_shift(g,8),np.left_shift(r,16)))
+        markers = [Solid(Mesh(v,triangles), vacuum, vacuum, color=c) for v,c in zip(vertices,colors)]
+        [geometry.add_solid(marker) for marker in markers]
+
+    def render_vertex(self,geometry,vertex,children=2,sz=5.0,colors={'mu-':0xFFE050,'e+':0x0000FF,'e-':0xFF0000,'gamma':0x00FF00}):
+        steps = np.vstack((vertex.steps.x,vertex.steps.y,vertex.steps.z)).T
+        for index in range(len(steps)-1):
+            vec = steps[index+1]-steps[index]
+            mag = np.linalg.norm(vec)
+            u = vec/mag
+            axis = np.cross(u,[0,0,1])
+            ang = np.arccos(np.dot(u,[0,0,1]))
+            rotmat = make_rotation_matrix(ang,axis)
+            x = sz/2
+            y = x*np.sqrt(3)/2
+            segment = make.linear_extrude([-x,0,x], [-y,y,-y], mag,[0,0,0],[0,0,0])
+            segment.vertices[:,2] += mag/2.0
+            marker = Solid(segment, vacuum, vacuum, color=colors[vertex.particle_name] if vertex.particle_name in colors else 0xAAAAAA)
+            geometry.add_solid(marker, displacement=steps[index], rotation=rotmat)
+            
+        if children and vertex.children:
+            for child in vertex.children:
+                if isinstance(children,bool):
+                    self.render_vertex(geometry,child,children)
+                else:
+                    self.render_vertex(geometry,child,children-1)
+
+    def render_photons(self,geometry,photons):
         x = 10.0
         h = x*np.sqrt(3)/2
         pyramid = make.linear_extrude([-x/2,0,x/2], [-h/2,h/2,-h/2], h,
                                       [0]*3, [0]*3)
         marker = Solid(pyramid, vacuum, vacuum)
-        
-        if self.ev is None:
-            return
-        
-        if self.photon_display_mode == 'none':
-            self.gpu_geometries = [self.gpu_geometry]
-        elif self.photon_display_mode == 'beg':
-            photons = self.ev.photons_beg
-        else:
-            photons = self.ev.photons_end
-        
-        if photons is None:
-            self.gpu_geometries = [self.gpu_geometry]
-        
-        geometry = Geometry()
-        sample_factor = max(1, len(photons.pos) // 10000)
+                
+
+        sample_factor = 1
         subset = photons[::sample_factor]
         for p,d,w in zip(subset.pos,subset.dir,subset.wavelengths):
             geometry.add_solid(marker, displacement=p, rotation=gen_rot([0,1,0],d))
 
-        geometry = create_geometry_from_obj(geometry)
-        gpu_geometry = gpu.GPUGeometry(geometry)
 
-        self.gpu_geometries = [self.gpu_geometry, gpu_geometry]
+    def render_mc_info(self):
+        #need to render photon tracking info if available
+        
+        self.gpu_geometries = [self.gpu_geometry]
+        if self.sum_mode or self.ev is None:
+            return
+ 
+        if self.photon_display_mode == 'beg':
+            photons = self.ev.photons_beg
+        elif self.photon_display_mode == 'end':
+            photons = self.ev.photons_end
+        else:
+            photons = None
+        
+        if photons is not None:
+            geometry = Geometry()
+            self.render_photons(geometry,photons)
+            geometry = create_geometry_from_obj(geometry)
+            gpu_geometry = gpu.GPUGeometry(geometry)
+            self.gpu_geometries.append(gpu_geometry)
+            
+        if self.track_display_mode in ['geant4', 'both'] and self.ev.vertices is not None:
+            geometry = Geometry()
+            any = False
+            for vertex in self.ev.vertices:
+                if vertex.steps:
+                    any = True
+                    self.render_vertex(geometry,vertex,children=True)
+            if any:
+                geometry = create_geometry_from_obj(geometry)
+                gpu_geometry = gpu.GPUGeometry(geometry)
+                self.gpu_geometries.append(gpu_geometry)
+                
+        
+        if self.track_display_mode in ['chroma', 'both'] and self.ev.photon_tracks is not None:
+            geometry = Geometry()
+            print('Total Photons',len(self.ev.photon_tracks))
+            rendered = 0
+            for track in self.ev.photon_tracks:
+                if track.wavelengths[0] > 550:
+                    self.render_photon_track(geometry,track[:min(len(track),5)])
+                    rendered = rendered + 1
+                elif track.wavelengths[0] <= 550:
+                    pass
+                    #self.render_photon_track(geometry,track[:min(len(track),5)])
+                    #rendered = rendered + 1
+            print('Rendered Photons',rendered)
+            geometry = create_geometry_from_obj(geometry)
+            gpu_geometry = gpu.GPUGeometry(geometry)
+            self.gpu_geometries.append(gpu_geometry)
+            
 
     def sum_events(self):
         print('Summing events in file...')
@@ -776,7 +854,7 @@ class EventViewer(Camera):
         from chroma.color import map_to_color
         self.gpu_geometry.reset_colors()
 
-        if self.ev is None or self.ev.channels is None:
+        if self.display_mode == 'geo' or self.ev is None or self.ev.channels is None:
             return
 
         if self.sum_mode:
@@ -805,6 +883,7 @@ class EventViewer(Camera):
             channel_color = np.zeros_like(hit,dtype=np.uint32)
             channel_color[::2] |= (255*hit[::2]/np.max(hit[::2])).astype(np.uint32)
             channel_color[::2] |= (255*hit[1::2]/np.max(hit[1::2])).astype(np.uint32)<<16
+            select[0::2] |= select[1::2]
             select[1::2] = 0
             
         solid_hit = np.zeros(len(self.geometry.mesh.triangles), dtype=np.bool)
@@ -819,13 +898,24 @@ class EventViewer(Camera):
 
         self.gpu_geometry.color_solids(solid_hit, solid_color)
 
+    def update(self):
+        Camera.update(self)
+
     def process_event(self, event):
         if event.type == KEYDOWN:
-            if event.key == K_t:
+            if event.key == K_p:
                 self.photon_display_mode = next(self.photon_display_mode_iter)
                 print(self.photon_display_mode)
-                self.render_particle_track()
+                self.render_mc_info()
                 self.update()
+                return
+                
+            if event.key == K_t:
+                self.track_display_mode = next(self.track_display_mode_iter)
+                print(self.track_display_mode)
+                self.render_mc_info()
+                self.update()
+                return
 
             if event.key == K_RIGHT and not self.sum_mode:
                 try:
@@ -834,10 +924,7 @@ class EventViewer(Camera):
                     pass
                 else:
                     self.color_hit_pmts()
-
-                    if self.ev.photons_beg is not None:
-                        self.render_particle_track()
-
+                    self.render_mc_info()
                     self.update()
                 return
 
@@ -848,16 +935,12 @@ class EventViewer(Camera):
                     pass
                 else:
                     self.color_hit_pmts()
-
-                    if self.ev.photons_beg is not None:
-                        self.render_particle_track()
-
+                    self.render_mc_info()
                     self.update()
                 return
             elif event.key == K_PERIOD:
                 self.display_mode = next(self.display_mode_iter)
                 self.color_hit_pmts()
-                self.render_particle_track()
                 self.update()
                 return
             elif event.key == K_s:
@@ -866,8 +949,8 @@ class EventViewer(Camera):
                     self.sum_events()
                 elif not self.sum_mode and not hasattr(self, 'ev'):
                     return
-
                 self.color_hit_pmts()
+                self.render_mc_info()
                 self.update()
                 return
 

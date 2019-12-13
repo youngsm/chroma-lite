@@ -46,6 +46,20 @@ def make_photon_with_arrays(size):
 
 def root_vertex_to_python_vertex(vertex):
     "Returns a chroma.event.Vertex object from a root Vertex object."
+    if len(vertex.step_x):
+        n = len(vertex.step_x)
+        steps = event.Steps(np.empty(n),np.empty(n),np.empty(n),np.empty(n),
+              np.empty(n),np.empty(n),np.empty(n),
+              np.empty(n),np.empty(n))
+        ROOT.get_steps(vertex,n,steps.x,steps.y,steps.z,steps.t,
+                       steps.px,steps.py,steps.pz,
+                       steps.ke,steps.edep)
+    else:
+        steps = None
+    if len(vertex.children) > 0:
+        children = [root_vertex_to_python_vertex(child) for child in vertex.children]
+    else:
+        children = None
     return event.Vertex(str(vertex.particle_name),
                         pos=tvector3_to_ndarray(vertex.pos),
                         dir=tvector3_to_ndarray(vertex.dir),
@@ -53,7 +67,9 @@ def root_vertex_to_python_vertex(vertex):
                         t0=vertex.t0,
                         pol=tvector3_to_ndarray(vertex.pol),
                         trackid=vertex.trackid,
-                        pdgcode=vertex.pdgcode)
+                        pdgcode=vertex.pdgcode,
+                        steps=steps,
+                        children=children)
 
 def python_vertex_to_root_vertex(pvertex,rvertex):
     rvertex.particle_name = pvertex.particle_name
@@ -65,6 +81,13 @@ def python_vertex_to_root_vertex(pvertex,rvertex):
     rvertex.t0 = pvertex.t0
     rvertex.trackid = pvertex.trackid
     rvertex.pdgcode = pvertex.pdgcode
+    if pvertex.steps:
+        ROOT.fill_steps(rvertex,len(pvertex.steps.x),pvertex.steps.x,pvertex.steps.y,pvertex.steps.z,
+                        pvertex.steps.t,pvertex.steps.px,pvertex.steps.py,pvertex.steps.pz,
+                        pvertex.steps.ke,pvertex.steps.edep)
+    if len(pvertex.children) > 0:
+        rvertex.children.resize(len(pvertex.children))
+        any(python_vertex_to_root_vertex(pchild,rchild) for pchild,rchild in zip(pvertex.children,rvertex.children))
 
 def root_event_to_python_event(ev):
     '''Returns a new chroma.event.Event object created from the
@@ -99,6 +122,24 @@ def root_event_to_python_event(ev):
                          photons.last_hit_triangles,
                          photons.flags)
         pyev.photons_end = photons
+
+    # photon tracks
+    if ev.photon_tracks.size() > 0:
+        photon_tracks = []
+        for i in range(ev.photon_tracks.size()):
+            photons = make_photon_with_arrays(ev.photon_tracks[i].size())
+            ROOT.get_photons(ev.photon_tracks[i],
+                             photons.pos.ravel(),
+                             photons.dir.ravel(),
+                             photons.pol.ravel(),
+                             photons.wavelengths,
+                             photons.t,
+                             photons.last_hit_triangles,
+                             photons.flags)
+            photon_tracks.append(photons)
+        pyev.photon_tracks = photon_tracks
+        pyev.photon_parent_trackids = np.asarray(ev.photon_parent_trackids).copy()    
+    
 
     # channels
     if ev.nchannels > 0:
@@ -154,7 +195,6 @@ class RootReader(object):
         '''Return the next event in the file. Raises StopIteration if
         that would go past the beginning.'''
         if self.i <= 0:
-            self.i = -1
             raise StopIteration
 
         self.i -= 1
@@ -212,7 +252,21 @@ class RootWriter(object):
                               photons.pol.ravel(),
                               photons.wavelengths, photons.t,
                               photons.last_hit_triangles, photons.flags)
-
+        
+        if pyev.photon_tracks is not None:
+            self.ev.photon_tracks.resize(len(pyev.photon_tracks))
+            for i in range(len(pyev.photon_tracks)):
+                photons = pyev.photon_tracks[i]
+                ROOT.fill_photons(self.ev.photon_tracks[i],
+                              len(photons.pos),
+                              photons.pos.ravel(),
+                              photons.dir.ravel(),
+                              photons.pol.ravel(),
+                              photons.wavelengths, photons.t,
+                              photons.last_hit_triangles, photons.flags)
+            self.ev.photon_parent_trackids.resize(len(pyev.photon_parent_trackids))
+            np.asarray(self.ev.photon_parent_trackids)[:] = pyev.photon_parent_trackids
+        
         self.ev.vertices.resize(0)
         if pyev.vertices is not None:
             self.ev.vertices.resize(len(pyev.vertices))

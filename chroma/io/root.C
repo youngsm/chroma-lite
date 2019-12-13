@@ -17,7 +17,7 @@ struct Vertex {
   int pdgcode;
   
   std::vector<Vertex> children;
-  std::vector<double> x,y,z,t,px,py,pz,child_ke,edep;
+  std::vector<double> step_x,step_y,step_z,step_t,step_px,step_py,step_pz,step_ke,step_edep;
 
   ClassDef(Vertex, 1);
 };
@@ -66,11 +66,52 @@ struct Event {
   std::vector<Vertex> vertices;
   std::vector<Photon> photons_beg;
   std::vector<Photon> photons_end;
+  std::vector<std::vector<Photon>> photon_tracks;
+  std::vector<int> photon_parent_trackids;
   std::map<int,Photon> hits;
   std::vector<Channel> channels;
 
   ClassDef(Event, 1);
 };
+
+void fill_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z,
+        double *t, double *px, double *py, double *pz, double *ke, double *edep) {
+  vtx->step_x.resize(nsteps);
+  vtx->step_y.resize(nsteps);
+  vtx->step_z.resize(nsteps);
+  vtx->step_t.resize(nsteps);
+  vtx->step_px.resize(nsteps);
+  vtx->step_py.resize(nsteps);
+  vtx->step_pz.resize(nsteps);
+  vtx->step_ke.resize(nsteps);
+  vtx->step_edep.resize(nsteps);
+  for (unsigned int i=0; i < nsteps; i++) {
+      vtx->step_x[i] = x[i];
+      vtx->step_y[i] = y[i];
+      vtx->step_z[i] = z[i];
+      vtx->step_t[i] = t[i];
+      vtx->step_px[i] = px[i];
+      vtx->step_py[i] = py[i];
+      vtx->step_pz[i] = pz[i];
+      vtx->step_ke[i] = ke[i];
+      vtx->step_edep[i] = edep[i];
+  }
+}
+
+void get_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z,
+        double *t, double *px, double *py, double *pz, double *ke, double *edep) {
+  for (unsigned int i=0; i < nsteps; i++) {
+      x[i] = vtx->step_x[i];
+      y[i] = vtx->step_y[i];
+      z[i] = vtx->step_z[i];
+      t[i] = vtx->step_t[i];
+      px[i] = vtx->step_px[i];
+      py[i] = vtx->step_py[i];
+      pz[i] = vtx->step_pz[i];
+      ke[i] = vtx->step_ke[i];
+      edep[i] = vtx->step_edep[i];
+  }
+}
 
 void fill_channels(Event *ev, unsigned int nhit, unsigned int *ids, float *t,
 		   float *q, unsigned int *flags, unsigned int nchannels)

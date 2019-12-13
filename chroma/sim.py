@@ -100,15 +100,19 @@ class Simulation(object):
                 batch_ev.photons_beg = None
                 
             if self.photon_tracking:
-                photon_ids,photons = [],[]
-                for step_ids,step_photons in zip(*tracking):
+                step_photon_ids,step_photons = tracking
+                nphotons = end_photon-start_photon
+                photon_tracks = [[] for i in range(nphotons)]
+                for step_ids,step_photons in zip(step_photon_ids,step_photons):
                     mask = np.logical_and(step_ids >= start_photon,step_ids<end_photon)
                     if np.count_nonzero(mask) == 0:
                         break
-                    photon_ids.append(step_ids[mask]-start_photon)
-                    photons.append(step_photons[mask])
-                print('Must add photon tracking to event')
-                        
+                    photon_ids = step_ids[mask]-start_photon
+                    photons = step_photons[mask]
+                    #Indexing Photons with a scalar changes the internal array shapes...
+                    any(photon_tracks[id].append(photons[i]) for i,id in enumerate(photon_ids))
+                batch_ev.photon_tracks = [event.Photons.join(photons,concatenate=False) if len(photons) > 0 else event.Photons() for photons in photon_tracks]
+
             if keep_photons_end:
                 batch_ev.photons_end = batch_photons_end[start_photon:end_photon]
                         
