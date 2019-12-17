@@ -64,7 +64,7 @@ class Simulation(object):
         
         #Idea: allocate memory on gpu and copy photons into it, instead of concatenating on CPU?
         batch_photons = event.Photons.join([ev.photons_beg for ev in batch_events])
-        batch_bounds = np.concatenate([[0],np.where(batch_photons.evidx[1:] != batch_photons.evidx[:-1])[0]+1,[len(batch_photons.evidx)]])
+        batch_bounds = np.cumsum(np.concatenate([[0],[len(ev.photons_beg) for ev in batch_events]]))
         
         #This copy to gpu has a _lot_ of overhead, want 100k photons at least, hence batches
         #Assume triangles, and weights are unimportant to copy to GPU
