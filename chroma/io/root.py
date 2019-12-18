@@ -191,7 +191,6 @@ class RootReader(object):
     def __iter__(self):
         for i in range(self.T.GetEntries()):
             self.T.GetEntry(i)
-            print(i)
             yield root_event_to_python_event(self.T.ev)
 
     def __next__(self):

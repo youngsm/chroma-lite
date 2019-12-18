@@ -171,6 +171,7 @@ void TrackingAction::Clear() {
     wavelength.clear();
     t0.clear();
     parentTrackID.clear();
+    flags.clear();
 }
 
 void TrackingAction::PreUserTrackingAction(const G4Track *track) {
