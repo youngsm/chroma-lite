@@ -140,6 +140,18 @@ def root_event_to_python_event(ev):
         pyev.photon_tracks = photon_tracks
         pyev.photon_parent_trackids = np.asarray(ev.photon_parent_trackids).copy()    
     
+    
+    if ev.hits.size() > 0:
+        pyev.hits = {}
+        for hit in ev.hits:
+            photons = make_photon_with_arrays(hit.second.size())
+            ROOT.get_photons(hit.second,
+                          photons.pos.ravel(),
+                          photons.dir.ravel(),
+                          photons.pol.ravel(),
+                          photons.wavelengths, photons.t,
+                          photons.last_hit_triangles, photons.flags)
+            pyev.hits[hit.first] = photons
 
     # channels
     if ev.nchannels > 0:
@@ -179,6 +191,7 @@ class RootReader(object):
     def __iter__(self):
         for i in range(self.T.GetEntries()):
             self.T.GetEntry(i)
+            print(i)
             yield root_event_to_python_event(self.T.ev)
 
     def __next__(self):
@@ -242,6 +255,8 @@ class RootWriter(object):
                               photons.pol.ravel(),
                               photons.wavelengths, photons.t,
                               photons.last_hit_triangles, photons.flags)
+        else:
+            self.ev.photons_beg.resize(0)
 
         if pyev.photons_end is not None:
             photons = pyev.photons_end
@@ -252,6 +267,8 @@ class RootWriter(object):
                               photons.pol.ravel(),
                               photons.wavelengths, photons.t,
                               photons.last_hit_triangles, photons.flags)
+        else:
+            self.ev.photons_end.resize(0)
         
         if pyev.photon_tracks is not None:
             self.ev.photon_tracks.resize(len(pyev.photon_tracks))
@@ -266,13 +283,29 @@ class RootWriter(object):
                               photons.last_hit_triangles, photons.flags)
             self.ev.photon_parent_trackids.resize(len(pyev.photon_parent_trackids))
             np.asarray(self.ev.photon_parent_trackids)[:] = pyev.photon_parent_trackids
+        else:
+            self.ev.photon_tracks.resize(0)
         
-        self.ev.vertices.resize(0)
         if pyev.vertices is not None:
             self.ev.vertices.resize(len(pyev.vertices))
             for i, vertex in enumerate(pyev.vertices):
                 python_vertex_to_root_vertex(vertex,self.ev.vertices[i])
-
+        else:
+            self.ev.vertices.resize(0)
+        
+        if pyev.hits is not None:
+            self.ev.hits.clear()
+            for hit in pyev.hits:
+                photons = pyev.hits[hit]
+                ROOT.fill_photons(self.ev.hits[hit],len(photons.pos),
+                              photons.pos.ravel(),
+                              photons.dir.ravel(),
+                              photons.pol.ravel(),
+                              photons.wavelengths, photons.t,
+                              photons.last_hit_triangles, photons.flags)
+        else:
+            self.ev.hits.clear()
+        
         if pyev.channels is not None:
             nhit = count_nonzero(pyev.channels.hit)
             if nhit > 0:

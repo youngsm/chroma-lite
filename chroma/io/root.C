@@ -68,7 +68,7 @@ struct Event {
   std::vector<Photon> photons_end;
   std::vector<std::vector<Photon>> photon_tracks;
   std::vector<int> photon_parent_trackids;
-  std::map<int,Photon> hits;
+  std::map<int,std::vector<Photon>> hits;
   std::vector<Channel> channels;
 
   ClassDef(Event, 1);
