@@ -85,9 +85,13 @@ def python_vertex_to_root_vertex(pvertex,rvertex):
         ROOT.fill_steps(rvertex,len(pvertex.steps.x),pvertex.steps.x,pvertex.steps.y,pvertex.steps.z,
                         pvertex.steps.t,pvertex.steps.px,pvertex.steps.py,pvertex.steps.pz,
                         pvertex.steps.ke,pvertex.steps.edep)
+    else:
+        ROOT.fill_steps(rvertex,len(pvertex.steps.x),None,None,None,None,None,None,None,None,None)
     if pvertex.children is not None and len(pvertex.children) > 0:
         rvertex.children.resize(len(pvertex.children))
         any(python_vertex_to_root_vertex(pchild,rchild) for pchild,rchild in zip(pvertex.children,rvertex.children))
+    else:
+        rvertex.children.resize(0)
 
 def root_event_to_python_event(ev):
     '''Returns a new chroma.event.Event object created from the
@@ -284,6 +288,7 @@ class RootWriter(object):
             np.asarray(self.ev.photon_parent_trackids)[:] = pyev.photon_parent_trackids
         else:
             self.ev.photon_tracks.resize(0)
+            self.ev.photon_parent_trackids.resize(0)
         
         if pyev.vertices is not None:
             self.ev.vertices.resize(len(pyev.vertices))

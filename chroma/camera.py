@@ -16,6 +16,7 @@ from chroma.geometry import Mesh, Solid, Geometry, vacuum
 from chroma.transform import rotate, make_rotation_matrix
 from chroma.sample import uniform_sphere
 from chroma.tools import from_film
+import chroma.event as event
 from chroma import make
 from chroma import gpu
 from chroma.loader import create_geometry_from_obj
@@ -739,7 +740,7 @@ class EventViewer(Camera):
         markers = [Solid(Mesh(v,triangles), vacuum, vacuum, color=c) for v,c in zip(vertices,colors)]
         [geometry.add_solid(marker) for marker in markers]
 
-    def render_vertex(self,geometry,vertex,children=2,sz=5.0,colors={'mu-':0xFFE050,'e+':0x0000FF,'e-':0xFF0000,'gamma':0x00FF00}):
+    def render_vertex(self,geometry,vertex,children=2,sz=5.0,colors={'mu+':0x50E0FF,'mu-':0xFFE050,'e+':0x0000FF,'e-':0xFF0000,'gamma':0x00FF00}):
         steps = np.vstack((vertex.steps.x,vertex.steps.y,vertex.steps.z)).T
         for index in range(len(steps)-1):
             vec = steps[index+1]-steps[index]
@@ -815,17 +816,18 @@ class EventViewer(Camera):
             print('Total Photons',len(self.ev.photon_tracks))
             rendered = 0
             for track in self.ev.photon_tracks:
-                if track.wavelengths[0] > 550:
-                    self.render_photon_track(geometry,track[:min(len(track),5)])
+                if track.flags[0] & event.CHERENKOV == event.CHERENKOV:
+                    self.render_photon_track(geometry,track[:min(len(track),5)],sz=0.05)
                     rendered = rendered + 1
                 elif track.wavelengths[0] <= 550:
                     pass
                     #self.render_photon_track(geometry,track[:min(len(track),5)])
                     #rendered = rendered + 1
-            print('Rendered Photons',rendered)
-            geometry = create_geometry_from_obj(geometry)
-            gpu_geometry = gpu.GPUGeometry(geometry)
-            self.gpu_geometries.append(gpu_geometry)
+            if rendered > 0:
+                print('Rendered Photons',rendered)
+                geometry = create_geometry_from_obj(geometry)
+                gpu_geometry = gpu.GPUGeometry(geometry)
+                self.gpu_geometries.append(gpu_geometry)
             
 
     def sum_events(self):
