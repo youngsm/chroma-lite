@@ -74,6 +74,18 @@ struct Event {
   ClassDef(Event, 1);
 };
 
+void clear_steps(Vertex *vtx) {
+  vtx->step_x.resize(0);
+  vtx->step_y.resize(0);
+  vtx->step_z.resize(0);
+  vtx->step_t.resize(0);
+  vtx->step_px.resize(0);
+  vtx->step_py.resize(0);
+  vtx->step_pz.resize(0);
+  vtx->step_ke.resize(0);
+  vtx->step_edep.resize(0);
+}
+
 void fill_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z,
         double *t, double *px, double *py, double *pz, double *ke, double *edep) {
   vtx->step_x.resize(nsteps);

@@ -777,7 +777,7 @@ class EventViewer(Camera):
             geometry.add_solid(marker, displacement=p, rotation=gen_rot([0,1,0],d))
 
 
-    def render_mc_info(self):
+    def render_mc_info(self,max_photons=1000,cher_only=True):
         #need to render photon tracking info if available
         
         self.gpu_geometries = [self.gpu_geometry]
@@ -814,17 +814,21 @@ class EventViewer(Camera):
         if self.track_display_mode in ['chroma', 'both'] and self.ev.photon_tracks is not None:
             geometry = Geometry()
             print('Total Photons',len(self.ev.photon_tracks))
-            rendered = 0
-            for track in self.ev.photon_tracks:
-                if track.flags[0] & event.CHERENKOV == event.CHERENKOV:
+            cherenkov = np.asarray([track.flags[0] & event.CHERENKOV == event.CHERENKOV for track in self.ev.photon_tracks])
+            ncherenkov = np.count_nonzero(cherenkov)
+            nphotons = ncherenkov if cher_only else len(self.ev.photon_tracks)
+            prob = max_photons/nphotons
+            selector = np.random.random(len(self.ev.photon_tracks)) < prob
+            nphotons = 0
+            for track in (t for s,t in zip(selector,self.ev.photon_tracks) if s):
+                if cher_only and track.flags[0] & event.CHERENKOV == event.CHERENKOV:
                     self.render_photon_track(geometry,track[:min(len(track),5)],sz=0.05)
-                    rendered = rendered + 1
-                elif track.wavelengths[0] <= 550:
-                    pass
-                    #self.render_photon_track(geometry,track[:min(len(track),5)])
-                    #rendered = rendered + 1
-            if rendered > 0:
-                print('Rendered Photons',rendered)
+                    nphotons = nphotons + 1
+                elif not cher_only:
+                    self.render_photon_track(geometry,track[:min(len(track),5)])
+                    nphotons = nphotons + 1
+            if nphotons > 0:
+                print('Rendered Photons',nphotons)
                 geometry = create_geometry_from_obj(geometry)
                 gpu_geometry = gpu.GPUGeometry(geometry)
                 self.gpu_geometries.append(gpu_geometry)
