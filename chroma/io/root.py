@@ -86,7 +86,7 @@ def python_vertex_to_root_vertex(pvertex,rvertex):
                         pvertex.steps.t,pvertex.steps.px,pvertex.steps.py,pvertex.steps.pz,
                         pvertex.steps.ke,pvertex.steps.edep)
     else:
-        ROOT.fill_steps(rvertex,len(pvertex.steps.x),None,None,None,None,None,None,None,None,None)
+        ROOT.fill_steps(rvertex,0,None,None,None,None,None,None,None,None,None)
     if pvertex.children is not None and len(pvertex.children) > 0:
         rvertex.children.resize(len(pvertex.children))
         any(python_vertex_to_root_vertex(pchild,rchild) for pchild,rchild in zip(pvertex.children,rvertex.children))
