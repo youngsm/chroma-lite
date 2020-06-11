@@ -31,7 +31,7 @@ def mesh_from_ascii_stl(filename):
     vertex_map = {}
 
     while True:
-        line = f.readline()
+        line = f.readline().decode('ascii')
 
         if line == '':
             break

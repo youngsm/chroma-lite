@@ -1,6 +1,0 @@
-Bootstrap: docker
-From: benland100/chroma3:440
-
-%post
-    apt-get -y update
-    apt-get -y install vim

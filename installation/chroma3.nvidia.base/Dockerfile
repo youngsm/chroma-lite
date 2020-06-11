@@ -6,12 +6,11 @@ SHELL ["/bin/bash", "-l", "-c"]
 RUN apt-get update && apt-get install -y curl git
 
 WORKDIR /opt/
-RUN curl -O https://repo.anaconda.com/archive/Anaconda3-2019.10-Linux-x86_64.sh
-RUN chmod +x Anaconda3-2019.10-Linux-x86_64.sh
-RUN ./Anaconda3-2019.10-Linux-x86_64.sh -b -p /opt/anaconda3
-RUN rm Anaconda3-2019.10-Linux-x86_64.sh
+RUN curl -O https://repo.anaconda.com/archive/Anaconda3-2020.02-Linux-x86_64.sh
+RUN chmod +x Anaconda3-2020.02-Linux-x86_64.sh
+RUN ./Anaconda3-2020.02-Linux-x86_64.sh -b -p /opt/anaconda3
+RUN rm Anaconda3-2020.02-Linux-x86_64.sh
 RUN conda install -y -c anaconda boost cmake
-
 
 FROM nvidia/cudagl:9.2-devel-ubuntu18.04  AS build-root
 MAINTAINER Benjamin Land <benland100@gmail.com>
@@ -21,6 +20,7 @@ COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
 RUN apt-get update && apt-get install -y curl git
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
+ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
 
 WORKDIR /opt/
@@ -41,6 +41,7 @@ COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
 RUN apt-get update && apt-get install -y curl git
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
+ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
 COPY --from=build-root /opt/root /opt/root
 RUN apt-get update && apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev
@@ -74,6 +75,7 @@ COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
 RUN apt-get update && apt-get install -y curl git
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
+ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y dpkg-dev gcc g++ binutils libx11-dev libxpm-dev libxft-dev libxext-dev libgsl-dev libfftw3-dev libpcre3-dev
 COPY --from=build-root /opt/root /opt/root
 RUN apt-get update && apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev

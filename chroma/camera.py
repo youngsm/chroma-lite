@@ -818,14 +818,15 @@ class EventViewer(Camera):
             ncherenkov = np.count_nonzero(cherenkov)
             nphotons = ncherenkov if cher_only else len(self.ev.photon_tracks)
             prob = max_photons/nphotons
-            selector = np.random.random(len(self.ev.photon_tracks)) < prob
+            #selector = np.random.random(len(self.ev.photon_tracks)) < prob
+            selector = np.asarray([track.flags[-1] & event.SURFACE_DETECT == event.SURFACE_DETECT for track in self.ev.photon_tracks])
             nphotons = 0
             for track in (t for s,t in zip(selector,self.ev.photon_tracks) if s):
                 if cher_only and track.flags[0] & event.CHERENKOV == event.CHERENKOV:
-                    self.render_photon_track(geometry,track[:min(len(track),5)],sz=0.05)
+                    self.render_photon_track(geometry,track[:min(len(track),20)],sz=2)
                     nphotons = nphotons + 1
                 elif not cher_only:
-                    self.render_photon_track(geometry,track[:min(len(track),5)])
+                    self.render_photon_track(geometry,track[:min(len(track),20)])
                     nphotons = nphotons + 1
             if nphotons > 0:
                 print('Rendered Photons',nphotons)
@@ -874,6 +875,9 @@ class EventViewer(Camera):
             q = self.ev.channels.q
             select = hit.copy()
 
+        if np.count_nonzero(select) == 0:
+            return
+
         # Important: Compute range only with HIT channels
         if self.display_mode == 'charge':
             channel_color = map_to_color(q, range=(q[select].min(),q[select].max()))
@@ -886,6 +890,8 @@ class EventViewer(Camera):
         elif self.display_mode == 'hit':
             channel_color = map_to_color(hit, range=(hit.min(), hit.max()))
         elif self.display_mode == 'dichroicon':
+            if len(select)%2 != 0:
+                return
             channel_color = np.zeros_like(hit,dtype=np.uint32)
             channel_color[::2] |= (255*hit[::2]/np.max(hit[::2])).astype(np.uint32)
             channel_color[::2] |= (255*hit[1::2]/np.max(hit[1::2])).astype(np.uint32)<<16

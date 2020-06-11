@@ -11,9 +11,6 @@ WORKDIR /opt/chroma/
 RUN sed -i 's/VIRTUAL_ENV/CONDA_PREFIX/g' setup.py #use anaconda env instead
 RUN python setup.py develop
 
-#Only needed for runtime, confuses the build process
-RUN echo export LD_LIBRARY_PATH=\\"$LD_LIBRARY_PATH:/opt/anaconda3/lib\\" >> /etc/profile.d/chroma_env.sh
-
 #For jupyter
 EXPOSE 8888
 
