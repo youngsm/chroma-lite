@@ -18,17 +18,11 @@ The images pushed to DockerHub are built from the subdirectories in the `install
 
 To get a prebuilt image, run `docker pull benland100/chroma3:[tag]` where tag identifies the image you want. 
 
-### Geant4 data
-
-Geant4 data is not included in these images. You should mount some host directory to /opt/geant4/share/Geant4-10.5.1/data/ when launching a container, and run `geant4-config --install-datasets` to download the data on the first run. 
-
-`docker run -v /path/to/host/data:/opt/geant4/share/Geant4-10.5.1/data/ benland100/chroma3:440 geant4-config --install-datasets`
-
 ## Docker usage
 
 Connecting the container to the GPU requires either the `nvidia-docker` runtime or passing the GPU device nodes manually to the container. See subsections for details.
 
-In general, the containers can be run with `docker run -it benland100/chroma3:[tag]`, but to do something useful, you should mount some host directory containing your analysis code and/or data storage to the container with additional `-v host_path:container_path` flags, and work within those directories. Paths not mounted from the host will not be saved when the container exits. Also, ensure that the Geant4 data is mounted, or Geant4 will not work.
+In general, the containers can be run with `docker run -it benland100/chroma3:[tag]`, but to do something useful, you should mount some host directory containing your analysis code and/or data storage to the container with additional `-v host_path:container_path` flags, and work within those directories. Paths not mounted from the host will not be saved when the container exits. 
 
 Consider adding `--net=host` to your run command and running `jupyter` within the container. The default Python3 environment is setup for Chroma.
 
@@ -40,7 +34,7 @@ This tool must be installed on the host, and adds the `nvidia-docker` command, w
 
 On my machine, the minimal docker command to launch a shell is:
 
-`nvidia-docker run -v /home/benland100/research/chroma_test/geant4.10.05.p01/share/Geant4-10.5.1/data/:/opt/geant4/share/Geant4-10.5.1/data/ -it benland100/chroma3:nvidia`
+`nvidia-docker run -it benland100/chroma3:nvidia`
 
 ### Without nvidia-docker
 
@@ -48,7 +42,7 @@ To use CUDA within a container, the host's NVIDIA device nodes must be passed to
 
 On my machine, this results in a very concise minimal docker run command:
 
-`docker run -v /home/benland100/research/chroma_test/geant4.10.05.p01/share/Geant4-10.5.1/data/:/opt/geant4/share/Geant4-10.5.1/data/ --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl -it benland100/chroma3:440`
+`docker run --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools --device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidiactl:/dev/nvidiactl -it benland100/chroma3:440`
 
 ## Singularity usage
 
@@ -60,9 +54,9 @@ The `:nvidia` tagged image used here is likely the best choice, as Singularity's
 
 Singularity can then be used to build an image: `sudo singularity build chroma3.simg Singularity`
 
-Running this image is straightforward, just remember to mount the Geant4 data. Your home directory will be available within the image, but other directories can be mounted as desired.
+Running this image is pretty setraightforward. Your home directory will be available within the image, but other directories can be mounted as desired.
 
-`singularity run --nv -B /home/benland100/research/chroma_test/geant4.10.05.p01/share/Geant4-10.5.1/data/:/opt/geant4/share/Geant4-10.5.1/data/ chroma3.simg`
+`singularity run --nv chroma3.simg`
 
 Visualization with OpenGL and simulation with CUDA will work in this container.
 

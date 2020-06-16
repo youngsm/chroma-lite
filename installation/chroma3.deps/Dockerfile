@@ -53,7 +53,7 @@ RUN curl -O https://geant4-data.web.cern.ch/geant4-data/releases/geant4.10.05.p0
 RUN tar xf geant4.10.05.p01.tar.gz
 RUN rm geant4.10.05.p01.tar.gz
 WORKDIR /opt/geant4.10.05.p01/build-g4
-RUN cmake -DCMAKE_BUILD_TYPE=Release -DGEANT4_INSTALL_DATA=OFF -DCMAKE_INSTALL_PREFIX=/opt/geant4 -DGEANT4_USE_GDML=ON -DGEANT4_USE_OPENGL_X11=ON -DGEANT4_USE_XM=OFF /opt/geant4.10.05.p01
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DGEANT4_INSTALL_DATA=ON -DCMAKE_INSTALL_PREFIX=/opt/geant4 -DGEANT4_USE_GDML=ON -DGEANT4_USE_OPENGL_X11=ON -DGEANT4_USE_XM=OFF /opt/geant4.10.05.p01
 RUN make -j12
 RUN make install
 WORKDIR /opt/geant4.10.05.p01
