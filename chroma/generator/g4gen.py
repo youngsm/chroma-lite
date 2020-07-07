@@ -13,36 +13,24 @@ import g4py.ParticleGun
 from chroma.generator import _g4chroma
 import chroma.geometry as geometry
 
-def add_wvl_prop(prop_table,name,material,prop_str):
+def add_prop(prop_table,name,material,prop_str,option=None):
     if prop_str not in material.__dict__:
         return
+    if option is None:
+        transform = lambda data: (list(data[:, 0].astype(float)),list(data[:, 1].astype(float)))
+    elif option is 'wavelength':
+        transform = lambda data: (list((2*pi*hbarc / (data[::-1,0] * nanometer)).astype(float)),list(data[::-1, 1].astype(float)))
+    elif option is 'dy_dwavelength':
+        transform = lambda data: (list((2*pi*hbarc / (data[::-1,0] * nanometer)).astype(float)),list((data[::-1, 1]*np.square(data[::-1, 0])*nanometer/2/pi/hbarc).astype(float)))
+    
     data = material.__dict__[prop_str]
     if data is not None:
         if type(data) is dict:
             for prefix,_data in data.items():
-                # Reverse entries so they are in ascending energy order rather than wavelength
-                energy = list((2*pi*hbarc / (_data[::-1,0] * nanometer)).astype(float))
-                values = list(_data[::-1, 1].astype(float))
+                energy, values = transform(_data)
                 prop_table.AddProperty(name+prefix, energy, values)
         else:
-            # Reverse entries so they are in ascending energy order rather than wavelength
-            energy = list((2*pi*hbarc / (data[::-1,0] * nanometer)).astype(float))
-            values = list(data[::-1, 1].astype(float))
-            prop_table.AddProperty(name, energy, values)
-
-def add_prop(prop_table,name,material,prop_str):
-    if prop_str not in material.__dict__:
-        return
-    data = material.__dict__[prop_str]
-    if data is not None:
-        if type(data) is dict:
-            for prefix,_data in data.items():
-                energy = list(_data[:, 0].astype(float))
-                values = list(_data[:, 1].astype(float))
-                prop_table.AddProperty(name+prefix, energy, values)
-        else:
-            energy = list(data[:, 0].astype(float))
-            values = list(data[:, 1].astype(float))
+            energy, values = transform(data)
             prop_table.AddProperty(name, energy, values)
     
 
@@ -55,9 +43,9 @@ def create_g4material(material):
     
     # Add properties necessary for primary scintillation generation
     prop_table = G4MaterialPropertiesTable()
-    add_wvl_prop(prop_table,'RINDEX',material,'refractive_index')
-    add_wvl_prop(prop_table,'SCINTILLATION',material,'scintillation_spectrum')
-    add_prop(prop_table,'SCINTWAVEFORM',material,'scintillation_waveform')
+    add_prop(prop_table,'RINDEX',material,'refractive_index',option='wavelength')
+    add_prop(prop_table,'SCINTILLATION',material,'scintillation_spectrum',option='dy_dwavelength')
+    add_prop(prop_table,'SCINTWAVEFORM',material,'scintillation_waveform') #could be a PDF but this requires time constants
     add_prop(prop_table,'SCINTMOD',material,'scintillation_mod')
     if 'scintillation_light_yield' in material.__dict__:
         data = material.scintillation_light_yield 
