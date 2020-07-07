@@ -13,6 +13,23 @@ import g4py.ParticleGun
 from chroma.generator import _g4chroma
 import chroma.geometry as geometry
 
+def add_wvl_prop(prop_table,name,material,prop_str):
+    if prop_str not in material.__dict__:
+        return
+    data = material.__dict__[prop_str]
+    if data is not None:
+        if type(data) is dict:
+            for prefix,_data in data.items():
+                # Reverse entries so they are in ascending energy order rather than wavelength
+                energy = list((2*pi*hbarc / (_data[::-1,0] * nanometer)).astype(float))
+                values = list(_data[::-1, 1].astype(float))
+                prop_table.AddProperty(name+prefix, energy, values)
+        else:
+            # Reverse entries so they are in ascending energy order rather than wavelength
+            energy = list((2*pi*hbarc / (data[::-1,0] * nanometer)).astype(float))
+            values = list(data[::-1, 1].astype(float))
+            prop_table.AddProperty(name, energy, values)
+
 def add_prop(prop_table,name,material,prop_str):
     if prop_str not in material.__dict__:
         return
@@ -34,24 +51,20 @@ def create_g4material(material):
                             len(material.composition))
     # Add elements
     for element_name, element_frac_by_weight in material.composition.items():
-        g4material.AddElement(G4Element.GetElement(element_name, True),
-                              element_frac_by_weight)
-    # Set index of refraction
+        g4material.AddElement(G4Element.GetElement(element_name, True), element_frac_by_weight)
+    
+    # Add properties necessary for primary scintillation generation
     prop_table = G4MaterialPropertiesTable()
-    # Reverse entries so they are in ascending energy order rather
-    # than wavelength
-    energy = list((2*pi*hbarc / (material.refractive_index[::-1,0] * nanometer)).astype(float))
-    values = list(material.refractive_index[::-1, 1].astype(float))
-    prop_table.AddProperty('RINDEX', energy, values)
-    if 'scintillation_light_yield' in material.__dict__:
-        data = material.__dict__['scintillation_light_yield'] 
-        if data is not None:
-            prop_table.AddConstProperty('LIGHT_YIELD',data)
-    add_prop(prop_table,'SCINTILLATION',material,'scintillation_spectrum')
+    add_wvl_prop(prop_table,'RINDEX',material,'refractive_index')
+    add_wvl_prop(prop_table,'SCINTILLATION',material,'scintillation_spectrum')
     add_prop(prop_table,'SCINTWAVEFORM',material,'scintillation_waveform')
     add_prop(prop_table,'SCINTMOD',material,'scintillation_mod')
+    if 'scintillation_light_yield' in material.__dict__:
+        data = material.scintillation_light_yield 
+        if data is not None:
+            prop_table.AddConstProperty('LIGHT_YIELD',data)
 
-    # Load properties
+    # Load properties into material
     g4material.SetMaterialPropertiesTable(prop_table)
     return g4material
 
