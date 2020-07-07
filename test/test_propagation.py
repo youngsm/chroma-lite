@@ -39,8 +39,8 @@ class TestPropagation(unittest.TestCase):
                           wavelengths=wavelengths)
 
         # First make one step to check for strangeness
-        photons_end = sim.simulate([photons], keep_photons_end=True,
-                                   max_steps=1).next().photons_end
+        photons_end = next(sim.simulate([photons], keep_photons_end=True,
+                                   max_steps=1)).photons_end
 
         self.assertFalse(np.isnan(photons_end.pos).any())
         self.assertFalse(np.isnan(photons_end.dir).any())
@@ -49,8 +49,8 @@ class TestPropagation(unittest.TestCase):
         self.assertFalse(np.isnan(photons_end.wavelengths).any())
 
         # Now let it run the usual ten steps
-        photons_end = sim.simulate([photons], keep_photons_end=True,
-                                   max_steps=10).next().photons_end
+        photons_end = next(sim.simulate([photons], keep_photons_end=True,
+                                   max_steps=10)).photons_end
         aborted = (photons_end.flags & (1 << 31)) > 0
         print('aborted photons: %1.1f' % \
             (float(count_nonzero(aborted)) / nphotons))

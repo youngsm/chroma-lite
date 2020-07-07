@@ -10,8 +10,6 @@ from chroma.event import Photons
 from chroma.rootimport import ROOT
 ROOT.gROOT.SetBatch(1)
 
-from chroma.histogram import Histogram, rootify
-
 class TestRayleigh(unittest.TestCase):
     def setUp(self):
         self.cube = Geometry(water)
@@ -36,7 +34,7 @@ class TestRayleigh(unittest.TestCase):
         # Fully polarized photons
         self.photons.pol[:] = [1.0, 0.0, 0.0]
 
-        photons_end = self.sim.simulate([self.photons], keep_photons_end=True, max_steps=1).next().photons_end
+        photons_end = next(self.sim.simulate([self.photons], keep_photons_end=True, max_steps=1)).photons_end
         aborted = (photons_end.flags & (1 << 31)) > 0
         self.assertFalse(aborted.any())
 
@@ -44,9 +42,9 @@ class TestRayleigh(unittest.TestCase):
         rayleigh_scatters = (photons_end.flags & (1 << 4)) > 0
         cos_scatter = (self.photons.dir[rayleigh_scatters] * photons_end.dir[rayleigh_scatters]).sum(axis=1)
         theta_scatter = np.arccos(cos_scatter)
-        h = Histogram(bins=100, range=(0, np.pi))
-        h.fill(theta_scatter)
-        h = rootify(h)
+        h = ROOT.TH1F('hpx','Histogram',100, 0, np.pi)
+        for ts in theta_scatter:
+            h.Fill(ts)
 
         # The functional form for polarized light should be
         # (1 + \cos^2 \theta)\sin \theta according to GEANT4 physics
