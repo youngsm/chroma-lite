@@ -8,6 +8,7 @@ from chroma.rootimport import ROOT
 # Check if we have already imported the ROOT class due to a user's
 # rootlogon.C script
 if not hasattr(ROOT, 'Vertex') or not hasattr(ROOT, 'Channel'):
+    print('Setting up ROOT datatypes.')
     # Create .chroma directory if it doesn't exist
     chroma_dir = os.path.expanduser('~/.chroma')
     if not os.path.isdir(chroma_dir):

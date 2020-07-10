@@ -717,8 +717,20 @@ class EventViewer(Camera):
         self.photon_display_mode = next(self.photon_display_mode_iter)
         self.track_display_mode_iter = itertools.cycle(['none','geant4','chroma','both'])
         self.track_display_mode = next(self.track_display_mode_iter)
+        
+        
+        ''' photons_max will randomly select at most that many photons
+            photons_max_steps truncates all photon tracks to that number of steps
+            photons_only_type can be set to 'cher', 'scint', or 'reemit' 
+            photons_detected_only will show only detected photon tracks 
+            photons_track_size controls the track size of the photons'''
+        self.photons_max = 1000
+        self.photons_max_steps = 20
+        self.photons_only_type = None
+        self.photons_detected_only = False
+        self.photons_track_size = 0.1
 
-    def render_photon_track(self,geometry,photon_track,sz=1.0):
+    def render_photon_track(self,geometry,photon_track,sz=1.0,color='wavelength'):
         origin = photon_track.pos[:-1]
         extent = photon_track.pos[1:]-photon_track.pos[:-1]
         perp1 = np.cross(origin,extent)
@@ -733,10 +745,14 @@ class EventViewer(Camera):
         triangles = np.asarray([[1, 3, 5], [1, 5, 7], [1, 7, 9], [1, 9, 3], [3, 2, 4], [5, 4, 6], [7, 6, 8], [9, 8, 2], [2, 0, 0], [4, 0, 0], [6, 0, 0], [8, 0, 0],
                                 [1, 5, 1], [1, 7, 1], [1, 9, 1], [1, 3, 1], [3, 4, 5], [5, 6, 7], [7, 8, 9], [9, 2, 3], [2, 0, 4], [4, 0, 6], [6, 0, 8], [8, 0, 2]],
                                 dtype=np.int32)
-        r = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[0,0,255]),dtype=np.uint32)
-        g = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[0,255,0]),dtype=np.uint32)
-        b = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[255,0,0]),dtype=np.uint32)
-        colors = np.bitwise_or(b,np.bitwise_or(np.left_shift(g,8),np.left_shift(r,16)))
+        if color == 'wavelength':
+            r = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[0,0,255]),dtype=np.uint32)
+            g = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[0,255,0]),dtype=np.uint32)
+            b = np.asarray(np.interp(photon_track.wavelengths[:-1],[300,550,800],[255,0,0]),dtype=np.uint32)
+            colors = np.bitwise_or(b,np.bitwise_or(np.left_shift(g,8),np.left_shift(r,16)))
+        else:
+            r,g,b = color
+            colors = np.full_like(photon_track.wavelengths[:-1],((r<<16)|(g<<8)|b),dtype=np.uint32)
         markers = [Solid(Mesh(v,triangles), vacuum, vacuum, color=c) for v,c in zip(vertices,colors)]
         [geometry.add_solid(marker) for marker in markers]
 
@@ -777,7 +793,7 @@ class EventViewer(Camera):
             geometry.add_solid(marker, displacement=p, rotation=gen_rot([0,1,0],d))
 
 
-    def render_mc_info(self,max_photons=1000,cher_only=True):
+    def render_mc_info(self):
         #need to render photon tracking info if available
         
         self.gpu_geometries = [self.gpu_geometry]
@@ -814,20 +830,45 @@ class EventViewer(Camera):
         if self.track_display_mode in ['chroma', 'both'] and self.ev.photon_tracks is not None:
             geometry = Geometry()
             print('Total Photons',len(self.ev.photon_tracks))
-            cherenkov = np.asarray([track.flags[0] & event.CHERENKOV == event.CHERENKOV for track in self.ev.photon_tracks])
-            ncherenkov = np.count_nonzero(cherenkov)
-            nphotons = ncherenkov if cher_only else len(self.ev.photon_tracks)
-            prob = max_photons/nphotons
-            #selector = np.random.random(len(self.ev.photon_tracks)) < prob
-            selector = np.asarray([track.flags[-1] & event.SURFACE_DETECT == event.SURFACE_DETECT for track in self.ev.photon_tracks])
-            nphotons = 0
-            for track in (t for s,t in zip(selector,self.ev.photon_tracks) if s):
-                if cher_only and track.flags[0] & event.CHERENKOV == event.CHERENKOV:
-                    self.render_photon_track(geometry,track[:min(len(track),20)],sz=2)
-                    nphotons = nphotons + 1
-                elif not cher_only:
-                    self.render_photon_track(geometry,track[:min(len(track),20)])
-                    nphotons = nphotons + 1
+            
+            def has(flags,test):
+                return flags & test == test
+            
+            tracks = self.ev.photon_tracks
+            if self.photons_detected_only:
+                detected = np.asarray([has(track.flags[-1],event.SURFACE_DETECT) for track in tracks])
+                tracks = [t for t,m in zip(tracks,detected) if m]
+            cherenkov = np.asarray([has(track.flags[0],event.CHERENKOV) and not has(track.flags[-1],event.BULK_REEMIT) for track in tracks])
+            scintillation = np.asarray([has(track.flags[0],event.SCINTILLATION) and not has(track.flags[-1],event.BULK_REEMIT) for track in tracks])
+            reemission = np.asarray([has(track.flags[-1],event.BULK_REEMIT) for track in tracks])
+            if self.photons_only_type is not None:
+                if self.photons_only_type == 'cher':
+                    selector = cherenkov
+                elif self.photons_only_type == 'scint':
+                    selector = scintillation
+                elif self.photons_only_type == 'reemit':
+                    selector = reemission
+                else:
+                    raise Exception('Unknown only type: %s'%only)
+                tracks = [t for t,m in zip(tracks,selector) if m]
+                cherenkov = cherenkov[selector]
+                scintillation = scintillation[selector]
+                reemission = reemission[selector]
+            nphotons = len(tracks)
+            prob = self.photons_max/nphotons if self.photons_max is not None else 1.0
+            selector = np.random.random(len(tracks)) < prob
+            nphotons = np.count_nonzero(selector)
+            for i,track in ((i,t) for i,(s,t) in enumerate(zip(selector,tracks)) if s):
+                if cherenkov[i]:
+                    color = [255,0,0]
+                elif scintillation[i]:
+                    color = [0,0,255]
+                elif reemission[i]:
+                    color = [0,255,0]
+                else:
+                    color = [255,255,255]
+                steps = min(len(track),self.photons_max_steps) if self.photons_max_steps is not None else len(track)
+                self.render_photon_track(geometry,track[:steps],sz=self.photons_track_size,color=color)
             if nphotons > 0:
                 print('Rendered Photons',nphotons)
                 geometry = create_geometry_from_obj(geometry)

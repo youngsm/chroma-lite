@@ -213,9 +213,13 @@ void fill_photons(std::vector<Photon> &photons,
 }
 
 #ifdef __MAKECINT__
-#pragma link C++ class vector<Vertex>;
-#pragma link C++ class vector<Photon>;
-#pragma link C++ class vector<Channel>;
+#pragma link C++ class Vertex+;
+#pragma link C++ class Photon+;
+#pragma link C++ class Event+;
+#pragma link C++ class std::vector<Vertex>+;
+#pragma link C++ class std::vector<Photon>+;
+#pragma link C++ class std::vector<Channel>+;
+#pragma link C++ class std::map<int,std::vector<Photon>>+;
 #endif
 
 
