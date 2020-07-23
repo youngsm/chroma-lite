@@ -32,6 +32,7 @@ struct Photon {
   double wavelength; // nm
   unsigned int flag;
   int last_hit_triangle;
+  int channel;
 
   ClassDef(Photon, 1);
 };
@@ -69,6 +70,7 @@ struct Event {
   std::vector<std::vector<Photon>> photon_tracks;
   std::vector<int> photon_parent_trackids;
   std::map<int,std::vector<Photon>> hits;
+  std::vector<Photon> flat_hits;
   std::vector<Channel> channels;
 
   ClassDef(Event, 1);
@@ -169,7 +171,7 @@ void get_channels(Event *ev, int *hit, float *t, float *q, unsigned int *flags)
 
 void get_photons(const std::vector<Photon> &photons, float *pos, float *dir,
 		 float *pol, float *wavelengths, float *t,
-		 int *last_hit_triangles, unsigned int *flags)
+		 int *last_hit_triangles, unsigned int *flags, unsigned int *channels)
 {
   for (unsigned int i=0; i < photons.size(); i++) {
     const Photon &photon = photons[i];
@@ -189,13 +191,15 @@ void get_photons(const std::vector<Photon> &photons, float *pos, float *dir,
     t[i] = photon.t;
     flags[i] = photon.flag;
     last_hit_triangles[i] = photon.last_hit_triangle;
+    channels[i] = photon.channel;
   }
 }
 		 
 void fill_photons(std::vector<Photon> &photons,
 		  unsigned int nphotons, float *pos, float *dir,
 		  float *pol, float *wavelengths, float *t,
-		  int *last_hit_triangles, unsigned int *flags)
+		  int *last_hit_triangles, unsigned int *flags,
+		  unsigned int *channels)
 {
   photons.resize(nphotons);
   
@@ -208,6 +212,7 @@ void fill_photons(std::vector<Photon> &photons,
     photon.wavelength = wavelengths[i];
     photon.last_hit_triangle = last_hit_triangles[i];
     photon.flag = flags[i];
+    photon.channel = channels[i];
 
   }
 }

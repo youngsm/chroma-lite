@@ -113,7 +113,8 @@ def root_event_to_python_event(ev):
                          photons.wavelengths,
                          photons.t,
                          photons.last_hit_triangles,
-                         photons.flags)
+                         photons.flags, 
+                         photons.channel)
         pyev.photons_beg = photons
 
     # photon end
@@ -126,7 +127,8 @@ def root_event_to_python_event(ev):
                          photons.wavelengths,
                          photons.t,
                          photons.last_hit_triangles,
-                         photons.flags)
+                         photons.flags, 
+                         photons.channel)
         pyev.photons_end = photons
 
     # photon tracks
@@ -141,7 +143,8 @@ def root_event_to_python_event(ev):
                              photons.wavelengths,
                              photons.t,
                              photons.last_hit_triangles,
-                             photons.flags)
+                             photons.flags, 
+                             photons.channel)
             photon_tracks.append(photons)
         pyev.photon_tracks = photon_tracks
         pyev.photon_parent_trackids = np.asarray(ev.photon_parent_trackids).copy()    
@@ -156,8 +159,23 @@ def root_event_to_python_event(ev):
                           photons.dir.ravel(),
                           photons.pol.ravel(),
                           photons.wavelengths, photons.t,
-                          photons.last_hit_triangles, photons.flags)
+                          photons.last_hit_triangles, photons.flags,
+                          photons.channel)
             pyev.hits[hit.first] = photons
+
+    # photon end
+    if ev.photons_end.size() > 0:
+        photons = make_photon_with_arrays(ev.photons_end.size())
+        ROOT.get_photons(ev.photons_end,
+                         photons.pos.ravel(),
+                         photons.dir.ravel(),
+                         photons.pol.ravel(),
+                         photons.wavelengths,
+                         photons.t,
+                         photons.last_hit_triangles,
+                         photons.flags,
+                         photons.channel)
+        pyev.photons_end = photons
 
     # channels
     if ev.nchannels > 0:
@@ -259,7 +277,8 @@ class RootWriter(object):
                               photons.dir.ravel(),
                               photons.pol.ravel(),
                               photons.wavelengths, photons.t,
-                              photons.last_hit_triangles, photons.flags)
+                              photons.last_hit_triangles, photons.flags, 
+                              photons.channel)
         else:
             self.ev.photons_beg.resize(0)
 
@@ -271,7 +290,8 @@ class RootWriter(object):
                               photons.dir.ravel(),
                               photons.pol.ravel(),
                               photons.wavelengths, photons.t,
-                              photons.last_hit_triangles, photons.flags)
+                              photons.last_hit_triangles, photons.flags, 
+                              photons.channel)
         else:
             self.ev.photons_end.resize(0)
         
@@ -285,7 +305,8 @@ class RootWriter(object):
                               photons.dir.ravel(),
                               photons.pol.ravel(),
                               photons.wavelengths, photons.t,
-                              photons.last_hit_triangles, photons.flags)
+                              photons.last_hit_triangles, photons.flags, 
+                              photons.channel)
             self.ev.photon_parent_trackids.resize(len(pyev.photon_parent_trackids))
             np.asarray(self.ev.photon_parent_trackids)[:] = pyev.photon_parent_trackids
         else:
@@ -308,9 +329,23 @@ class RootWriter(object):
                               photons.dir.ravel(),
                               photons.pol.ravel(),
                               photons.wavelengths, photons.t,
-                              photons.last_hit_triangles, photons.flags)
+                              photons.last_hit_triangles, photons.flags, 
+                              photons.channel)
         else:
             self.ev.hits.clear()
+            
+        if pyev.flat_hits is not None:
+            photons = pyev.flat_hits
+            ROOT.fill_photons(self.ev.flat_hits,
+                              len(photons.pos),
+                              photons.pos.ravel(),
+                              photons.dir.ravel(),
+                              photons.pol.ravel(),
+                              photons.wavelengths, photons.t,
+                              photons.last_hit_triangles, photons.flags, 
+                              photons.channel)
+        else:
+            self.ev.flat_hits.resize(0)
         
         if pyev.channels is not None:
             nhit = count_nonzero(pyev.channels.hit)

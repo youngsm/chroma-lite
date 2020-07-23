@@ -93,9 +93,20 @@ class GPUPhotons(object):
         evidx = self.evidx.get()
         return event.Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights, evidx)
         
-    def get_hits(self, gpu_detector, target_flag=(0x1<<2), nthreads_per_block=64, max_blocks=1024,
-               start_photon=None, nphotons=None, no_map=False):
+    def get_hits(self, *args, **kwargs):
         '''Return a map of GPUPhoton objects containing only photons that
+        have a particular bit set in their history word and were detected by
+        a channel.'''
+        flat_hits = self.get_flat_hits(*args,**kwargs)
+        hitmap = {}
+        for chan in np.unique(flat_hits.channel):
+            mask = (flat_hits.channel == chan).astype(bool)
+            hitmap[int(chan)] = flat_hits[mask]
+        return hitmap
+
+    def get_flat_hits(self, gpu_detector, target_flag=(0x1<<2), nthreads_per_block=64, max_blocks=1024,
+               start_photon=None, nphotons=None, no_map=False):
+        '''GPUPhoton objects containing only photons that
         have a particular bit set in their history word and were detected by
         a channel.'''
         cuda.Context.get_current().synchronize()
@@ -161,11 +172,8 @@ class GPUPhotons(object):
         evidx = evidx.get()
         channels = channels.get()
         hitmap = {}
-        for chan in np.unique(channels):
-            mask = (channels == chan).astype(bool)
-            hitmap[int(chan)] = event.Photons(pos[mask], dir[mask], pol[mask], wavelengths[mask], t[mask], last_hit_triangles[mask], flags[mask], weights[mask], evidx[mask])
-        return hitmap
-
+        return event.Photons(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights, evidx, channels)
+        
     def iterate_copies(self):
         '''Returns an iterator that yields GPUPhotonsSlice objects
         corresponding to the event copies stored in ``self``.'''

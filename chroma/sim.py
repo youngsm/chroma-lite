@@ -55,7 +55,7 @@ class Simulation(object):
 
         self.pdf_config = None
      
-    def _simulate_batch(self,batch_events,keep_photons_beg=False,keep_photons_end=False,keep_hits=True,run_daq=False, max_steps=100, verbose=False):
+    def _simulate_batch(self,batch_events,keep_photons_beg=False,keep_photons_end=False,keep_hits=True,keep_flat_hits=True,run_daq=False, max_steps=100, verbose=False):
         '''Assumes batch_events is a list of Event objects with photons_beg having evidx set to the index in the array.
            
            Yields the fully formed events. Do not call directly.'''
@@ -91,8 +91,8 @@ class Simulation(object):
         if keep_photons_end:
             batch_photons_end = gpu_photons.get()
             
-        if hasattr(self.detector, 'num_channels') and keep_hits:
-            batch_hits = gpu_photons.get_hits(self.gpu_geometry)
+        if hasattr(self.detector, 'num_channels') and (keep_hits or keep_flat_hits):
+            batch_hits = gpu_photons.get_flat_hits(self.gpu_geometry)
                 
         for i,(batch_ev,(start_photon,end_photon)) in enumerate(zip(batch_events,zip(batch_bounds[:-1],batch_bounds[1:]))):
                     
@@ -116,10 +116,14 @@ class Simulation(object):
             if keep_photons_end:
                 batch_ev.photons_end = batch_photons_end[start_photon:end_photon]
                         
-            if hasattr(self.detector, 'num_channels') and keep_hits:
-                #Thought: this is kind of expensive computationally, but keep_hits is for diagnostics
-                batch_ev.hits = {chan:batch_hits[chan][batch_hits[chan].evidx == i] for chan in batch_hits}
-                batch_ev.hits = {chan:batch_ev.hits[chan] for chan in batch_ev.hits if len(batch_ev.hits[chan]) > 0}
+            if hasattr(self.detector, 'num_channels') and (keep_hits or keep_flat_hits):
+                ev_hits = batch_hits[batch_hits.evidx == i]
+                if keep_hits:
+                    #This is kind of expensive computationally, but keep_hits is for diagnostics
+                    batch_ev.hits = { int(chan):ev_hits[ev_hits.channel == chan] for chan in np.unique(ev_hits.channel) }
+                if keep_flat_hits:
+                    batch_ev.flat_hits = ev_hits[ev_hits.evidx == i]
+                    
                         
             if hasattr(self, 'gpu_daq') and run_daq:
                 #Must run DAQ per event, or design a much more complicated daq algorithm
@@ -134,8 +138,8 @@ class Simulation(object):
                     
             yield batch_ev
 
-    def simulate(self, iterable, keep_photons_beg=False,
-                 keep_photons_end=False, keep_hits=True, run_daq=False, max_steps=1000,
+    def simulate(self, iterable, keep_photons_beg=False, keep_photons_end=False,
+                 keep_hits=True, keep_flat_hits=True, run_daq=False, max_steps=1000,
                  photons_per_batch=1000000):
         if isinstance(iterable, event.Photons):
             first_element, iterable = iterable, [iterable]
@@ -166,6 +170,7 @@ class Simulation(object):
                                                 keep_photons_beg=keep_photons_beg,
                                                 keep_photons_end=keep_photons_end,
                                                 keep_hits=keep_hits,
+                                                keep_flat_hits=keep_flat_hits,
                                                 run_daq=run_daq, max_steps=max_steps)
                 nphotons = 0
                 batch_events = []
@@ -175,6 +180,7 @@ class Simulation(object):
                                             keep_photons_beg=keep_photons_beg,
                                             keep_photons_end=keep_photons_end,
                                             keep_hits=keep_hits,
+                                            keep_flat_hits=keep_flat_hits,
                                             run_daq=run_daq, max_steps=max_steps)
 
     def create_pdf(self, iterable, tbins, trange, qbins, qrange, nreps=1):

@@ -69,7 +69,7 @@ class Vertex(object):
     __repr__ = __str__
 
 class Photons(object):
-    def __init__(self, pos=np.empty((0,3)), dir=np.empty((0,3)), pol=np.empty((0,3)), wavelengths=np.empty((0)), t=None, last_hit_triangles=None, flags=None, weights=None, evidx=None):
+    def __init__(self, pos=np.empty((0,3)), dir=np.empty((0,3)), pol=np.empty((0,3)), wavelengths=np.empty((0)), t=None, last_hit_triangles=None, flags=None, weights=None, evidx=None, channel=None):
         '''Create a new list of n photons.
 
             pos: numpy.ndarray(dtype=numpy.float32, shape=(n,3))
@@ -98,6 +98,9 @@ class Photons(object):
             weights: numpy.ndarray(dtype=numpy.float32, shape=n)
                Survival probability for each photon.  Used by 
                photon propagation code when computing likelihood functions.
+               
+           evidx: numpy.ndarray(dtype=numpy.uint32, shape=n)
+               Index of the event in a GPU batch
         '''
         self.pos = np.asarray(pos, dtype=np.float32)
         self.dir = np.asarray(dir, dtype=np.float32)
@@ -131,6 +134,11 @@ class Photons(object):
         else:
             self.evidx = np.asarray(evidx, dtype=np.uint32)
             
+        if channel is None:
+            self.channel = np.zeros(len(pos), dtype=np.uint32)
+        else:
+            self.channel = np.asarray(channel, dtype=np.uint32)
+            
     def join(photon_list,concatenate=True):
         '''Concatenates many photon objects together efficiently'''
         if concatenate: #internally lists
@@ -143,8 +151,9 @@ class Photons(object):
             flags = np.concatenate([p.flags for p in photon_list])
             weights = np.concatenate([p.weights for p in photon_list])
             evidx = np.concatenate([p.evidx for p in photon_list])
+            channel = np.concatenate([p.channel for p in photon_list])
             return Photons(pos, dir, pol, wavelengths, t,
-                           last_hit_triangles, flags, weights, evidx)
+                           last_hit_triangles, flags, weights, evidx,channel)
         else: #internally scalars
             pos = np.asarray([p.pos for p in photon_list])
             dir = np.asarray([p.dir for p in photon_list])
@@ -155,8 +164,9 @@ class Photons(object):
             flags = np.asarray([p.flags for p in photon_list])
             weights = np.asarray([p.weights for p in photon_list])
             evidx = np.asarray([p.evidx for p in photon_list])
+            channel = np.asarray([p.channel for p in photon_list])
             return Photons(pos, dir, pol, wavelengths, t,
-                           last_hit_triangles, flags, weights, evidx)
+                           last_hit_triangles, flags, weights, evidx, channel)
 
     def __add__(self, other):
         '''Concatenate two Photons objects into one list of photons.
@@ -175,8 +185,9 @@ class Photons(object):
         flags = np.concatenate((self.flags, other.flags))
         weights = np.concatenate((self.weights, other.weights))
         evidx = np.concatenate((self.evidx, other.evidx))
+        channel = np.concatenate((self.channel, other.channel))
         return Photons(pos, dir, pol, wavelengths, t,
-                       last_hit_triangles, flags, weights, evidx)
+                       last_hit_triangles, flags, weights, evidx, channel)
 
     def __len__(self):
         '''Returns the number of photons in self.'''
@@ -202,7 +213,7 @@ class Photons(object):
         return Photons(self.pos[key], self.dir[key], self.pol[key],
                        self.wavelengths[key], self.t[key],
                        self.last_hit_triangles[key], self.flags[key],
-                       self.weights[key],self.evidx[key])
+                       self.weights[key],self.evidx[key],self.channel[key])
 
     def reduced(self, reduction_factor=1.0):
         '''Return a new Photons object with approximately
@@ -241,7 +252,7 @@ class Channels(object):
         return self.hit.nonzero(), self.t[self.hit], self.q[self.hit]
 
 class Event(object):
-    def __init__(self, id=0, vertices=None, photons_beg=None, photons_end=None, photon_tracks=None, photon_parent_trackids=None, hits=None, channels=None):
+    def __init__(self, id=0, vertices=None, photons_beg=None, photons_end=None, photon_tracks=None, photon_parent_trackids=None, hits=None, flat_hits=None, channels=None):
         '''Create an event.
 
             id: int
@@ -262,6 +273,12 @@ class Event(object):
             photon_tracks: a python list where each index is a chroma.event.Photons
               object that gives the state of the photon at each step or None
 
+            hits: dict of chroma.event.Photons for each channel with hits
+              Set photons that were detected by PMTs grouped by channel
+              
+            flat_hits: chroma.event.Photons
+              A regular Photons object for photons detected by PMTs
+              
             channels: chroma.event.Channels
               Electronics channel readout information.  Every channel
               should be included, with hit or not hit status indicated
@@ -284,4 +301,5 @@ class Event(object):
         self.photon_tracks = photon_tracks
         self.photon_parent_trackids = photon_parent_trackids
         self.hits = hits
+        self.flat_hits = flat_hits
         self.channels = channels
