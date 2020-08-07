@@ -4,6 +4,7 @@ import numpy as np
 import chroma.event as event
 from chroma.tools import count_nonzero
 from chroma.rootimport import ROOT
+import array
 
 # Check if we have already imported the ROOT class due to a user's
 # rootlogon.C script
@@ -205,6 +206,17 @@ class RootReader(object):
     def __init__(self, filename):
         '''Open ROOT file named `filename` containing TTree `T`.'''
         self.f = ROOT.TFile(filename)
+        
+        if hasattr(self.f,'CH'):
+            ch_info = self.f.CH
+            ch_num = ch_info.GetEntries()
+            self.ch_pos = np.empty((ch_num,3),dtype=np.float32)
+            self.ch_type = np.empty((ch_num,),dtype=np.int32)
+            for i in range(ch_num):
+                ch_info.GetEntry(i)
+                ch_info.pos.GetXYZ(self.ch_pos[i])
+                self.ch_type[i] = ch_info.type
+            
         self.T = self.f.T
         self.i = -1
         
@@ -257,10 +269,22 @@ class RootReader(object):
         return self.i
 
 class RootWriter(object):
-    def __init__(self, filename):
+    def __init__(self, filename, detector=None):
         self.filename = filename
         self.file = ROOT.TFile(filename, 'RECREATE')
-
+        
+        if detector is not None:
+            ch_info = ROOT.TTree('CH', 'Chroma channel info')
+            ch_pos = ROOT.TVector3()
+            ch_type = array.array( 'i', [0])
+            ch_info.Branch('pos',ch_pos)
+            ch_info.Branch('type',ch_type,'type/I')
+            for pos,chtype in zip(detector.channel_index_to_position,
+                                  detector.channel_index_to_channel_type):
+                ch_pos.SetXYZ(*pos)
+                ch_type[0] = chtype
+                ch_info.Fill()
+            ch_info.Write()
         self.T = ROOT.TTree('T', 'Chroma events')
         self.ev = ROOT.Event()
         self.T.Branch('ev', self.ev)
