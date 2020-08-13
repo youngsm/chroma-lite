@@ -74,7 +74,6 @@ MAINTAINER Benjamin Land <benland100@gmail.com>
 
 USER root
 RUN apt-get update && apt-get install -y curl git
-COPY chroma_env.sh /etc/profile.d/
 SHELL ["/bin/bash", "-l", "-c"] 
 COPY --from=build-anaconda /opt/anaconda3 /opt/anaconda3
 ARG DEBIAN_FRONTEND=noninteractive
