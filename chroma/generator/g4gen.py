@@ -18,9 +18,9 @@ def add_prop(prop_table,name,material,prop_str,option=None):
         return
     if option is None:
         transform = lambda data: (list(data[:, 0].astype(float)),list(data[:, 1].astype(float)))
-    elif option is 'wavelength':
+    elif option == 'wavelength':
         transform = lambda data: (list((2*pi*hbarc / (data[::-1,0] * nanometer)).astype(float)),list(data[::-1, 1].astype(float)))
-    elif option is 'dy_dwavelength':
+    elif option == 'dy_dwavelength':
         transform = lambda data: (list((2*pi*hbarc / (data[::-1,0] * nanometer)).astype(float)),list((data[::-1, 1]*np.square(data[::-1, 0])*nanometer/2/pi/hbarc).astype(float)))
     
     data = material.__dict__[prop_str]
