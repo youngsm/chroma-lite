@@ -54,7 +54,7 @@ def root_vertex_to_python_vertex(vertex):
               np.empty(n),np.empty(n),np.empty(n),
               np.empty(n),np.empty(n))
         ROOT.get_steps(vertex,n,steps.x,steps.y,steps.z,steps.t,
-                       steps.px,steps.py,steps.pz,
+                       steps.dx,steps.dy,steps.dz,
                        steps.ke,steps.edep)
     else:
         steps = None
@@ -85,7 +85,7 @@ def python_vertex_to_root_vertex(pvertex,rvertex):
     rvertex.pdgcode = pvertex.pdgcode
     if pvertex.steps:
         ROOT.fill_steps(rvertex,len(pvertex.steps.x),pvertex.steps.x,pvertex.steps.y,pvertex.steps.z,
-                        pvertex.steps.t,pvertex.steps.px,pvertex.steps.py,pvertex.steps.pz,
+                        pvertex.steps.t,pvertex.steps.dx,pvertex.steps.dy,pvertex.steps.dz,
                         pvertex.steps.ke,pvertex.steps.edep)
     else:
         nil = np.empty(0,dtype=np.float64)

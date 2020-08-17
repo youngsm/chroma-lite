@@ -16,14 +16,14 @@ SCINTILLATION    = 0x1 << 11
 NAN_ABORT        = 0x1 << 31
 
 class Steps(object):
-    def __init__(self,x,y,z,t,px,py,pz,ke,edep):
+    def __init__(self,x,y,z,t,dx,dy,dz,ke,edep):
         self.x = x
         self.y = y
         self.z = z
         self.t = t
-        self.px = px
-        self.py = py
-        self.pz = pz
+        self.dx = dx
+        self.dy = dy
+        self.dz = dz
         self.ke = ke
         self.edep = edep
     

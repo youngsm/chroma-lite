@@ -148,11 +148,11 @@ class G4Generator(object):
     def _extract_vertex_from_stepping_action(self, index=1):
         track = self.stepping_action.getTrack(index)
         steps = Steps(track.getStepX(),track.getStepY(),track.getStepZ(),track.getStepT(),
-                      track.getStepPX(),track.getStepPY(),track.getStepPZ(),track.getStepKE(),
+                      track.getStepDX(),track.getStepDY(),track.getStepDZ(),track.getStepKE(),
                       track.getStepEDep())
         children = [self._extract_vertex_from_stepping_action(track.getChildTrackID(id)) for id in range(track.getNumChildren())]
         return Vertex(track.name, np.array([steps.x[0],steps.y[0],steps.z[0]]), 
-                        np.array([steps.px[0],steps.py[0],steps.pz[0]]), 
+                        np.array([steps.dx[0],steps.dy[0],steps.dz[0]]), 
                         steps.ke[0], steps.t[0], steps=steps, children=children, trackid=index, pdgcode=track.pdg_code)
         
 
@@ -205,10 +205,9 @@ class G4Generator(object):
                 gRunManager.BeamOn(1)
                 
                 if tracking:
-                    tracked_vertices.append(self._extract_vertex_from_stepping_action())
+                    vertex = self._extract_vertex_from_stepping_action()
                     photon_parent_tracks.append(self.tracking_action.GetParentTrackID().astype(np.int32))
-                else:
-                    tracked_vertices.append(vertex)
+                tracked_vertices.append(vertex)
                 photons += self._extract_photons_from_tracking_action()
             if tracking:    
                 photon_parent_tracks = [track for track in photon_parent_tracks if len(track)>0]

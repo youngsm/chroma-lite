@@ -23,16 +23,16 @@ class Step {
 public:
     inline Step(const double _x, const double _y, const double _z, 
                 const double _t, 
-                const double _px, const double _py, const double _pz, 
+                const double _dx, const double _dy, const double _dz, 
                 const double _ke, const double _edep, 
                 const std::string &_procname) :
-                x(_x), y(_y), z(_z), t(_t), px(_px), py(_py), pz(_pz), 
+                x(_x), y(_y), z(_z), t(_t), dx(_dx), dy(_dy), dz(_dz), 
                 ke(_ke), edep(_edep), procname(_procname) {
     }
     
     inline ~Step() { }
 
-    const double x,y,z,t,px,py,pz,ke,edep;
+    const double x,y,z,t,dx,dy,dz,ke,edep;
     const std::string procname;
 };
 

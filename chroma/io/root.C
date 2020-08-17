@@ -17,7 +17,7 @@ struct Vertex {
   int pdgcode;
   
   std::vector<Vertex> children;
-  std::vector<double> step_x,step_y,step_z,step_t,step_px,step_py,step_pz,step_ke,step_edep;
+  std::vector<double> step_x,step_y,step_z,step_t,step_dx,step_dy,step_dz,step_ke,step_edep;
 
   ClassDef(Vertex, 1);
 };
@@ -81,22 +81,22 @@ void clear_steps(Vertex *vtx) {
   vtx->step_y.resize(0);
   vtx->step_z.resize(0);
   vtx->step_t.resize(0);
-  vtx->step_px.resize(0);
-  vtx->step_py.resize(0);
-  vtx->step_pz.resize(0);
+  vtx->step_dx.resize(0);
+  vtx->step_dy.resize(0);
+  vtx->step_dz.resize(0);
   vtx->step_ke.resize(0);
   vtx->step_edep.resize(0);
 }
 
 void fill_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z,
-        double *t, double *px, double *py, double *pz, double *ke, double *edep) {
+        double *t, double *dx, double *dy, double *dz, double *ke, double *edep) {
   vtx->step_x.resize(nsteps);
   vtx->step_y.resize(nsteps);
   vtx->step_z.resize(nsteps);
   vtx->step_t.resize(nsteps);
-  vtx->step_px.resize(nsteps);
-  vtx->step_py.resize(nsteps);
-  vtx->step_pz.resize(nsteps);
+  vtx->step_dx.resize(nsteps);
+  vtx->step_dy.resize(nsteps);
+  vtx->step_dz.resize(nsteps);
   vtx->step_ke.resize(nsteps);
   vtx->step_edep.resize(nsteps);
   for (unsigned int i=0; i < nsteps; i++) {
@@ -104,24 +104,24 @@ void fill_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *
       vtx->step_y[i] = y[i];
       vtx->step_z[i] = z[i];
       vtx->step_t[i] = t[i];
-      vtx->step_px[i] = px[i];
-      vtx->step_py[i] = py[i];
-      vtx->step_pz[i] = pz[i];
+      vtx->step_dx[i] = dx[i];
+      vtx->step_dy[i] = dy[i];
+      vtx->step_dz[i] = dz[i];
       vtx->step_ke[i] = ke[i];
       vtx->step_edep[i] = edep[i];
   }
 }
 
 void get_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z,
-        double *t, double *px, double *py, double *pz, double *ke, double *edep) {
+        double *t, double *dx, double *dy, double *dz, double *ke, double *edep) {
   for (unsigned int i=0; i < nsteps; i++) {
       x[i] = vtx->step_x[i];
       y[i] = vtx->step_y[i];
       z[i] = vtx->step_z[i];
       t[i] = vtx->step_t[i];
-      px[i] = vtx->step_px[i];
-      py[i] = vtx->step_py[i];
-      pz[i] = vtx->step_pz[i];
+      dx[i] = vtx->step_dx[i];
+      dy[i] = vtx->step_dy[i];
+      dz[i] = vtx->step_dz[i];
       ke[i] = vtx->step_ke[i];
       edep[i] = vtx->step_edep[i];
   }

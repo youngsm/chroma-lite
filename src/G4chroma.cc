@@ -133,10 +133,10 @@ void Track::appendStepPoint(const G4StepPoint* point, const G4Step* step, const 
     const double z = position.z();
     const double t = point->GetGlobalTime();
 
-    const G4ThreeVector &momentum = point->GetMomentum();
-    const double px = momentum.x();
-    const double py = momentum.y();
-    const double pz = momentum.z();
+    const G4ThreeVector &direction = point->GetMomentumDirection();
+    const double dx = direction.x();
+    const double dy = direction.y();
+    const double dz = direction.z();
     const double ke = point->GetKineticEnergy();
 
     const double edep = step->GetTotalEnergyDeposit();
@@ -151,7 +151,7 @@ void Track::appendStepPoint(const G4StepPoint* point, const G4Step* step, const 
         procname = "---";
     }
     
-    steps.emplace_back(x,y,z,t,px,py,pz,ke,edep,procname);
+    steps.emplace_back(x,y,z,t,dx,dy,dz,ke,edep,procname);
 }
 
 TrackingAction::TrackingAction() {
@@ -257,9 +257,9 @@ StepAccessor(double,getStepX,x)
 StepAccessor(double,getStepY,y)
 StepAccessor(double,getStepZ,z)
 StepAccessor(double,getStepT,t)
-StepAccessor(double,getStepPX,px)
-StepAccessor(double,getStepPY,py)
-StepAccessor(double,getStepPZ,pz)
+StepAccessor(double,getStepDX,dx)
+StepAccessor(double,getStepDY,dy)
+StepAccessor(double,getStepDZ,dz)
 StepAccessor(double,getStepKE,ke)
 StepAccessor(double,getStepEDep,edep)
 //StepAccessor(std::string,getStepProcess,procname)
@@ -285,9 +285,9 @@ void export_Chroma()
     .def("getStepY",PTA_getStepY)
     .def("getStepZ",PTA_getStepZ)
     .def("getStepT",PTA_getStepT)
-    .def("getStepPX",PTA_getStepPX)
-    .def("getStepPY",PTA_getStepPY)
-    .def("getStepPZ",PTA_getStepPZ)
+    .def("getStepDX",PTA_getStepDX)
+    .def("getStepDY",PTA_getStepDY)
+    .def("getStepDZ",PTA_getStepDZ)
     .def("getStepKE",PTA_getStepKE)
     .def("getStepEDep",PTA_getStepEDep)
     //.def("getStepProcess",PTA_getStepProcess)
