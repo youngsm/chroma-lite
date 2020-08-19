@@ -4,6 +4,7 @@ if [ -e /opt/anaconda3/bin/conda ]; then
     export CPATH="/opt/anaconda3/include:$CPATH"
     export LIBRARY_PATH="$LIBRARY_PATH:/opt/anaconda3/lib"
     export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/anaconda3/lib"
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/cuda/lib64"
 fi
 if [ -e /opt/root/bin/thisroot.sh ]; then
     source /opt/root/bin/thisroot.sh
