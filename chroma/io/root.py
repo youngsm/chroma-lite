@@ -164,6 +164,18 @@ def root_event_to_python_event(ev):
                           photons.channel)
             pyev.hits[hit.first] = photons
 
+    # flat_hits
+    if ev.flat_hits.size() > 0:
+        photons = make_photon_with_arrays(ev.flat_hits.size())
+        ROOT.get_photons(ev.flat_hits,
+                      photons.pos.ravel(),
+                      photons.dir.ravel(),
+                      photons.pol.ravel(),
+                      photons.wavelengths, photons.t,
+                      photons.last_hit_triangles, photons.flags,
+                      photons.channel)
+        pyev.flat_hits = photons
+
     # photon end
     if ev.photons_end.size() > 0:
         photons = make_photon_with_arrays(ev.photons_end.size())
