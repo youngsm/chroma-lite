@@ -127,45 +127,31 @@ void get_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z
   }
 }
 
-void fill_channels(Event *ev, unsigned int nhit, unsigned int *ids, float *t,
-		   float *q, unsigned int *flags, unsigned int nchannels)
+void fill_channels(Event *ev, unsigned int nhit, unsigned int *hit_id, 
+           unsigned int nchannels, float *t, float *q, unsigned int *flags)
 {
-  ev->nhit = 0;
+  ev->nhit = nhit;
   ev->nchannels = nchannels;
-  ev->channels.resize(0);
+  ev->channels.resize(nhit);
 
-  Channel ch;
-  unsigned int id;
-  for (unsigned int i=0; i < nhit; i++) {
-      ev->nhit++;
-      id = ids[i];
-      ch.id = id;
-      ch.t = t[id];
-      ch.q = q[id];
-      ch.flag = flags[id];
-      ev->channels.push_back(ch);
+  for (unsigned int i = 0; i < nhit; i++) {
+      Channel *ch = &ev->channels[i];
+      unsigned int id = hit_id[i];
+      ch->id = id;
+      ch->t = t[id];
+      ch->q = q[id];
+      ch->flag = flags[id];
   }
 }
 
 void get_channels(Event *ev, int *hit, float *t, float *q, unsigned int *flags)
 {
-  for (unsigned int i=0; i < ev->nchannels; i++) {
-    hit[i] = 0;
-    t[i] = -1e9f;
-    q[i] = -1e9f;
-    flags[i] = 0;
-  }
-
-  unsigned int id;
   for (unsigned int i=0; i < ev->channels.size(); i++) {
-    id = ev->channels[i].id;
-
-    if (id < ev->nchannels) {
-      hit[id] = 1;
-      t[id] = ev->channels[i].t;
-      q[id] = ev->channels[i].q;
-      flags[id] = ev->channels[i].flag;
-    }
+    unsigned int id = ev->channels[i].id;
+    hit[id] = 1;
+    t[id] = ev->channels[i].t;
+    q[id] = ev->channels[i].q;
+    flags[id] = ev->channels[i].flag;
   }
 }
 

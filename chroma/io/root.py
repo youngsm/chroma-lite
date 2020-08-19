@@ -150,7 +150,7 @@ def root_event_to_python_event(ev):
         pyev.photon_tracks = photon_tracks
         pyev.photon_parent_trackids = np.asarray(ev.photon_parent_trackids).copy()    
     
-    
+    # hits
     if ev.hits.size() > 0:
         pyev.hits = {}
         for hit in ev.hits:
@@ -180,10 +180,10 @@ def root_event_to_python_event(ev):
 
     # channels
     if ev.nchannels > 0:
-        hit = np.empty(ev.nchannels, dtype=np.int32)
-        t = np.empty(ev.nchannels, dtype=np.float32)
-        q = np.empty(ev.nchannels, dtype=np.float32)
-        flags = np.empty(ev.nchannels, dtype=np.uint32)
+        hit = np.zeros(ev.nchannels, dtype=np.int32)
+        t = np.zeros(ev.nchannels, dtype=np.float32)
+        q = np.zeros(ev.nchannels, dtype=np.float32)
+        flags = np.zeros(ev.nchannels, dtype=np.uint32)
 
         ROOT.get_channels(ev, hit, t, q, flags)
         pyev.channels = event.Channels(hit.astype(bool), t, q, flags)
@@ -372,13 +372,8 @@ class RootWriter(object):
             self.ev.flat_hits.resize(0)
         
         if pyev.channels is not None:
-            nhit = count_nonzero(pyev.channels.hit)
-            if nhit > 0:
-                ROOT.fill_channels(self.ev, nhit, np.arange(len(pyev.channels.t))[pyev.channels.hit].astype(np.uint32), pyev.channels.t, pyev.channels.q, pyev.channels.flags, len(pyev.channels.hit))
-            else:
-                self.ev.nhit = 0
-                self.ev.channels.resize(0)
-                self.ev.nchannels = len(pyev.channels.hit)
+            hit_channels = pyev.channels.hit.nonzero()[0].astype(np.int32)
+            ROOT.fill_channels(self.ev, len(hit_channels), hit_channels, len(pyev.channels.hit), pyev.channels.t, pyev.channels.q, pyev.channels.flags)
         else:
             self.ev.nhit = 0
             self.ev.channels.resize(0)
