@@ -24,15 +24,15 @@ public:
     inline Step(const double _x, const double _y, const double _z, 
                 const double _t, 
                 const double _dx, const double _dy, const double _dz, 
-                const double _ke, const double _edep, 
+                const double _ke, const double _edep, const double _qedep, 
                 const std::string &_procname) :
                 x(_x), y(_y), z(_z), t(_t), dx(_dx), dy(_dy), dz(_dz), 
-                ke(_ke), edep(_edep), procname(_procname) {
+                ke(_ke), edep(_edep), qedep(_qedep), procname(_procname) {
     }
     
     inline ~Step() { }
 
-    const double x,y,z,t,dx,dy,dz,ke,edep;
+    const double x,y,z,t,dx,dy,dz,ke,edep,qedep;
     const std::string procname;
 };
 
@@ -45,7 +45,7 @@ public:
     double weight;
     std::string name;
     
-    void appendStepPoint(const G4StepPoint* point, const G4Step* step, const bool initial = false);  
+    void appendStepPoint(const G4StepPoint* point, const G4Step* step, double qedep, const bool initial = false);  
     inline const std::vector<Step>& getSteps() { return steps; };  
     int getNumSteps();
     
@@ -75,8 +75,6 @@ public:
   
 private:
     bool scint;
-    
-    void appendStep(std::vector<Step> &track, const G4StepPoint* point, const G4Step* step, const bool initial);
     
     bool tracking;
     bool children_mapped;

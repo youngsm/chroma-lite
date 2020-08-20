@@ -65,6 +65,28 @@ void SteppingAction::EnableTracking(bool enabled) {
 
 
 void SteppingAction::UserSteppingAction(const G4Step *step) {
+
+    double qedep = step->GetTotalEnergyDeposit();
+
+    if (scint) {
+        
+        G4VParticleChange * pParticleChange = GLG4Scint::GenericPostPostStepDoIt(step);
+        
+        if (pParticleChange) {
+
+            qedep = GLG4Scint::GetLastEdepQuenched();
+            
+            const size_t nsecondaries = pParticleChange->GetNumberOfSecondaries();
+            
+            for (size_t i = 0; i < nsecondaries; i++) { 
+                G4Track * tempSecondaryTrack = pParticleChange->GetSecondary(i);
+                fpSteppingManager->GetfSecondary()->push_back( tempSecondaryTrack );
+            }
+            
+            pParticleChange->Clear();
+        }
+        
+    }
     
     if (tracking) {
         
@@ -77,25 +99,9 @@ void SteppingAction::UserSteppingAction(const G4Step *step) {
             track.pdg_code = g4track->GetDefinition()->GetPDGEncoding();
             track.weight = g4track->GetWeight();
             track.name = g4track->GetDefinition()->GetParticleName();
-            track.appendStepPoint(step->GetPreStepPoint(), step, true);
+            track.appendStepPoint(step->GetPreStepPoint(), step, 0.0, true);
         }
-        track.appendStepPoint(step->GetPostStepPoint(), step);
-        
-    }
-
-    if (scint) {
-        
-        G4VParticleChange * pParticleChange = GLG4Scint::GenericPostPostStepDoIt(step);
-        if (!pParticleChange) return;
-             
-        const size_t nsecondaries = pParticleChange->GetNumberOfSecondaries();
-        
-        for (size_t i = 0; i < nsecondaries; i++) { 
-            G4Track * tempSecondaryTrack = pParticleChange->GetSecondary(i);
-            fpSteppingManager->GetfSecondary()->push_back( tempSecondaryTrack );
-        }
-        
-        pParticleChange->Clear();
+        track.appendStepPoint(step->GetPostStepPoint(), step, qedep);
         
     }
     
@@ -124,7 +130,7 @@ int Track::getNumSteps() {
     return steps.size(); 
 }  
 
-void Track::appendStepPoint(const G4StepPoint* point, const G4Step* step, const bool initial) {
+void Track::appendStepPoint(const G4StepPoint* point, const G4Step* step, double qedep, const bool initial) {
     const double len = initial ? 0.0 : step->GetStepLength();
     
     const G4ThreeVector &position = point->GetPosition();
@@ -141,6 +147,7 @@ void Track::appendStepPoint(const G4StepPoint* point, const G4Step* step, const 
 
     const double edep = step->GetTotalEnergyDeposit();
 
+
     const G4VProcess *process = point->GetProcessDefinedStep();
     string procname;
     if (process) {
@@ -151,7 +158,7 @@ void Track::appendStepPoint(const G4StepPoint* point, const G4Step* step, const 
         procname = "---";
     }
     
-    steps.emplace_back(x,y,z,t,dx,dy,dz,ke,edep,procname);
+    steps.emplace_back(x,y,z,t,dx,dy,dz,ke,edep,qedep,procname);
 }
 
 TrackingAction::TrackingAction() {
@@ -262,6 +269,7 @@ StepAccessor(double,getStepDY,dy)
 StepAccessor(double,getStepDZ,dz)
 StepAccessor(double,getStepKE,ke)
 StepAccessor(double,getStepEDep,edep)
+StepAccessor(double,getStepQEDep,qedep)
 //StepAccessor(std::string,getStepProcess,procname)
 
 using namespace boost::python;
@@ -290,6 +298,7 @@ void export_Chroma()
     .def("getStepDZ",PTA_getStepDZ)
     .def("getStepKE",PTA_getStepKE)
     .def("getStepEDep",PTA_getStepEDep)
+    .def("getStepQEDep",PTA_getStepQEDep)
     //.def("getStepProcess",PTA_getStepProcess)
     .def("getNumChildren",&Track::getNumChildren)
     .def("getChildTrackID",&Track::getChildTrackID)

@@ -16,7 +16,7 @@ SCINTILLATION    = 0x1 << 11
 NAN_ABORT        = 0x1 << 31
 
 class Steps(object):
-    def __init__(self,x,y,z,t,dx,dy,dz,ke,edep):
+    def __init__(self,x,y,z,t,dx,dy,dz,ke,edep,qedep):
         self.x = x
         self.y = y
         self.z = z
@@ -26,6 +26,7 @@ class Steps(object):
         self.dz = dz
         self.ke = ke
         self.edep = edep
+        self.qedep = qedep
     
 
 class Vertex(object):

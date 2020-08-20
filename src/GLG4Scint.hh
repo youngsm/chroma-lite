@@ -226,6 +226,10 @@ private:
         return totEdep;
     }
 
+    static G4double GetLastEdepQuenched() {
+        return lastEdep_quenched;
+    }
+
     static G4double GetTotEdepQuenched() {
         return totEdep_quenched;
     }
@@ -281,6 +285,7 @@ protected:
 
     // total real energy deposited and total quenched energy deposited
     static G4double totEdep;
+    static G4double lastEdep_quenched;
     static G4double totEdep_quenched;
     static G4double totEdep_time;
     static G4ThreeVector scintCentroidSum;

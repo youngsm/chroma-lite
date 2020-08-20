@@ -149,7 +149,7 @@ class G4Generator(object):
         track = self.stepping_action.getTrack(index)
         steps = Steps(track.getStepX(),track.getStepY(),track.getStepZ(),track.getStepT(),
                       track.getStepDX(),track.getStepDY(),track.getStepDZ(),track.getStepKE(),
-                      track.getStepEDep())
+                      track.getStepEDep(),track.getStepQEDep())
         children = [self._extract_vertex_from_stepping_action(track.getChildTrackID(id)) for id in range(track.getNumChildren())]
         return Vertex(track.name, np.array([steps.x[0],steps.y[0],steps.z[0]]), 
                         np.array([steps.dx[0],steps.dy[0],steps.dz[0]]), 

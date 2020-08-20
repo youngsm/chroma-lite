@@ -104,6 +104,7 @@ G4int GLG4Scint::maxTracksPerStep           = 180000;
 G4double GLG4Scint::meanPhotonsPerSecondary = 1.0;
 G4bool   GLG4Scint::doScintillation         = true;
 G4double GLG4Scint::totEdep                 = 0.0;
+G4double GLG4Scint::lastEdep_quenched       = 0.0;
 G4double GLG4Scint::totEdep_quenched        = 0.0;
 G4double GLG4Scint::totEdep_time            = 0.0;
 G4ThreeVector GLG4Scint::scintCentroidSum(0.0, 0.0, 0.0);
@@ -274,6 +275,7 @@ GLG4Scint::PostPostStepDoIt(const G4Track& aTrack, const G4Step& aStep) {
     // Track total edep, quenched edep
     totEdep          += TotalEnergyDeposit;
     totEdep_quenched += QuenchedTotalEnergyDeposit;
+    lastEdep_quenched = QuenchedTotalEnergyDeposit;
     totEdep_time      = t0;
     scintCentroidSum + QuenchedTotalEnergyDeposit * (x0 + p0 * (0.5 * aStep.GetStepLength()));
 

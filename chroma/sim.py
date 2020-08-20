@@ -122,7 +122,7 @@ class Simulation(object):
                     #This is kind of expensive computationally, but keep_hits is for diagnostics
                     batch_ev.hits = { int(chan):ev_hits[ev_hits.channel == chan] for chan in np.unique(ev_hits.channel) }
                 if keep_flat_hits:
-                    batch_ev.flat_hits = ev_hits[ev_hits.evidx == i]
+                    batch_ev.flat_hits = ev_hits
                     
                         
             if hasattr(self, 'gpu_daq') and run_daq:

@@ -17,7 +17,7 @@ struct Vertex {
   int pdgcode;
   
   std::vector<Vertex> children;
-  std::vector<double> step_x,step_y,step_z,step_t,step_dx,step_dy,step_dz,step_ke,step_edep;
+  std::vector<double> step_x,step_y,step_z,step_t,step_dx,step_dy,step_dz,step_ke,step_edep,step_qedep;
 
   ClassDef(Vertex, 1);
 };
@@ -89,7 +89,7 @@ void clear_steps(Vertex *vtx) {
 }
 
 void fill_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z,
-        double *t, double *dx, double *dy, double *dz, double *ke, double *edep) {
+        double *t, double *dx, double *dy, double *dz, double *ke, double *edep, double *qedep) {
   vtx->step_x.resize(nsteps);
   vtx->step_y.resize(nsteps);
   vtx->step_z.resize(nsteps);
@@ -99,6 +99,7 @@ void fill_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *
   vtx->step_dz.resize(nsteps);
   vtx->step_ke.resize(nsteps);
   vtx->step_edep.resize(nsteps);
+  vtx->step_qedep.resize(nsteps);
   for (unsigned int i=0; i < nsteps; i++) {
       vtx->step_x[i] = x[i];
       vtx->step_y[i] = y[i];
@@ -109,11 +110,12 @@ void fill_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *
       vtx->step_dz[i] = dz[i];
       vtx->step_ke[i] = ke[i];
       vtx->step_edep[i] = edep[i];
+      vtx->step_qedep[i] = qedep[i];
   }
 }
 
 void get_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z,
-        double *t, double *dx, double *dy, double *dz, double *ke, double *edep) {
+        double *t, double *dx, double *dy, double *dz, double *ke, double *edep, double *qedep) {
   for (unsigned int i=0; i < nsteps; i++) {
       x[i] = vtx->step_x[i];
       y[i] = vtx->step_y[i];
@@ -124,6 +126,7 @@ void get_steps(Vertex *vtx, unsigned int nsteps, double *x, double *y, double *z
       dz[i] = vtx->step_dz[i];
       ke[i] = vtx->step_ke[i];
       edep[i] = vtx->step_edep[i];
+      qedep[i] = vtx->step_qedep[i];
   }
 }
 
