@@ -52,10 +52,10 @@ def root_vertex_to_python_vertex(vertex):
         n = len(vertex.step_x)
         steps = event.Steps(np.empty(n),np.empty(n),np.empty(n),np.empty(n),
               np.empty(n),np.empty(n),np.empty(n),
-              np.empty(n),np.empty(n))
+              np.empty(n),np.empty(n),np.empty(n))
         ROOT.get_steps(vertex,n,steps.x,steps.y,steps.z,steps.t,
                        steps.dx,steps.dy,steps.dz,
-                       steps.ke,steps.edep)
+                       steps.ke,steps.edep,steps.qedep)
     else:
         steps = None
     if len(vertex.children) > 0:
@@ -86,7 +86,7 @@ def python_vertex_to_root_vertex(pvertex,rvertex):
     if pvertex.steps:
         ROOT.fill_steps(rvertex,len(pvertex.steps.x),pvertex.steps.x,pvertex.steps.y,pvertex.steps.z,
                         pvertex.steps.t,pvertex.steps.dx,pvertex.steps.dy,pvertex.steps.dz,
-                        pvertex.steps.ke,pvertex.steps.edep)
+                        pvertex.steps.ke,pvertex.steps.edep,pvertex.steps.qedep)
     else:
         nil = np.empty(0,dtype=np.float64)
         ROOT.clear_steps(rvertex)
