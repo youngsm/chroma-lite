@@ -119,21 +119,19 @@ DummyProcess GLG4Scint::scintProcess("Scintillation", fUserDefined);
 GLG4Scint::GLG4Scint(const G4String& tablename, G4double lowerMassLimit) {
     verboseLevel = 0;
     myLowerMassLimit = lowerMassLimit;
-
+    
     myPhysicsTable = MyPhysicsTable::FindOrBuild(tablename);
     myPhysicsTable->IncUsedBy();
 
     if (verboseLevel) myPhysicsTable->Dump();
 
-    // Add to ordered list
-    if ((masterVectorOfGLG4Scint.size() == 0) ||
-        (lowerMassLimit >= masterVectorOfGLG4Scint.back()->myLowerMassLimit)) {
+    // Add to ordered list (largest minimum mass first)
+    if ((masterVectorOfGLG4Scint.size() == 0) || (lowerMassLimit < masterVectorOfGLG4Scint.back()->myLowerMassLimit)) {
         masterVectorOfGLG4Scint.push_back(this);
     } else {
-        for (std::vector<GLG4Scint *>::iterator i = masterVectorOfGLG4Scint.begin();
-             i != masterVectorOfGLG4Scint.end();
-             i++) {
-            if (lowerMassLimit < (*i)->myLowerMassLimit) {
+        for (std::vector<GLG4Scint *>::iterator i = masterVectorOfGLG4Scint.begin(); i != masterVectorOfGLG4Scint.end(); i++) {
+            std::cout << "Test Lower Limit: " << (*i)->myLowerMassLimit << "\n";
+            if (lowerMassLimit > (*i)->myLowerMassLimit) {
                 masterVectorOfGLG4Scint.insert(i, this);
                 break;
             }
@@ -424,8 +422,7 @@ GLG4Scint::PostPostStepDoIt(const G4Track& aTrack, const G4Step& aStep) {
 G4VParticleChange * GLG4Scint::GenericPostPostStepDoIt(const G4Step *pStep) {
     G4Track *track = pStep->GetTrack();
     G4double mass  = track->GetDynamicParticle()->GetMass();
-
-    // FIXME - what does this do?
+    // Choose the set of properties with the largest minimum mass less than this mass
     for (size_t i = 0; i < masterVectorOfGLG4Scint.size(); i++) {
         if (mass > masterVectorOfGLG4Scint[i]->myLowerMassLimit) {
             return masterVectorOfGLG4Scint[i]->PostPostStepDoIt(*track, *pStep);
