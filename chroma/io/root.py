@@ -304,7 +304,7 @@ class RootWriter(object):
     def write_event(self, pyev):
         "Write an event.Event object to the ROOT tree as a ROOT.Event object."
         self.ev.id = pyev.id
-
+        
         if pyev.photons_beg is not None:
             photons = pyev.photons_beg
             ROOT.fill_photons(self.ev.photons_beg,
@@ -369,7 +369,7 @@ class RootWriter(object):
                               photons.channel)
         else:
             self.ev.hits.clear()
-            
+        
         if pyev.flat_hits is not None:
             photons = pyev.flat_hits
             ROOT.fill_photons(self.ev.flat_hits,
@@ -385,11 +385,20 @@ class RootWriter(object):
         
         if pyev.channels is not None:
             hit_channels = pyev.channels.hit.nonzero()[0].astype(np.int32)
-            ROOT.fill_channels(self.ev, len(hit_channels), hit_channels, len(pyev.channels.hit), pyev.channels.t, pyev.channels.q, pyev.channels.flags)
+            if len(hit_channels) > 0:
+                ROOT.fill_channels(self.ev, len(hit_channels), hit_channels, 
+                                   len(pyev.channels.hit), 
+                                   pyev.channels.t.astype(np.float32), 
+                                   pyev.channels.q.astype(np.float32), 
+                                   pyev.channels.flags.astype(np.uint32))
+            else:
+                self.ev.nhit = 0
+                self.ev.nchannels = 0
+                self.ev.channels.resize(0)
         else:
             self.ev.nhit = 0
-            self.ev.channels.resize(0)
             self.ev.nchannels = 0
+            self.ev.channels.resize(0)
 
         self.T.Fill()
 
