@@ -65,12 +65,12 @@ def main():
 
     if options.rootlogon:
         if os.path.exists('.rootlogon.C'):
-            print >>sys.stderr, ".rootlogon.C file already exists!"
+            print(".rootlogon.C file already exists!", file=sys.stderr)
             sys.exit(1)
         else:
             with open('.rootlogon.C', 'w') as f:
-                print >>f, '{\ngROOT->ProcessLine(".L ~/.chroma/root.C+");\n}'
-            print >>sys.stderr, '.rootlogon.C created'
+                print('{\ngROOT->ProcessLine(".L ~/.chroma/root.C+");\n}', file=f)
+            print('.rootlogon.C created', file=sys.stderr)
             sys.exit(0)
 
     if len(args) < 1:
@@ -90,7 +90,7 @@ def main():
     sim = Simulation(detector, seed=options.seed, cuda_device=options.device,
                      geant4_processes=options.ngenerators)
     
-    print 'RNG seed: %i' % sim.seed
+    print('RNG seed: %i' % sim.seed)
 
     writer = root.RootWriter(options.output_filename)
 
@@ -100,16 +100,16 @@ def main():
                                                     options.nevents),
                                    keep_photons_beg=options.save_photons_beg,
                                    keep_photons_end=options.save_photons_end)):
-        print '\rEvent: %i' % (i+1),
+        print('\rEvent: %i' % (i+1), end=' ')
         sys.stdout.flush()
 
         assert ev.nphotons > 0, 'Geant4 generated event with no photons!'
 
         writer.write_event(ev)
-    print
+    print()
 
     writer.close()
-    print 'Events per second: %1.1f' % (options.nevents / (time.time() - start))
+    print('Events per second: %1.1f' % (options.nevents / (time.time() - start)))
 
 if __name__ == '__main__':
     main()

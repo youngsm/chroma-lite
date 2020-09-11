@@ -30,10 +30,10 @@ class ChromaServer(object):
         '''Listen for photons, propagate them, and return the final states.'''
         while True:
             photons_in = self.socket.recv_pyobj()
-            print 'Processing', len(photons_in), 'photons'
+            print('Processing', len(photons_in), 'photons')
 
             # propagate in chroma simulation
-            photons_end = self.sim.simulate(photons_in, keep_photons_end=True).next()
+            photons_end = next(self.sim.simulate(photons_in, keep_photons_end=True))
 
             # return final photon vertices to client
             self.socket.send_pyobj(photons_end)
@@ -48,10 +48,10 @@ if __name__ == '__main__':
     if len(args) < 1:
         sys.exit(parser.format_help())
 
-    print 'reticulating splines...'
+    print('reticulating splines...')
     detector = load_geometry_from_string(args[0])
 
-    print 'starting chroma server listening on', options.address
+    print('starting chroma server listening on', options.address)
     server = ChromaServer(options.address, detector)
     server.serve_forever()
 

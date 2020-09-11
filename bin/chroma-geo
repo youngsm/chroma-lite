@@ -10,21 +10,21 @@ from chroma.log import logger, logging
 
 def list_geo(cache, args):
     geometries = cache.list_geometry()
-    print 'List of cached geometries:'
-    print '\n'.join(geometries)
+    print('List of cached geometries:')
+    print('\n'.join(geometries))
 
 def save(cache, args):
     start = time.time()
     geometry = load_geometry_from_string(args[0])
-    print 'Geometry generated in %1.1f seconds.' % (time.time() - start)
+    print('Geometry generated in %1.1f seconds.' % (time.time() - start))
 
     start = time.time()
     cache.save_geometry(args[1], geometry)
-    print 'Geometry saved to cache in %1.1f seconds.' % (time.time() - start)
+    print('Geometry saved to cache in %1.1f seconds.' % (time.time() - start))
 
 def remove(cache, args):
     cache.remove_geometry(args[0])
-    print 'Geometry "%s" removed.' % args[0]
+    print('Geometry "%s" removed.' % args[0])
 
 commands = { 'list' : list_geo,
              'save' : save,
@@ -53,7 +53,7 @@ def main():
     if cmd in commands:
         commands[cmd](cache, cmd_args)
     else:
-        print 'error: unknown cmd %s' % cmd
+        print('error: unknown cmd %s' % cmd)
         sys.exit(1)
 
 if __name__ == '__main__':
