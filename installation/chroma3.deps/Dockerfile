@@ -5,7 +5,7 @@ USER root
 RUN apt-get update && apt-get install -y curl git
 
 WORKDIR /opt/
-RUN curl -O https://repo.anaconda.com/archive/Anaconda3-2020.02-Linux-x86_64.sh
+RUN curl -O https://repo.anaconda.com/archive/Anaconda3-2020.07-Linux-x86_64.sh
 RUN chmod +x Anaconda3-2020.02-Linux-x86_64.sh
 RUN ./Anaconda3-2020.02-Linux-x86_64.sh -b -p /opt/anaconda3
 RUN rm Anaconda3-2020.02-Linux-x86_64.sh
