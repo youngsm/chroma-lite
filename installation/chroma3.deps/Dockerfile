@@ -30,7 +30,7 @@ RUN curl -O https://root.cern/download/root_v6.22.02.source.tar.gz
 RUN tar xf root_v6.22.02.source.tar.gz
 RUN rm root_v6.22.02.source.tar.gz
 WORKDIR /opt/root-6.22.02/build-root
-RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/root -Ddavix=OFF -Dminuit2=ON -Droofit=ON /opt/root-6.22.02
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/root -Dpython3=ON -Ddavix=OFF -Dminuit2=ON -Droofit=ON /opt/root-6.22.02
 RUN make -j12
 RUN make install
 RUN rm -rf /opt/root-6.22.02
