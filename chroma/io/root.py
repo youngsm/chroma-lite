@@ -384,7 +384,7 @@ class RootWriter(object):
             self.ev.flat_hits.resize(0)
         
         if pyev.channels is not None:
-            hit_channels = pyev.channels.hit.nonzero()[0].astype(np.int32)
+            hit_channels = pyev.channels.hit.nonzero()[0].astype(np.uint32)
             if len(hit_channels) > 0:
                 ROOT.fill_channels(self.ev, len(hit_channels), hit_channels, 
                                    len(pyev.channels.hit), 
