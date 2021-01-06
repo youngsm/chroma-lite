@@ -265,6 +265,7 @@ int propagate_to_boundary(Photon &p, State &s, curandState &rng,
                 p.direction = uniform_sphere(&rng);
                 p.polarization = cross(uniform_sphere(&rng), p.direction);
                 p.polarization /= norm(p.polarization);
+                p.last_hit_triangle = -1;
                 p.history |= BULK_REEMIT;
                 return CONTINUE;
             } // photon is reemitted isotropically
