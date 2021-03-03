@@ -165,6 +165,7 @@ class GPUGeometry(object):
             self.surface_data.append(reemit_gpu)
             self.surface_data.append(reflect_diffuse_gpu)
             self.surface_data.append(reflect_specular_gpu)
+            self.surface_data.append(reemission_cdf_gpu)
             self.surface_data.append(eta_gpu)
             self.surface_data.append(k_gpu)
             self.surface_data.append(dichroic_props)
