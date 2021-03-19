@@ -4,7 +4,7 @@ Chroma is a high performance optical photon simulation for particle physics dete
 
 With the assistance of a CUDA-enabled GPU, Chroma can propagate 2.5 million photons per second in a detector with 29,000 photomultiplier tubes. This is 200x faster than the same simulation with GEANT4.
 
-Check out the [Chroma whitepaper](https://pdfs.semanticscholar.org/33ad/1bae64007a43a840288a888eba7bc3e3a37a.pdf) for information on how Chroma works.
+Check out the [Chroma whitepaper](doc/source/chroma.pdf) for information on how Chroma works.
 
 Information about the historical development of Chroma can be found at the [bitbucket repository](https://chroma.bitbucket.io/index.html) this repository was forked from.
 
