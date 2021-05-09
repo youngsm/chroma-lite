@@ -141,7 +141,7 @@ def create_cuda_context(device_id=None):
 
     return context
 
-vec_dtypes = set([ x for x in list(ga.vec.__dict__.values()) if type(x) == np.dtype ])
+vec_dtypes = set([ x for x in list(ga.vec.__dict__.values()) if isinstance(x,np.dtype) ])
 
 def make_gpu_struct(size, members):
     struct = cuda.mem_alloc(size)
