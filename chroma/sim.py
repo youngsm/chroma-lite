@@ -165,6 +165,7 @@ class Simulation(object):
             nphotons += ev.nphotons
             batch_events.append(ev)
             
+            #FIXME need an alternate implementation to split an event that is too large
             if nphotons >= photons_per_batch:
                 yield from self._simulate_batch(batch_events,
                                                 keep_photons_beg=keep_photons_beg,
