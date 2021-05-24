@@ -1,4 +1,4 @@
-from . import g4gen
+
 import multiprocessing
 import numpy as np
 import threading
@@ -8,6 +8,7 @@ import uuid
 class G4GeneratorProcess(multiprocessing.Process):
     def __init__(self, idnum, material, vertex_socket_address, photon_socket_address, seed=None, tracking=False):
         multiprocessing.Process.__init__(self)
+        from . import g4gen
 
         self.idnum = idnum
         self.material = material
