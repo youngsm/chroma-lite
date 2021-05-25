@@ -700,15 +700,38 @@ def gen_rot(a,b):
     v = np.cross(a,b)
     c = np.arccos(-np.dot(a,b))
     return make_rotation_matrix(c,v)
-    
+
+class RevIter:
+    def __init__(self,l):
+        self.l = l
+        self.i = 0
+    def __next__(self):
+        n = self.l[self.i]
+        self.i += 1
+        if self.i >= len(self.l):
+            self.i = len(self.l-1)
+        return n
+    def __len__(self):
+        return len(self.l)
+    def __iter__(self):
+        return iter(self.l)
+    def prev(self):
+        self.i -= 1
+        if self.i < 0:
+            self.i = 0
+        return self.l[self.i]
+        
 class EventViewer(Camera):
 
     def __init__(self, geometry, filename, **kwargs):
         Camera.__init__(self, geometry, **kwargs)
-        # This is really slow, so we do it here in the constructor to 
-        # avoid slowing down the import of this module
-        from chroma.io.root import RootReader
-        self.rr = RootReader(filename)
+        if type(filename) is str:
+            # This is really slow, so we do it here in the constructor to 
+            # avoid slowing down the import of this module
+            from chroma.io.root import RootReader
+            self.rr = RootReader(filename)
+        else:
+            self.rr = RevIter(filename)
         self.ev = next(self.rr)
         self.display_mode_iter = itertools.cycle(['geo','charge','time','hit','dichroicon'])
         self.display_mode = next(self.display_mode_iter)

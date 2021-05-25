@@ -8,7 +8,6 @@ import uuid
 class G4GeneratorProcess(multiprocessing.Process):
     def __init__(self, idnum, material, vertex_socket_address, photon_socket_address, seed=None, tracking=False):
         multiprocessing.Process.__init__(self)
-        from . import g4gen
 
         self.idnum = idnum
         self.material = material
@@ -19,6 +18,7 @@ class G4GeneratorProcess(multiprocessing.Process):
         self.daemon = True
 
     def run(self):
+        from . import g4gen
         gen = g4gen.G4Generator(self.material, seed=self.seed)
         context = zmq.Context()
         vertex_socket = context.socket(zmq.PULL)
