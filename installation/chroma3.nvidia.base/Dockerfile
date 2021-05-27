@@ -6,10 +6,10 @@ SHELL ["/bin/bash", "-l", "-c"]
 RUN apt-get update && apt-get install -y curl git
 
 WORKDIR /opt/
-RUN curl -O https://repo.anaconda.com/archive/Anaconda3-2020.07-Linux-x86_64.sh
-RUN chmod +x Anaconda3-2020.07-Linux-x86_64.sh
-RUN ./Anaconda3-2020.07-Linux-x86_64.sh -b -p /opt/anaconda3
-RUN rm Anaconda3-2020.07-Linux-x86_64.sh
+RUN curl -O https://repo.anaconda.com/archive/Anaconda3-2021.05-Linux-x86_64.sh
+RUN chmod +x Anaconda3-2021.05-Linux-x86_64.sh
+RUN ./Anaconda3-2021.05-Linux-x86_64.sh -b -p /opt/anaconda3
+RUN rm Anaconda3-2021.05-Linux-x86_64.sh
 RUN conda install -y -c anaconda boost cmake
 
 FROM nvidia/cudagl:9.2-devel-ubuntu18.04  AS build-root
@@ -80,5 +80,8 @@ RUN apt-get update && apt-get install -y dpkg-dev gcc g++ binutils libx11-dev li
 COPY --from=build-root /opt/root /opt/root
 RUN apt-get update && apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev
 COPY --from=build-geant4 /opt/geant4 /opt/geant4
+RUN apt-get update && apt-get install -y libgmp-dev libmpfr-dev libgmpxx4ldbl zip unzip patchelf
+COPY chroma_env.sh /etc/profile.d/
+RUN git clone --branch v0.3 https://github.com/PyMesh/PyMesh.git && cd PyMesh && git submodule update --init && python setup.py build && python setup.py install && cd .. && rm -rf PyMesh
 
 CMD ["/bin/bash","-l"]
