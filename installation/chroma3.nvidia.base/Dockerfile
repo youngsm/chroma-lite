@@ -81,7 +81,11 @@ COPY --from=build-root /opt/root /opt/root
 RUN apt-get update && apt-get install -y libxerces-c-dev libxmu-dev libxi-dev freeglut3-dev
 COPY --from=build-geant4 /opt/geant4 /opt/geant4
 RUN apt-get update && apt-get install -y libgmp-dev libmpfr-dev libgmpxx4ldbl zip unzip patchelf
-COPY chroma_env.sh /etc/profile.d/
-RUN git clone --branch v0.3 https://github.com/PyMesh/PyMesh.git && cd PyMesh && git submodule update --init && python setup.py build && python setup.py install && cd .. && rm -rf PyMesh
+RUN git clone --branch v0.3 https://github.com/PyMesh/PyMesh.git && \
+    cd PyMesh && \
+    git submodule update --init && \
+    python setup.py build && \
+    python setup.py install && \
+    cd ..
 
 CMD ["/bin/bash","-l"]
