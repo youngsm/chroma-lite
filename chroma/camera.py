@@ -26,6 +26,26 @@ from pygame.locals import *
 from timeit import default_timer as timer
 
 def bvh_mesh(geometry, layer):
+    """
+    Creates a 3D mesh visualization of the bounding volume hierarchy (BVH) tree at a specified layer for a given 3D model.
+
+    Parameters
+    ----------
+    geometry: Geometry
+        A Geometry object containing the geometries of the 3D model.
+    layer: int
+        An integer specifying the layer of the BVH tree to be visualized.
+
+    Returns
+    -------
+    Geometry
+        A Geometry object containing a 3D mesh visualization of the BVH tree at the specified layer.
+
+    Raises
+    ------
+    Exception
+        If there are no nodes at the specified layer.
+    """
     lower_bounds, upper_bounds = geometry.bvh.get_layer(layer).get_bounds()
 
     if len(lower_bounds) == 0 or len(upper_bounds) == 0:
@@ -45,6 +65,19 @@ def bvh_mesh(geometry, layer):
     return create_geometry_from_obj(geometry)
 
 def encode_movie(dir):
+    """
+    Creates a movie file from a series of image frames stored in a specified directory.
+
+    Parameters
+    ----------
+    dir: str
+        A string specifying the directory containing the image frames for the movie.
+
+    Returns
+    -------
+    None
+        The function saves the movie file to the current working directory and prints a message indicating where it was saved.
+    """
     root, ext = 'movie', 'avi'
     for i in itertools.count():
         path = '.'.join([root + str(i).zfill(5), ext])
