@@ -219,6 +219,7 @@ class Material(object):
         self.scattering_length = None
         self.scintillation_spectrum = None
         self.scintillation_light_yield = None
+        self.scintillation_rise_time = None
         self.scintillation_waveform = None
         self.scintillation_mod = None
         self.comp_reemission_prob = []
