@@ -1,11 +1,14 @@
+
+import os
+if 'PYGAME_HIDE_SUPPORT_PROMPT' not in os.environ:
+    os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+
 try:
     from chroma.camera import Camera, EventViewer, view, build
 except ImportError:
     pass # Allow chroma usage when pygame not present
 from chroma import geometry
 from chroma import event
-from chroma import generator
-from chroma.generator import constant_particle_gun
 try: 
     from chroma import gpu
     from chroma.sim import Simulation
