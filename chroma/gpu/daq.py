@@ -36,6 +36,7 @@ class GPUChannels(object):
 
 class GPUDaq(object):
     def __init__(self, gpu_detector, ndaq=1):
+        assert gpu_detector.nchannels>0, "Geometry has no detectors, DAQ can't be initialized."
         self.earliest_time_gpu = ga.empty(gpu_detector.nchannels*ndaq, dtype=np.float32)
         self.earliest_time_int_gpu = ga.empty(gpu_detector.nchannels*ndaq, dtype=np.uint32)
         self.channel_history_gpu = ga.zeros_like(self.earliest_time_int_gpu)

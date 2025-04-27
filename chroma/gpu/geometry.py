@@ -39,6 +39,7 @@ class GPUGeometry(object):
         self.material_ptrs = []
 
         def interp_material_property(wavelengths, property):
+            assert property is not None, 'property must not be None'
             # note that it is essential that the material properties be
             # interpolated linearly. this fact is used in the propagation
             # code to guarantee that probabilities still sum to one.
@@ -49,13 +50,16 @@ class GPUGeometry(object):
 
             if material is None:
                 raise Exception('one or more triangles is missing a material.')
-
-            refractive_index = interp_material_property(wavelengths, material.refractive_index)
-            refractive_index_gpu = ga.to_gpu(refractive_index)
-            absorption_length = interp_material_property(wavelengths, material.absorption_length)
-            absorption_length_gpu = ga.to_gpu(absorption_length)
-            scattering_length = interp_material_property(wavelengths, material.scattering_length)
-            scattering_length_gpu = ga.to_gpu(scattering_length)
+            try:
+                refractive_index = interp_material_property(wavelengths, material.refractive_index)
+                refractive_index_gpu = ga.to_gpu(refractive_index)
+                absorption_length = interp_material_property(wavelengths, material.absorption_length)
+                absorption_length_gpu = ga.to_gpu(absorption_length)
+                scattering_length = interp_material_property(wavelengths, material.scattering_length)
+                scattering_length_gpu = ga.to_gpu(scattering_length)
+            except Exception as e:
+                print('Error with material %s: %s' % (material.name, e))
+                raise e
             num_comp = len(material.comp_reemission_prob)
             comp_reemission_prob_gpu = [ga.to_gpu(interp_material_property(wavelengths, component)) for component in material.comp_reemission_prob]
             self.material_data.append(comp_reemission_prob_gpu)
