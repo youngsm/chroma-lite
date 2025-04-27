@@ -65,6 +65,8 @@ class Mesh(object):
         self.vertices = unique_vertices.view(self.vertices.dtype).reshape((unique_vertices.shape[0], self.vertices.shape[1]))
         # remap the triangles to the unique vertices
         self.triangles = inverse[self.triangles]
+        if self.triangles.ndim == 3:
+            self.triangles = self.triangles.squeeze(-1)
 
     def remove_null_triangles(self):
         '''Remove any zero-area triangles from a mesh.
