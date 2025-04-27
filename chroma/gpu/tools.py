@@ -2,14 +2,21 @@ import numpy as np
 import pytools
 import pycuda.tools
 from pycuda import characterize
+from pycuda.tools import context_dependent_memoize
+
 import pycuda.driver as cuda
 import pycuda.compiler
 from pycuda import gpuarray as ga
-
+import os
 from chroma.cuda import srcdir
 
 # standard nvcc options
 cuda_options = ('--use_fast_math',)#, '--ptxas-options=-v']
+
+# add conda prefix to include paths if it exist
+if 'CONDA_PREFIX' in os.environ:
+    conda_include_path = os.path.join(os.environ['CONDA_PREFIX'], 'include')
+    cuda_options += ('-I'+conda_include_path,)
 
 @pycuda.tools.context_dependent_memoize
 def get_cu_module(name, options=None, include_source_directory=True):
@@ -30,6 +37,34 @@ def get_cu_module(name, options=None, include_source_directory=True):
 
     return pycuda.compiler.SourceModule(source, options=options,
                                         no_extern_c=True)
+
+# monkey patch for pycuda.characterize.sizeof, which breaks for some reason on newer versions of cuda/pycuda/?
+@context_dependent_memoize
+def sizeof(type_name, preamble=""):
+    from pycuda.compiler import SourceModule
+
+    mod = SourceModule(
+        """
+    %s
+    extern "C"
+    __global__ void write_size(size_t *output)
+    {
+      *output = sizeof(%s);
+    }
+    """
+        % (preamble, type_name),
+        no_extern_c=True,
+        options=list(cuda_options)
+    )
+
+    import pycuda.gpuarray as gpuarray
+
+    output = gpuarray.empty((), dtype=np.uintp)
+    mod.get_function("write_size")(output, block=(1, 1, 1), grid=(1, 1))
+
+    return int(output.get())
+
+pycuda.characterize.sizeof = sizeof
 
 @pytools.memoize
 def get_cu_source(name):
@@ -76,7 +111,7 @@ def get_rng_states(size, seed=1):
     "Return `size` number of CUDA random number generator states."
     rng_states = cuda.mem_alloc(size*characterize.sizeof('curandStateXORWOW', '#include <curand_kernel.h>'))
 
-    module = pycuda.compiler.SourceModule(init_rng_src, no_extern_c=True)
+    module = pycuda.compiler.SourceModule(init_rng_src, no_extern_c=True, options=list(cuda_options))
     init_rng = module.get_function('init_rng')
 
     init_rng(np.int32(size), rng_states, np.uint64(seed), np.uint64(0), block=(64,1,1), grid=(size//64+1,1))
