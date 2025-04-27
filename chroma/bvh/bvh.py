@@ -6,7 +6,7 @@ from pycuda.gpuarray import vec
 uint4 = vec.uint4 # pylint: disable-msg=C0103,E1101
 
 CHILD_BITS = 28
-NCHILD_MASK = np.uint32(0xFFFF << CHILD_BITS)
+NCHILD_MASK = np.uint64(0xFFFF << CHILD_BITS)
 
 def unpack_nodes(nodes):
     '''Creates a numpy record array with the contents of nodes
@@ -18,12 +18,12 @@ def unpack_nodes(nodes):
     Returns ndarray(shape=n, dtype=[('xlo', np.uint16), ('xhi', np.uint16),
                                     ('ylo', np.uint16), ('yhi', np.uint16),
                                     ('zlo', np.uint16), ('zhi', np.uint16),
-                                    ('child', np.uint32), ('nchild', np.uint16)])
+                                    ('child', np.uint64), ('nchild', np.uint16)])
     '''
     unpacked_dtype = np.dtype([('xlo', np.uint16), ('xhi', np.uint16),
                                ('ylo', np.uint16), ('yhi', np.uint16),
                                ('zlo', np.uint16), ('zhi', np.uint16),
-                               ('child', np.uint32), ('nchild', np.uint16)])
+                               ('child', np.uint64), ('nchild', np.uint16)])
     unpacked = np.empty(shape=len(nodes), dtype=unpacked_dtype)
     
     for axis in ['x', 'y', 'z']:
