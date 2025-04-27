@@ -42,7 +42,7 @@ def make_recursive_grid_bvh(mesh, target_degree=3, verbose=False):
             nunique = count_unique_in_sorted(morton_codes)
 
         # Determine the grouping of child nodes into parents
-        morton_delta = np.ediff1d(morton_codes, to_begin=1).astype(np.uint64)
+        morton_delta = np.ediff1d(morton_codes, to_begin=np.uint64(1)).astype(np.uint64)
         parent_morton_codes = morton_codes[morton_delta > 0]
         first_child = np.argwhere(morton_delta > 0).flatten().astype(np.uint32)
         nchild = np.ediff1d(first_child, to_end=nnodes - first_child[-1]).astype(np.uint32)
