@@ -1,5 +1,25 @@
 import numpy as np
 
+def gen_rot(a, b):
+    """Construct a matrix to rotate vector a to vector -b"""
+    a = a / np.linalg.norm(a)
+    b = b / np.linalg.norm(b)
+
+    if (a == -b).all():
+        return np.diag([1.0, 1.0, 1.0])
+    if (a == b).all():
+        if a[1] == 0 and a[2] == 0:
+            v = np.cross(a, [0, 1, 0])
+        else:
+            v = np.cross(a, [1, 0, 0])
+        c = np.pi
+    else:
+        v = np.cross(a, b)
+        c = np.arccos(-np.dot(a, b))
+    return make_rotation_matrix(c, v)
+
+
+
 def get_perp(x):
     """Returns an arbitrary vector perpendicular to `x`."""
     a = np.zeros(3)
