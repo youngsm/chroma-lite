@@ -83,7 +83,7 @@ def read_csv(filename):
 
     return np.array(points)
 
-def offset(points, x):
+def offset(points, x, tol=1e-9):
     """
     Return the set of points obtained by offsetting the edges of the profile
     created by `points` by an amount `x`.
@@ -95,39 +95,51 @@ def offset(points, x):
             Distance to offset the profile; a positive `x` value will offset
             the profile in the direction of the profile path rotated 90 degrees
             clockwise.
+        - tol: float
+            Tolerance for removing consecutive duplicates.
     """
     points = np.asarray(points)
-    points = np.array([points[0] - (points[1] - points[0])] + list(points) + [points[-1] - (points[-2] - points[-1])])
-    
+
+    keep = np.ones(len(points), dtype=bool)
+    keep[1:] = np.linalg.norm(points[1:] - points[:-1], axis=1) > tol
+    points = points[keep]
+
+    points = np.array(
+        [points[0] - (points[1] - points[0])]
+        + list(points)
+        + [points[-1] - (points[-2] - points[-1])]
+    )
+
     offset_points = []
-    for i in range(1,len(points)-1):
-        v1 = np.cross(points[i]-points[i-1], (0,0,1))[:2]
+    for i in range(1, len(points) - 1):
+        v1 = np.cross(points[i] - points[i - 1], (0, 0, 1))[:2]
         v1 /= np.linalg.norm(v1)
         v1 *= x
 
-        a = points[i-1] + v1
+        a = points[i - 1] + v1
         b = points[i] + v1
 
-        v2 = np.cross(points[i+1]-points[i], (0,0,1))[:2]
+        v2 = np.cross(points[i + 1] - points[i], (0, 0, 1))[:2]
         v2 /= np.linalg.norm(v2)
         v2 *= x
 
         c = points[i] + v2
-        d = points[i+1] + v2
+        d = points[i + 1] + v2
 
-        m = np.empty((2,2))
-        m[:,0] = b-a
-        m[:,1] = c-d
+        m = np.empty((2, 2))
+        m[:, 0] = b - a
+        m[:, 1] = c - d
 
         try:
-            j = np.linalg.solve(m, c-a)[0]
+            j = np.linalg.solve(m, c - a)[0]
         except np.linalg.linalg.LinAlgError as e:
             offset_points.append(b)
             continue
 
-        offset_points.append((a + j*(b-a)))
+        offset_points.append((a + j * (b - a)))
 
     return np.array(offset_points)
+
 
 def memoize_method_with_dictionary_arg(func):
     def lookup(*args):
