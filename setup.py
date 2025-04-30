@@ -7,6 +7,9 @@ setup(
     version = '0.5',
     packages = find_packages(),
     include_package_data=True,
+    package_data={
+        'chroma': ['cuda/*.cu', 'cuda/*.h'],
+    },
 
     scripts = ['bin/chroma-sim', 'bin/chroma-cam',
                'bin/chroma-geo', 'bin/chroma-bvh',
