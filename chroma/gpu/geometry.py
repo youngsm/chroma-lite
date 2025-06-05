@@ -33,6 +33,7 @@ class GPUGeometry(object):
         material_struct_size = characterize.sizeof('Material', geometry_source)
         surface_struct_size = characterize.sizeof('Surface', geometry_source)
         dichroicprops_struct_size = characterize.sizeof('DichroicProps', geometry_source)
+        angularprops_struct_size = characterize.sizeof('AngularProps', geometry_source)
         geometry_struct_size = characterize.sizeof('Geometry', geometry_source)
 
         self.material_data = []
@@ -162,8 +163,20 @@ class GPUGeometry(object):
             else:
                 dichroic_props = np.uint64(0) #NULL
             
+            if surface.angular_props:
+                props = surface.angular_props
+                angles_gpu = ga.to_gpu(np.asarray(props.angles, dtype=np.float32))
+                transmit_gpu = ga.to_gpu(np.asarray(props.transmit, dtype=np.float32))
+                reflect_spec_gpu = ga.to_gpu(np.asarray(props.reflect_specular, dtype=np.float32))
+                reflect_diff_gpu = ga.to_gpu(np.asarray(props.reflect_diffuse, dtype=np.float32))
+                
+                self.surface_data.extend([angles_gpu, transmit_gpu, reflect_spec_gpu, reflect_diff_gpu])
+                angular_props = make_gpu_struct(angularprops_struct_size, 
+                                               [angles_gpu, transmit_gpu, reflect_spec_gpu, reflect_diff_gpu, 
+                                                np.uint32(len(props.angles))])
+            else:
+                angular_props = np.uint64(0)  # NULL
             
-
             self.surface_data.append(detect_gpu)
             self.surface_data.append(absorb_gpu)
             self.surface_data.append(reemit_gpu)
@@ -173,6 +186,7 @@ class GPUGeometry(object):
             self.surface_data.append(eta_gpu)
             self.surface_data.append(k_gpu)
             self.surface_data.append(dichroic_props)
+            self.surface_data.append(angular_props)
             
             surface_gpu = \
                 make_gpu_struct(surface_struct_size,
@@ -180,6 +194,7 @@ class GPUGeometry(object):
                                  reflect_diffuse_gpu,reflect_specular_gpu,
                                  eta_gpu, k_gpu, reemission_cdf_gpu,
                                  dichroic_props,
+                                 angular_props,
                                  np.uint32(surface.model),
                                  np.uint32(len(wavelengths)),
                                  np.uint32(surface.transmissive),

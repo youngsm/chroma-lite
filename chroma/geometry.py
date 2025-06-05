@@ -252,6 +252,13 @@ class DichroicProps(object):
         self.dichroic_reflect = np.asarray(reflect) #[angle][point]
         self.dichroic_transmit = np.asarray(transmit) #[angle][point]
 
+class AngularProps(object):
+    def __init__(self, angles, transmit, reflect_specular=None, reflect_diffuse=None):
+        self.angles = np.asarray(angles)  # [angle in radians]
+        self.transmit = np.asarray(transmit)  # [transmission probability]
+        self.reflect_specular = np.asarray(reflect_specular) if reflect_specular is not None else np.zeros_like(transmit)
+        self.reflect_diffuse = np.asarray(reflect_diffuse) if reflect_diffuse is not None else np.zeros_like(transmit)
+
 class Surface(object):
     """Surface optical properties."""
     def __init__(self, name='none', model=0):
@@ -268,6 +275,7 @@ class Surface(object):
         self.set('reemission_cdf', 0)
         
         self.dichroic_props = None
+        self.angular_props = None
 
         self.thickness = 0.0
         self.transmissive = 0

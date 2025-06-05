@@ -638,6 +638,53 @@ propagate_at_dichroic(Photon &p, State &s, curandState &rng, Surface *surface, b
 } // propagate_at_dichroic
 
 __device__ int
+propagate_at_angular(Photon &p, State &s, curandState &rng, Surface *surface, bool use_weights=false)
+{
+    float incident_angle = get_theta(s.surface_normal, -p.direction);
+    
+    const AngularProps *props = surface->angular_props;
+    float idx = interp_idx(incident_angle, props->nangles, props->angles);
+    unsigned int iidx = (int)idx;
+    
+    // Linear interpolation between adjacent angle bins
+    float t = idx - iidx;  // fractional part
+    float transmit_prob = props->transmit[iidx] + t * (props->transmit[iidx+1] - props->transmit[iidx]);
+    float reflect_spec_prob = props->reflect_specular[iidx] + t * (props->reflect_specular[iidx+1] - props->reflect_specular[iidx]);
+    float reflect_diff_prob = props->reflect_diffuse[iidx] + t * (props->reflect_diffuse[iidx+1] - props->reflect_diffuse[iidx]);
+    
+    float absorb_prob = 1.0f - transmit_prob - reflect_spec_prob - reflect_diff_prob;
+    
+    if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD && absorb_prob < (1.0f - WEIGHT_LOWER_THRESHOLD)) {
+        // Prevent absorption and reweight accordingly
+        float survive = 1.0f - absorb_prob;
+        absorb_prob = 0.0f;
+        p.weight *= survive;
+        
+        // Renormalize remaining probabilities
+        transmit_prob /= survive;
+        reflect_spec_prob /= survive;
+        reflect_diff_prob /= survive;
+    }
+    
+    float uniform_sample = curand_uniform(&rng);
+    
+    if (uniform_sample < absorb_prob) {
+        p.history |= SURFACE_ABSORB;
+        return BREAK;
+    }
+    else if (uniform_sample < absorb_prob + transmit_prob) {
+        p.history |= SURFACE_TRANSMIT;
+        return PASS;  // No refraction - just pass through
+    }
+    else if (uniform_sample < absorb_prob + transmit_prob + reflect_spec_prob) {
+        return propagate_at_specular_reflector(p, s);
+    }
+    else {
+        return propagate_at_diffuse_reflector(p, s, rng);
+    }
+} // propagate_at_angular
+
+__device__ int
 propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
                      bool use_weights=false)
 {
@@ -649,6 +696,8 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
         return propagate_at_wls(p, s, rng, surface, use_weights);
     else if (surface->model == SURFACE_DICHROIC)
         return propagate_at_dichroic(p, s, rng, surface, use_weights);
+    else if (surface->model == SURFACE_ANGULAR)
+        return propagate_at_angular(p, s, rng, surface, use_weights);
     else {
         // use default surface model: do a combination of specular and
         // diffuse reflection, detection, and absorption based on relative
