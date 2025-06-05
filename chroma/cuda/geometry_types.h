@@ -19,7 +19,7 @@ struct Material
     float time_start;
 };
 
-enum { SURFACE_DEFAULT, SURFACE_COMPLEX, SURFACE_WLS, SURFACE_DICHROIC };
+enum { SURFACE_DEFAULT, SURFACE_COMPLEX, SURFACE_WLS, SURFACE_DICHROIC, SURFACE_ANGULAR};
 
 struct DichroicProps
 {
@@ -27,6 +27,15 @@ struct DichroicProps
     float **dichroic_reflect;
     float **dichroic_transmit;
     unsigned int nangles;
+};
+
+struct AngularProps
+{
+    float *angles;          
+    float *transmit;        
+    float *reflect_specular;
+    float *reflect_diffuse; 
+    unsigned int nangles;   
 };
 
 struct Surface
@@ -40,7 +49,8 @@ struct Surface
     float *k;
     float *reemission_cdf;
     DichroicProps *dichroic_props;
- 
+    AngularProps *angular_props;
+    
     unsigned int model;
     unsigned int wavelength_n;
     unsigned int transmissive;
