@@ -14,6 +14,8 @@ import copy
 
 from chroma.log import logger
 
+cache_dir = os.environ.get('CHROMA_CACHE_DIR', os.path.expanduser('~/.chroma/'))
+
 class GeometryNotFoundError(Exception):
     '''A requested geometry was not found in the on-disk cache.'''
     def __init__(self, msg):
@@ -61,7 +63,7 @@ class Cache(object):
     with the special name "default" will be the default BVH.
     '''
     
-    def __init__(self, cache_dir=os.path.expanduser('~/.chroma/')):
+    def __init__(self, cache_dir=cache_dir):
         '''Open a Chroma cache stored at ``cache_dir``.
         
         If ``cache_dir`` does not already exist, it will be created.  By default,
