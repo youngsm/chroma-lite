@@ -18,8 +18,8 @@ def pick_seed():
     return int(time.time()) ^ (os.getpid() << 16) & 2**32-1
 
 class Simulation(object):
-    def __init__(self, detector, seed=None, cuda_device=None, particle_tracking=False, photon_tracking=False,
-                 geant4_processes=4, nthreads_per_block=256, max_blocks=1024):
+    def __init__(self, detector, seed=None, cuda_device=None, photon_tracking=False,
+                 nthreads_per_block=512, max_blocks=1024):
         self.detector = detector
 
         self.nthreads_per_block = nthreads_per_block
@@ -34,9 +34,6 @@ class Simulation(object):
         # We have three generators to seed: numpy.random, GEANT4, and CURAND.
         # The latter two are done below.
         np.random.seed(self.seed)
-
-        if geant4_processes > 0:
-            raise NotImplementedError("GEANT4 is not supported in Chroma")
 
         self.context = gpu.create_cuda_context(cuda_device)
 
