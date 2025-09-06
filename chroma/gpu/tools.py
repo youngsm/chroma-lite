@@ -11,7 +11,8 @@ import os
 from chroma.cuda import srcdir
 
 # standard nvcc options
-cuda_options = ('--use_fast_math',)#, '--ptxas-options=-v']
+# Prefer L1 caching for global loads on modern GPUs and fast math intrinsics
+cuda_options = ('--use_fast_math', '-Xptxas=-dlcm=ca',)  #, '--ptxas-options=-v']
 
 # add conda prefix to include paths if it exist
 if 'CONDA_PREFIX' in os.environ:

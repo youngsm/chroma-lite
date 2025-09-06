@@ -66,7 +66,7 @@ class GPUPhotons(object):
         # Replicate the photons to the rest of the slots if needed
         if ncopies > 1:
             max_blocks = 1024
-            nthreads_per_block = 64
+            nthreads_per_block = 256
             for first_photon, photons_this_round, blocks in \
                     chunk_iterator(nphotons, nthreads_per_block, max_blocks):
                 self.gpu_funcs.photon_duplicate(np.int32(first_photon), np.int32(photons_this_round),
@@ -104,7 +104,7 @@ class GPUPhotons(object):
             hitmap[int(chan)] = flat_hits[mask]
         return hitmap
 
-    def get_flat_hits(self, gpu_detector, target_flag=(0x1<<2), nthreads_per_block=64, max_blocks=1024,
+    def get_flat_hits(self, gpu_detector, target_flag=(0x1<<2), nthreads_per_block=256, max_blocks=1024,
                start_photon=None, nphotons=None, no_map=False):
         '''GPUPhoton objects containing only photons that
         have a particular bit set in their history word and were detected by
@@ -190,7 +190,7 @@ class GPUPhotons(object):
                                   evidx=self.evidx[window])
 
     @profile_if_possible
-    def propagate(self, gpu_geometry, rng_states, nthreads_per_block=64,
+    def propagate(self, gpu_geometry, rng_states, nthreads_per_block=256,
                   max_blocks=1024, max_steps=10, use_weights=False,
                   scatter_first=0, track=False):
         """Propagate photons on GPU to termination or max_steps, whichever
@@ -259,7 +259,7 @@ class GPUPhotons(object):
             return step_photon_ids,step_photons
 
     @profile_if_possible
-    def copy_queue(self, queue_gpu, nphotons, nthreads_per_block=64, max_blocks=1024,
+    def copy_queue(self, queue_gpu, nphotons, nthreads_per_block=256, max_blocks=1024,
                start_photon=0):
                
         # Allocate new storage space
@@ -286,7 +286,7 @@ class GPUPhotons(object):
         return GPUPhotonsSlice(pos, dir, pol, wavelengths, t, last_hit_triangles, flags, weights, evidx)
         
     @profile_if_possible
-    def select(self, target_flag, nthreads_per_block=64, max_blocks=1024,
+    def select(self, target_flag, nthreads_per_block=256, max_blocks=1024,
                start_photon=None, nphotons=None):
         '''Return a new GPUPhoton object containing only photons that
         have a particular bit set in their history word.'''
