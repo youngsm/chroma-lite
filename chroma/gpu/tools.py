@@ -9,10 +9,19 @@ import pycuda.compiler
 from pycuda import gpuarray as ga
 import os
 from chroma.cuda import srcdir
+from . import profiler as _gpu_profiler
 
 # standard nvcc options
 # Prefer L1 caching for global loads on modern GPUs and fast math intrinsics
 cuda_options = ('--use_fast_math', '-Xptxas=-dlcm=ca',)  #, '--ptxas-options=-v']
+
+# Optional device-side profiling (inner-kernel). Enable with CHROMA_DEVICE_PROFILE=1
+if os.environ.get('CHROMA_DEVICE_PROFILE', '').strip().lower() in ('1','true','yes','on'):
+    cuda_options += ('-DCHROMA_DEVICE_PROFILE=1',)
+
+# Optional: keep last_hit_triangle on BULK_ABSORB for debugging culprit faces
+if os.environ.get('CHROMA_KEEP_LAST_TRI_ON_BULK', '').strip().lower() in ('1','true','yes','on'):
+    cuda_options += ('-DCHROMA_KEEP_LAST_TRI_ON_BULK=1',)
 
 # add conda prefix to include paths if it exist
 if 'CONDA_PREFIX' in os.environ:
@@ -86,6 +95,8 @@ class GPUFuncs(object):
             return self.funcs[name]
         except KeyError:
             f = self.module.get_function(name)
+            # Always return a wrapper; it is a no-op if profiling is disabled
+            f = _gpu_profiler.wrap_function(f, name)
             self.funcs[name] = f
             return f
 

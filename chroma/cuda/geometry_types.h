@@ -76,6 +76,32 @@ struct Node
     unsigned int nchild;
 };
 
+// Analytic, procedural wire-plane primitive: periodic array of parallel cylinders
+struct WirePlane
+{
+    // A point on the plane (typically plane center)
+    float3 origin;
+    // Unit vector along wire axis (u) and in-plane perpendicular to wires (v)
+    float3 u;
+    float3 v;
+    // Period (pitch) along v and cylinder radius
+    float pitch;
+    float radius;
+    // Finite bounds along u and v in local coordinates (relative to origin)
+    float umin;
+    float umax;
+    float vmin;
+    float vmax;
+    // Optional offset of wire centers along v relative to origin
+    float v0;
+    // Indices into global materials/surfaces tables
+    int surface_index;
+    int material_outer_index; // material outside the wire (e.g., LAr)
+    int material_inner_index; // material inside the wire (e.g., metal)
+    // Optional display color
+    unsigned int color;
+};
+
 struct Geometry
 {
     float3 *vertices;
@@ -89,6 +115,9 @@ struct Geometry
     float3 world_origin;
     float world_scale;
     int nprimary_nodes;
+    // Optional analytic wire-planes for fast intersection
+    WirePlane *wireplanes;
+    int nwireplanes;
 };
 
 #endif

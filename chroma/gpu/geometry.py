@@ -35,6 +35,7 @@ class GPUGeometry(object):
         dichroicprops_struct_size = characterize.sizeof('DichroicProps', geometry_source)
         angularprops_struct_size = characterize.sizeof('AngularProps', geometry_source)
         geometry_struct_size = characterize.sizeof('Geometry', geometry_source)
+        wireplane_struct_size = characterize.sizeof('WirePlane', geometry_source)
 
         self.material_data = []
         self.material_ptrs = []
@@ -259,6 +260,73 @@ class GPUGeometry(object):
             self.vertices = ga.to_gpu(self.vertices)
             logger.info('Optimization: Sufficient memory to move vertices onto GPU')
 
+        # analytic wire-plane descriptors for fast intersection
+        wireplanes_ptr = np.uint64(0)
+        nwireplanes = 0
+        if hasattr(geometry, 'wireplanes') and geometry.wireplanes is not None and len(geometry.wireplanes) > 0:
+            # build lookup for materials/surfaces in this geometry
+            mat_lookup = {m: i for i, m in enumerate(geometry.unique_materials)}
+            surf_lookup = {s: i for i, s in enumerate(geometry.unique_surfaces)}
+
+            members = []
+            for wp in geometry.wireplanes:
+                get = (lambda key, default=None: (wp.get(key, default) if isinstance(wp, dict) else getattr(wp, key, default)))
+
+                origin = np.asarray(get('origin'), dtype=np.float32)
+                u = np.asarray(get('u'), dtype=np.float32)
+                v = np.asarray(get('v'), dtype=np.float32)
+                pitch = np.float32(get('pitch'))
+                radius = np.float32(get('radius'))
+                umin = np.float32(get('umin', -1e9))
+                umax = np.float32(get('umax', +1e9))
+                vmin = np.float32(get('vmin', -1e9))
+                vmax = np.float32(get('vmax', +1e9))
+                v0 = np.float32(get('v0', 0.0))
+
+                # surface/material indices can be specified directly or via objects
+                surf_idx = get('surface_index', None)
+                if surf_idx is None:
+                    surf_obj = get('surface', None)
+                    surf_idx = surf_lookup.get(surf_obj, None)
+                if surf_idx is None or int(surf_idx) < 0 or int(surf_idx) >= len(geometry.unique_surfaces):
+                    raise ValueError('WirePlane surface unresolved: provide surface_index or ensure surface object is in geometry.unique_surfaces')
+                surf_idx = np.int32(int(surf_idx))
+
+                m_out_idx = get('material_outer_index', None)
+                if m_out_idx is None:
+                    mo = get('material_outer', None)
+                    m_out_idx = mat_lookup.get(mo, None)
+                if m_out_idx is None or int(m_out_idx) < 0 or int(m_out_idx) >= len(geometry.unique_materials):
+                    raise ValueError('WirePlane material_outer unresolved: provide material_outer_index or ensure material object is in geometry.unique_materials')
+                m_out_idx = np.int32(int(m_out_idx))
+
+                m_in_idx = get('material_inner_index', None)
+                if m_in_idx is None:
+                    mi = get('material_inner', None)
+                    m_in_idx = mat_lookup.get(mi, None)
+                if m_in_idx is None or int(m_in_idx) < 0 or int(m_in_idx) >= len(geometry.unique_materials):
+                    raise ValueError('WirePlane material_inner unresolved: provide material_inner_index or ensure material object is in geometry.unique_materials')
+                m_in_idx = np.int32(int(m_in_idx))
+
+                color = np.uint32(get('color', 0))
+
+                members.extend([
+                    ga.vec.make_float3(*origin),
+                    ga.vec.make_float3(*u),
+                    ga.vec.make_float3(*v),
+                    pitch,
+                    radius,
+                    umin, umax, vmin, vmax,
+                    v0,
+                    surf_idx,
+                    m_out_idx,
+                    m_in_idx,
+                    color
+                ])
+
+            wireplanes_ptr = make_gpu_struct(wireplane_struct_size*len(geometry.wireplanes), members)
+            nwireplanes = len(geometry.wireplanes)
+
         self.gpudata = make_gpu_struct(geometry_struct_size,
                                        [Mapped(self.vertices), 
                                         Mapped(self.triangles),
@@ -269,7 +337,10 @@ class GPUGeometry(object):
                                         self.surface_pointer_array,
                                         self.world_origin,
                                         self.world_scale,
-                                        np.int32(len(self.nodes))])
+                                        np.int32(len(self.nodes)),
+                                        np.uint32(0),
+                                        wireplanes_ptr,
+                                        np.int32(nwireplanes)])
 
         self.geometry = geometry
 
@@ -315,4 +386,3 @@ class GPUGeometry(object):
                          solid_hit_gpu, solid_colors_gpu, self.gpudata,
                          block=(nblocks_per_thread,1,1), 
                          grid=(blocks,1))
-

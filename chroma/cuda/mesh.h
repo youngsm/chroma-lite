@@ -3,6 +3,7 @@
 
 #include "intersect.h"
 #include "geometry.h"
+#include "profile.h"
 
 #include "stdio.h"
 
@@ -16,21 +17,24 @@ __device__ bool
 intersect_node(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
 	       Geometry *g, const Node &node, const float min_distance=-1.0f)
 {
+    CHROMA_PROF_FUNC_START(CHROMA_PROF_INTERSECT_NODE);
     float distance_to_box;
+    bool result = false;
 
     if (intersect_box(neg_origin_inv_dir, inv_dir, node.lower, node.upper,
 		      distance_to_box)) {
 	if (min_distance < 0.0f)
-	    return true;
-
-	if (distance_to_box > min_distance)
-	    return false;
-
-	return true;
+	    result = true;
+	else if (distance_to_box > min_distance)
+	    result = false;
+	else
+	    result = true;
+    } else {
+	result = false;
     }
-    else {
-	return false;
-    }
+
+    CHROMA_PROF_FUNC_END(CHROMA_PROF_INTERSECT_NODE);
+    return result;
 }
 
 /* Finds the intersection between a ray and `geometry`. If the ray does
@@ -42,6 +46,7 @@ __device__ int
 intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
 	       float &min_distance, int last_hit_triangle = -1)
 {
+    CHROMA_PROF_FUNC_START(CHROMA_PROF_INTERSECT_MESH);
     int triangle_index = -1;
 
     float distance;
@@ -52,8 +57,10 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
     float3 neg_origin_inv_dir = -origin / direction;
     float3 inv_dir = 1.0f / direction;
 
-    if (!intersect_node(neg_origin_inv_dir, inv_dir, g, root, min_distance))
+    if (!intersect_node(neg_origin_inv_dir, inv_dir, g, root, min_distance)) {
+        CHROMA_PROF_FUNC_END(CHROMA_PROF_INTERSECT_MESH);
 	return -1;
+    }
 
     unsigned int child_ptr_stack[STACK_SIZE];
     unsigned int nchild_ptr_stack[STACK_SIZE];
@@ -114,6 +121,7 @@ intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
     //  printf("triangle count: %d\n", tri_count);
     //}
 
+    CHROMA_PROF_FUNC_END(CHROMA_PROF_INTERSECT_MESH);
     return triangle_index;
 }
 

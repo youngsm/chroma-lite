@@ -6,6 +6,7 @@
 #include "linalg.h"
 #include "matrix.h"
 #include "geometry.h"
+#include "profile.h"
 #include <float.h>
 
 
@@ -26,6 +27,7 @@ __device__ bool
 intersect_triangle(const float3 &origin, const float3 &direction,
 		   const Triangle &triangle, float &distance)
 {
+        CHROMA_PROF_FUNC_START(CHROMA_PROF_INTERSECT_TRIANGLE);
 	/*
 	float3 m1 = triangle.v1-triangle.v0;
 	float3 m2 = triangle.v2-triangle.v0;
@@ -88,10 +90,14 @@ intersect_triangle(const float3 &origin, const float3 &direction,
         {
             //outIntersectionPoint = origin + direction * t;
             distance = t;
+            CHROMA_PROF_FUNC_END(CHROMA_PROF_INTERSECT_TRIANGLE);
             return true;
         }
         else // This means that there is a line intersection but not a ray intersection.
+        {
+            CHROMA_PROF_FUNC_END(CHROMA_PROF_INTERSECT_TRIANGLE);
             return false;
+        }
 }
 
 /* Tests the intersection between a ray and an axis-aligned box defined by
@@ -108,6 +114,7 @@ intersect_box(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
 	      const float3 &lower_bound, const float3 &upper_bound,
 	      float& distance_to_box)
 {
+	CHROMA_PROF_FUNC_START(CHROMA_PROF_INTERSECT_BOX);
 	float tmin = 0.0f, tmax = CHROMA_INFINITY;
 	float t0, t1;
 
@@ -138,11 +145,14 @@ intersect_box(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
 	  tmax = min(tmax, max(t0, t1));
 	}
 
-	if (tmin > tmax)
+	if (tmin > tmax) {
+		CHROMA_PROF_FUNC_END(CHROMA_PROF_INTERSECT_BOX);
 		return false;
+	}
 
 	distance_to_box = tmin;
 
+	CHROMA_PROF_FUNC_END(CHROMA_PROF_INTERSECT_BOX);
 	return true;
 }
 

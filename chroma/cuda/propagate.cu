@@ -4,11 +4,48 @@
 #include "geometry.h"
 #include "detector.h"
 #include "photon.h"
+#include "profile.h"
 
 #include "stdio.h"
 
+#ifdef CHROMA_DEVICE_PROFILE
+// Device-global counters for inner-kernel profiling
+extern "C" __device__ unsigned long long chroma_prof_calls[CHROMA_PROF_COUNT];
+extern "C" __device__ unsigned long long chroma_prof_cycles[CHROMA_PROF_COUNT];
+
+extern "C" __global__ void chroma_prof_reset()
+{
+    for (int i = threadIdx.x; i < CHROMA_PROF_COUNT; i += blockDim.x) {
+        chroma_prof_calls[i] = 0ULL;
+        chroma_prof_cycles[i] = 0ULL;
+    }
+}
+#endif
+
 extern "C"
 {
+
+// ---- Debug counter storage and reset ----
+extern "C" __device__ unsigned long long chroma_dbg_mesh_dir_counts[2];
+extern "C" __device__ unsigned long long chroma_dbg_mesh_mat1_counts[256];
+extern "C" __device__ unsigned long long chroma_dbg_wp_dir_counts[2];
+extern "C" __device__ unsigned long long chroma_dbg_wp_mat1_counts[256];
+
+extern "C" __global__ void chroma_dbg_reset()
+{
+    for (int i = threadIdx.x; i < 2; i += blockDim.x) {
+        chroma_dbg_mesh_dir_counts[i] = 0ULL;
+        chroma_dbg_wp_dir_counts[i] = 0ULL;
+    }
+    for (int i = threadIdx.x; i < 256; i += blockDim.x) {
+        chroma_dbg_mesh_mat1_counts[i] = 0ULL;
+        chroma_dbg_wp_mat1_counts[i] = 0ULL;
+        chroma_dbg_mesh_mat1_by_dir[0][i] = 0ULL;
+        chroma_dbg_mesh_mat1_by_dir[1][i] = 0ULL;
+        chroma_dbg_wp_mat1_by_dir[0][i] = 0ULL;
+        chroma_dbg_wp_mat1_by_dir[1][i] = 0ULL;
+    }
+}
 
 __global__ void
 photon_duplicate(int first_photon, int nthreads,
