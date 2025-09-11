@@ -922,7 +922,7 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
         // allocate any tiny residual due to rounding to specular so total is exactly 1
         float sum2 = absorb + detect + reflect_diffuse + reflect_specular;
         if (sum2 != 1.0f) {
-            reflect_specular += (1.0f - sum_probs);
+            reflect_specular += (1.0f - sum2);
         }
 #endif
         float uniform_sample = curand_uniform(&rng);
