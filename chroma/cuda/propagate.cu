@@ -25,27 +25,6 @@ extern "C" __global__ void chroma_prof_reset()
 extern "C"
 {
 
-// ---- Debug counter storage and reset ----
-extern "C" __device__ unsigned long long chroma_dbg_mesh_dir_counts[2];
-extern "C" __device__ unsigned long long chroma_dbg_mesh_mat1_counts[256];
-extern "C" __device__ unsigned long long chroma_dbg_wp_dir_counts[2];
-extern "C" __device__ unsigned long long chroma_dbg_wp_mat1_counts[256];
-
-extern "C" __global__ void chroma_dbg_reset()
-{
-    for (int i = threadIdx.x; i < 2; i += blockDim.x) {
-        chroma_dbg_mesh_dir_counts[i] = 0ULL;
-        chroma_dbg_wp_dir_counts[i] = 0ULL;
-    }
-    for (int i = threadIdx.x; i < 256; i += blockDim.x) {
-        chroma_dbg_mesh_mat1_counts[i] = 0ULL;
-        chroma_dbg_wp_mat1_counts[i] = 0ULL;
-        chroma_dbg_mesh_mat1_by_dir[0][i] = 0ULL;
-        chroma_dbg_mesh_mat1_by_dir[1][i] = 0ULL;
-        chroma_dbg_wp_mat1_by_dir[0][i] = 0ULL;
-        chroma_dbg_wp_mat1_by_dir[1][i] = 0ULL;
-    }
-}
 
 __global__ void
 photon_duplicate(int first_photon, int nthreads,

@@ -6,7 +6,7 @@ from pycuda import characterize
 from chroma.geometry import standard_wavelengths
 from chroma.gpu.tools import get_cu_module, get_cu_source, cuda_options, \
     chunk_iterator, format_array, format_size, to_uint3, to_float3, \
-    make_gpu_struct, GPUFuncs, mapped_empty, Mapped
+    make_gpu_struct, mapped_empty, Mapped
 
 from chroma.log import logger
 
@@ -39,6 +39,7 @@ class GPUGeometry(object):
 
         self.material_data = []
         self.material_ptrs = []
+        materials_list = list(geometry.unique_materials)
 
         def interp_material_property(wavelengths, property):
             assert property is not None, 'property must not be None'
@@ -47,8 +48,8 @@ class GPUGeometry(object):
             # code to guarantee that probabilities still sum to one.
             return np.interp(wavelengths, property[:,0], property[:,1]).astype(np.float32)
 
-        for i in range(len(geometry.unique_materials)):
-            material = geometry.unique_materials[i]
+        for i in range(len(materials_list)):
+            material = materials_list[i]
 
             if material is None:
                 raise Exception('one or more triangles is missing a material.')
@@ -105,14 +106,70 @@ class GPUGeometry(object):
 
             self.material_ptrs.append(material_gpu)
 
-        self.material_pointer_array = \
-            make_gpu_struct(8*len(self.material_ptrs), self.material_ptrs)
+        # include any materials referenced only by analytic wireplanes
+        plane_descs_for_materials = getattr(geometry, 'wireplanes', None) or []
+        for desc in plane_descs_for_materials:
+            for mat in (desc.get('material_inner', None), desc.get('material_outer', None)):
+                if mat is None:
+                    continue
+                if mat in materials_list:
+                    continue
+                # append new material to lists and GPU buffers
+                try:
+                    refractive_index = interp_material_property(wavelengths, mat.refractive_index)
+                    refractive_index_gpu = ga.to_gpu(refractive_index)
+                    absorption_length = interp_material_property(wavelengths, mat.absorption_length)
+                    absorption_length_gpu = ga.to_gpu(absorption_length)
+                    scattering_length = interp_material_property(wavelengths, mat.scattering_length)
+                    scattering_length_gpu = ga.to_gpu(scattering_length)
+                except Exception as e:
+                    print('Error with material %s: %s' % (mat.name, e))
+                    raise e
+                num_comp = len(mat.comp_reemission_prob)
+                comp_reemission_prob_gpu = [ga.to_gpu(interp_material_property(wavelengths, component)) for component in mat.comp_reemission_prob]
+                self.material_data.append(comp_reemission_prob_gpu)
+                comp_reemission_prob_gpu = np.uint64(0) if len(comp_reemission_prob_gpu) == 0 else make_gpu_struct(8*len(comp_reemission_prob_gpu), comp_reemission_prob_gpu)
+                assert num_comp == len(mat.comp_reemission_wvl_cdf), 'component arrays must be same length'
+                comp_reemission_wvl_cdf_gpu = [ga.to_gpu(interp_material_property(wavelengths, component)) for component in mat.comp_reemission_wvl_cdf]
+                self.material_data.append(comp_reemission_wvl_cdf_gpu)
+                comp_reemission_wvl_cdf_gpu = np.uint64(0) if len(comp_reemission_wvl_cdf_gpu) == 0 else make_gpu_struct(8*len(comp_reemission_wvl_cdf_gpu), comp_reemission_wvl_cdf_gpu)
+                assert num_comp == len(mat.comp_reemission_time_cdf), 'component arrays must be same length'
+                comp_reemission_time_cdf_gpu = [ga.to_gpu(interp_material_property(times, component)) for component in mat.comp_reemission_time_cdf]
+                self.material_data.append(comp_reemission_time_cdf_gpu)
+                comp_reemission_time_cdf_gpu = np.uint64(0) if len(comp_reemission_time_cdf_gpu) == 0 else make_gpu_struct(8*len(comp_reemission_time_cdf_gpu), comp_reemission_time_cdf_gpu)
+                assert num_comp == len(mat.comp_absorption_length), 'component arrays must be same length'
+                comp_absorption_length_gpu = [ga.to_gpu(interp_material_property(wavelengths, component)) for component in mat.comp_absorption_length]
+                self.material_data.append(comp_absorption_length_gpu)
+                comp_absorption_length_gpu = np.uint64(0) if len(comp_absorption_length_gpu) == 0 else make_gpu_struct(8*len(comp_absorption_length_gpu), comp_absorption_length_gpu)
+
+                self.material_data.extend([refractive_index_gpu, absorption_length_gpu, scattering_length_gpu, comp_reemission_prob_gpu, comp_reemission_wvl_cdf_gpu, comp_reemission_time_cdf_gpu, comp_absorption_length_gpu])
+
+                material_gpu = make_gpu_struct(material_struct_size,
+                                              [refractive_index_gpu, absorption_length_gpu,
+                                               scattering_length_gpu,
+                                               comp_reemission_prob_gpu,
+                                               comp_reemission_wvl_cdf_gpu,
+                                               comp_reemission_time_cdf_gpu,
+                                               comp_absorption_length_gpu,
+                                               np.uint32(num_comp),
+                                               np.uint32(len(wavelengths)),
+                                               np.float32(wavelength_step),
+                                               np.float32(wavelengths[0]),
+                                               np.uint32(len(times)),
+                                               np.float32(time_step),
+                                               np.float32(times[0])])
+
+                self.material_ptrs.append(material_gpu)
+                materials_list.append(mat)
+
+        self.material_pointer_array = make_gpu_struct(8*len(self.material_ptrs), self.material_ptrs)
 
         self.surface_data = []
         self.surface_ptrs = []
+        surfaces_list = list(geometry.unique_surfaces)
 
-        for i in range(len(geometry.unique_surfaces)):
-            surface = geometry.unique_surfaces[i]
+        for i in range(len(surfaces_list)):
+            surface = surfaces_list[i]
 
             if surface is None:
                 # need something to copy to the surface array struct
@@ -205,8 +262,129 @@ class GPUGeometry(object):
 
             self.surface_ptrs.append(surface_gpu)
 
-        self.surface_pointer_array = \
-            make_gpu_struct(8*len(self.surface_ptrs), self.surface_ptrs)
+        # include any surfaces referenced only by analytic wireplanes
+        for desc in plane_descs_for_materials:
+            surface = desc.get('surface', None)
+            if surface is None:
+                continue
+            if surface in surfaces_list:
+                continue
+            detect = interp_material_property(wavelengths, surface.detect)
+            detect_gpu = ga.to_gpu(detect)
+            absorb = interp_material_property(wavelengths, surface.absorb)
+            absorb_gpu = ga.to_gpu(absorb)
+            reemit = interp_material_property(wavelengths, surface.reemit)
+            reemit_gpu = ga.to_gpu(reemit)
+            reflect_diffuse = interp_material_property(wavelengths, surface.reflect_diffuse)
+            reflect_diffuse_gpu = ga.to_gpu(reflect_diffuse)
+            reflect_specular = interp_material_property(wavelengths, surface.reflect_specular)
+            reflect_specular_gpu = ga.to_gpu(reflect_specular)
+            eta = interp_material_property(wavelengths, surface.eta)
+            eta_gpu = ga.to_gpu(eta)
+            k = interp_material_property(wavelengths, surface.k)
+            k_gpu = ga.to_gpu(k)
+            reemission_cdf = interp_material_property(wavelengths, surface.reemission_cdf)
+            reemission_cdf_gpu = ga.to_gpu(reemission_cdf)
+
+            if surface.dichroic_props:
+                props = surface.dichroic_props
+                transmit_pointers = []
+                reflect_pointers = []
+                angles_gpu = ga.to_gpu(np.asarray(props.angles,dtype=np.float32))
+                self.surface_data.append(angles_gpu)
+                for i_ang,angle in enumerate(props.angles):
+                    dichroic_reflect = interp_material_property(wavelengths, props.dichroic_reflect[i_ang])
+                    dichroic_reflect_gpu = ga.to_gpu(dichroic_reflect)
+                    self.surface_data.append(dichroic_reflect_gpu)
+                    reflect_pointers.append(dichroic_reflect_gpu)
+                    dichroic_transmit = interp_material_property(wavelengths, props.dichroic_transmit[i_ang])
+                    dichroic_transmit_gpu = ga.to_gpu(dichroic_transmit)
+                    self.surface_data.append(dichroic_transmit_gpu)
+                    transmit_pointers.append(dichroic_transmit_gpu)
+                reflect_arr_gpu = make_gpu_struct(8*len(reflect_pointers),reflect_pointers)
+                self.surface_data.append(reflect_arr_gpu)
+                transmit_arr_gpu = make_gpu_struct(8*len(transmit_pointers), transmit_pointers)
+                self.surface_data.append(transmit_arr_gpu)
+                dichroic_props = make_gpu_struct(dichroicprops_struct_size,[angles_gpu,reflect_arr_gpu,transmit_arr_gpu,np.uint32(len(props.angles))])
+            else:
+                dichroic_props = np.uint64(0)
+
+            if surface.angular_props:
+                props = surface.angular_props
+                angles_gpu = ga.to_gpu(np.asarray(props.angles, dtype=np.float32))
+                transmit_gpu = ga.to_gpu(np.asarray(props.transmit, dtype=np.float32))
+                reflect_spec_gpu = ga.to_gpu(np.asarray(props.reflect_specular, dtype=np.float32))
+                reflect_diff_gpu = ga.to_gpu(np.asarray(props.reflect_diffuse, dtype=np.float32))
+                self.surface_data.extend([angles_gpu, transmit_gpu, reflect_spec_gpu, reflect_diff_gpu])
+                angular_props = make_gpu_struct(angularprops_struct_size, 
+                                               [angles_gpu, transmit_gpu, reflect_spec_gpu, reflect_diff_gpu, 
+                                                np.uint32(len(props.angles))])
+            else:
+                angular_props = np.uint64(0)
+
+            self.surface_data.extend([detect_gpu, absorb_gpu, reemit_gpu, reflect_diffuse_gpu, reflect_specular_gpu, reemission_cdf_gpu, eta_gpu, k_gpu, dichroic_props, angular_props])
+            surface_gpu = make_gpu_struct(surface_struct_size,
+                                [detect_gpu, absorb_gpu, reemit_gpu,
+                                 reflect_diffuse_gpu,reflect_specular_gpu,
+                                 eta_gpu, k_gpu, reemission_cdf_gpu,
+                                 dichroic_props,
+                                 angular_props,
+                                 np.uint32(surface.model),
+                                 np.uint32(len(wavelengths)),
+                                 np.uint32(surface.transmissive),
+                                 np.float32(wavelength_step),
+                                 np.float32(wavelengths[0]),
+                                 np.float32(surface.thickness)])
+            self.surface_ptrs.append(surface_gpu)
+            surfaces_list.append(surface)
+
+        self.surface_pointer_array = make_gpu_struct(8*len(self.surface_ptrs), self.surface_ptrs)
+
+        # analytic wire-planes (optional)
+        self.wireplane_ptrs = []
+        self.wireplane_data = []
+        # build lookups for indices including any extras
+        material_lookup = dict(list(zip(materials_list, list(range(len(materials_list))))))
+        surface_lookup = dict(list(zip(surfaces_list, list(range(len(surfaces_list))))))
+        plane_descs = getattr(geometry, 'wireplanes', None)
+        if plane_descs is None:
+            plane_descs = []
+        for desc in plane_descs:
+            origin = ga.vec.make_float3(*np.asarray(desc['origin'], dtype=np.float32))
+            u = ga.vec.make_float3(*np.asarray(desc['u'], dtype=np.float32))
+            v = ga.vec.make_float3(*np.asarray(desc['v'], dtype=np.float32))
+            pitch = np.float32(desc['pitch'])
+            radius = np.float32(desc['radius'])
+            umin = np.float32(desc['umin'])
+            umax = np.float32(desc['umax'])
+            vmin = np.float32(desc['vmin'])
+            vmax = np.float32(desc['vmax'])
+            v0 = np.float32(desc['v0'])
+            surface = desc.get('surface', None)
+            material_inner = desc.get('material_inner', None)
+            material_outer = desc.get('material_outer', None)
+            color = np.uint32(desc.get('color', 0))
+
+            surface_idx = -1 if surface is None else int(surface_lookup.get(surface, -1))
+            if material_outer is None or material_inner is None:
+                # fall back to first entries (should not happen under normal use)
+                material_outer_idx = 0
+                material_inner_idx = 0
+            else:
+                material_outer_idx = int(material_lookup[material_outer])
+                material_inner_idx = int(material_lookup[material_inner])
+
+            plane_gpu = make_gpu_struct(
+                wireplane_struct_size,
+                [origin, u, v, pitch, radius, umin, umax, vmin, vmax, v0,
+                 np.int32(surface_idx), np.int32(material_outer_idx), np.int32(material_inner_idx), color]
+            )
+            self.wireplane_ptrs.append(plane_gpu)
+
+        if len(self.wireplane_ptrs) > 0:
+            self.wireplane_pointer_array = make_gpu_struct(8*len(self.wireplane_ptrs), self.wireplane_ptrs)
+        else:
+            self.wireplane_pointer_array = np.uint64(0)  # NULL
 
         self.vertices = mapped_empty(shape=len(geometry.mesh.vertices),
                                      dtype=ga.vec.float3,
@@ -230,7 +408,7 @@ class GPUGeometry(object):
 
         # Limit memory usage by splitting BVH into on and off-GPU parts
         gpu_free, gpu_total = cuda.mem_get_info()
-        node_array_usage = geometry.bvh.nodes.nbytes
+        # node_array_usage = geometry.bvh.nodes.nbytes
 
         # Figure out how many elements we can fit on the GPU,
         # but no fewer than 100 elements, and no more than the number of actual nodes
@@ -335,12 +513,11 @@ class GPUGeometry(object):
                                         Mapped(self.extra_nodes),
                                         self.material_pointer_array,
                                         self.surface_pointer_array,
+                                        self.wireplane_pointer_array,
                                         self.world_origin,
                                         self.world_scale,
                                         np.int32(len(self.nodes)),
-                                        np.uint32(0),
-                                        wireplanes_ptr,
-                                        np.int32(nwireplanes)])
+                                        np.int32(len(self.wireplane_ptrs))])
 
         self.geometry = geometry
 
