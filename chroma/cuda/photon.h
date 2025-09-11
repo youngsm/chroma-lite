@@ -956,7 +956,9 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
         }
         else if (uniform_sample < absorb + detect + reflect_diffuse)
             return propagate_at_diffuse_reflector(p, s, rng);
-        else 
+        else if (uniform_sample < absorb + detect + reflect_diffuse + reflect_specular)
+            return propagate_at_specular_reflector(p, s);
+        else
 #if CHROMA_FORCE_SCATTER_AT_PASS
             /* include any residual in specular to avoid PASS */
             return propagate_at_specular_reflector(p, s);
