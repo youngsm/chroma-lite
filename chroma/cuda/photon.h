@@ -225,10 +225,10 @@ fill_state(State &s, Photon &p, Geometry *g)
         // classification using raw outward normal from chosen wire and incident ray
         if (analytic_plane_idx >= 0) {
             const WirePlane *wp = g->wireplanes[analytic_plane_idx];
-            // boundary point in FP64 (for logging)
-            const double xb_x = (double)p.position.x + (double)s.distance_to_boundary * (double)p.direction.x;
-            const double xb_y = (double)p.position.y + (double)s.distance_to_boundary * (double)p.direction.y;
-            const double xb_z = (double)p.position.z + (double)s.distance_to_boundary * (double)p.direction.z;
+            // // boundary point in FP64 (for logging)
+            // const double xb_x = (double)p.position.x + (double)s.distance_to_boundary * (double)p.direction.x;
+            // const double xb_y = (double)p.position.y + (double)s.distance_to_boundary * (double)p.direction.y;
+            // const double xb_z = (double)p.position.z + (double)s.distance_to_boundary * (double)p.direction.z;
 
             // decide outside/inside purely from raw normal and ray (physically robust)
             const float dot_raw = analytic_dot_raw;
@@ -245,30 +245,30 @@ fill_state(State &s, Photon &p, Geometry *g)
                 s.inside_to_outside = true;
             }
 
-            const double ux = (double)wp->u.x, uy = (double)wp->u.y, uz = (double)wp->u.z;
-            const double vx0 = (double)wp->v.x, vy0 = (double)wp->v.y, vz0 = (double)wp->v.z;
-            const double un = 1.0 / sqrt(ux*ux + uy*uy + uz*uz);
-            const double ux1 = ux*un, uy1 = uy*un, uz1 = uz*un;
-            const double vdotu = vx0*ux1 + vy0*uy1 + vz0*uz1;
-            const double vx1 = vx0 - vdotu*ux1;
-            const double vy1 = vy0 - vdotu*uy1;
-            const double vz1 = vz0 - vdotu*uz1;
-            const double vn = 1.0 / sqrt(vx1*vx1 + vy1*vy1 + vz1*vz1);
-            const double vx = vx1*vn, vy = vy1*vn, vz = vz1*vn;
-            const double nx = uy1*vz - uz1*vy;
-            const double ny = uz1*vx - ux1*vz;
-            const double nz = ux1*vy - uy1*vx;
-            const double wbx = xb_x - (double)wp->origin.x;
-            const double wby = xb_y - (double)wp->origin.y;
-            const double wbz = xb_z - (double)wp->origin.z;
-            const double wv_b = wbx*vx + wby*vy + wbz*vz;
-            const double wn_b = wbx*nx + wby*ny + wbz*nz;
-            const double dv_b = wv_b - (double)wp->v0;
-            const double pitch = (double)wp->pitch;
-            const double kf = floor(dv_b / pitch + 0.5);
-            const double yb = dv_b - kf * pitch;
-            const double r2_b = yb*yb + wn_b*wn_b;
-            const double r2_wire = (double)wp->radius * (double)wp->radius;
+            // const double ux = (double)wp->u.x, uy = (double)wp->u.y, uz = (double)wp->u.z;
+            // const double vx0 = (double)wp->v.x, vy0 = (double)wp->v.y, vz0 = (double)wp->v.z;
+            // const double un = 1.0 / sqrt(ux*ux + uy*uy + uz*uz);
+            // const double ux1 = ux*un, uy1 = uy*un, uz1 = uz*un;
+            // const double vdotu = vx0*ux1 + vy0*uy1 + vz0*uz1;
+            // const double vx1 = vx0 - vdotu*ux1;
+            // const double vy1 = vy0 - vdotu*uy1;
+            // const double vz1 = vz0 - vdotu*uz1;
+            // const double vn = 1.0 / sqrt(vx1*vx1 + vy1*vy1 + vz1*vz1);
+            // const double vx = vx1*vn, vy = vy1*vn, vz = vz1*vn;
+            // const double nx = uy1*vz - uz1*vy;
+            // const double ny = uz1*vx - ux1*vz;
+            // const double nz = ux1*vy - uy1*vx;
+            // const double wbx = xb_x - (double)wp->origin.x;
+            // const double wby = xb_y - (double)wp->origin.y;
+            // const double wbz = xb_z - (double)wp->origin.z;
+            // const double wv_b = wbx*vx + wby*vy + wbz*vz;
+            // const double wn_b = wbx*nx + wby*ny + wbz*nz;
+            // const double dv_b = wv_b - (double)wp->v0;
+            // const double pitch = (double)wp->pitch;
+            // const double kf = floor(dv_b / pitch + 0.5);
+            // const double yb = dv_b - kf * pitch;
+            // const double r2_b = yb*yb + wn_b*wn_b;
+            // const double r2_wire = (double)wp->radius * (double)wp->radius;
 
             // printf("Boundary classification: r2_b=%.6e r2_wire=%.6e diff=%.6e dot=%.6f outside=%d\n",
             //     r2_b, r2_wire, fabs(r2_b - r2_wire), dot_raw, outside_now);
