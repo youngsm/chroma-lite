@@ -4,18 +4,34 @@
 #include "geometry.h"
 #include "detector.h"
 #include "photon.h"
+#include "profile.h"
 
 #include "stdio.h"
+
+#ifdef CHROMA_DEVICE_PROFILE
+// Device-global counters for inner-kernel profiling
+extern "C" __device__ unsigned long long chroma_prof_calls[CHROMA_PROF_COUNT];
+extern "C" __device__ unsigned long long chroma_prof_cycles[CHROMA_PROF_COUNT];
+
+extern "C" __global__ void chroma_prof_reset()
+{
+    for (int i = threadIdx.x; i < CHROMA_PROF_COUNT; i += blockDim.x) {
+        chroma_prof_calls[i] = 0ULL;
+        chroma_prof_cycles[i] = 0ULL;
+    }
+}
+#endif
 
 extern "C"
 {
 
+
 __global__ void
 photon_duplicate(int first_photon, int nthreads,
-		 float3 *positions, float3 *directions,
-		 float *wavelengths, float3 *polarizations,
-		 float *times, unsigned int *histories,
-		 int *last_hit_triangles, float *weights, unsigned int *evidx,
+		 float3 *__restrict__ positions, float3 *__restrict__ directions,
+		 float *__restrict__ wavelengths, float3 *__restrict__ polarizations,
+		 float *__restrict__ times, unsigned int *__restrict__ histories,
+		 int *__restrict__ last_hit_triangles, float *__restrict__ weights, unsigned int *__restrict__ evidx,
 		 int copies, int stride)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -53,8 +69,8 @@ photon_duplicate(int first_photon, int nthreads,
 
 __global__ void
 count_photons(int first_photon, int nthreads, unsigned int target_flag,
-	      unsigned int *index_counter,
-	      unsigned int *histories)
+	      unsigned int *__restrict__ index_counter,
+	      unsigned int *__restrict__ histories)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     __shared__ unsigned int counter;
@@ -80,15 +96,15 @@ count_photons(int first_photon, int nthreads, unsigned int target_flag,
 
 __global__ void
 copy_photons(int first_photon, int nthreads, unsigned int target_flag,
-	     unsigned int *index_counter,
-	     float3 *positions, float3 *directions,
-	     float *wavelengths, float3 *polarizations,
-	     float *times, unsigned int *histories,
-	     int *last_hit_triangles, float *weights, unsigned int *evidx,
-	     float3 *new_positions, float3 *new_directions,
-	     float *new_wavelengths, float3 *new_polarizations,
-	     float *new_times, unsigned int *new_histories,
-	     int *new_last_hit_triangles, float *new_weights, unsigned int *new_evidx)
+	     unsigned int *__restrict__ index_counter,
+	     const float3 *__restrict__ positions, const float3 *__restrict__ directions,
+	     const float *__restrict__ wavelengths, const float3 *__restrict__ polarizations,
+	     const float *__restrict__ times, const unsigned int *__restrict__ histories,
+	     const int *__restrict__ last_hit_triangles, const float *__restrict__ weights, const unsigned int *__restrict__ evidx,
+	     float3 *__restrict__ new_positions, float3 *__restrict__ new_directions,
+	     float *__restrict__ new_wavelengths, float3 *__restrict__ new_polarizations,
+	     float *__restrict__ new_times, unsigned int *__restrict__ new_histories,
+	     int *__restrict__ new_last_hit_triangles, float *__restrict__ new_weights, unsigned int *__restrict__ new_evidx)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -97,32 +113,41 @@ copy_photons(int first_photon, int nthreads, unsigned int target_flag,
     
     int photon_id = first_photon + id;
 
-    if (histories[photon_id] & target_flag) {
-	int offset = atomicAdd(index_counter, 1);
+    unsigned int alive = (histories[photon_id] & target_flag) ? 1u : 0u;
+    unsigned int mask = __ballot_sync(0xffffffff, alive);
+    int lane = threadIdx.x & 31;
+    int warp_count = __popc(mask);
+    int warp_prefix = __popc(mask & ((1u << lane) - 1u));
+    unsigned int base = 0;
+    if (lane == 0 && warp_count > 0) {
+        base = atomicAdd(index_counter, (unsigned int)warp_count);
+    }
+    base = __shfl_sync(0xffffffff, base, 0);
 
-	new_positions[offset] = positions[photon_id];
-	new_directions[offset] = directions[photon_id];
-	new_polarizations[offset] = polarizations[photon_id];
-	new_wavelengths[offset] = wavelengths[photon_id];
-	new_times[offset] = times[photon_id];
-	new_histories[offset] = histories[photon_id];
-	new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
-	new_weights[offset] = weights[photon_id];
-	new_evidx[offset] = evidx[photon_id];
-	
+    if (alive) {
+        int offset = base + warp_prefix;
+        new_positions[offset] = positions[photon_id];
+        new_directions[offset] = directions[photon_id];
+        new_polarizations[offset] = polarizations[photon_id];
+        new_wavelengths[offset] = wavelengths[photon_id];
+        new_times[offset] = times[photon_id];
+        new_histories[offset] = histories[photon_id];
+        new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
+        new_weights[offset] = weights[photon_id];
+        new_evidx[offset] = evidx[photon_id];
     }
 }
 
 __global__ void
-copy_photon_queue(int first_photon, int nthreads, unsigned int *queue,
-	     float3 *positions, float3 *directions,
-	     float *wavelengths, float3 *polarizations,
-	     float *times, unsigned int *histories,
-	     int *last_hit_triangles, float *weights, unsigned int *evidx,
-	     float3 *new_positions, float3 *new_directions,
-	     float *new_wavelengths, float3 *new_polarizations,
-	     float *new_times, unsigned int *new_histories,
-	     int *new_last_hit_triangles, float *new_weights, unsigned int *new_evidx)
+copy_photon_queue(int first_photon, int nthreads, const unsigned int *__restrict__ queue,
+	     const float3 *__restrict__ positions, const float3 *__restrict__ directions,
+	     const float *__restrict__ wavelengths, const float3 *__restrict__ polarizations,
+	     const float *__restrict__ times, const unsigned int *__restrict__ histories,
+	     const int *__restrict__ last_hit_triangles, const float *__restrict__ weights, const unsigned int *__restrict__ evidx,
+	     float3 *__restrict__ new_positions, float3 *__restrict__ new_directions,
+	     float *__restrict__ new_wavelengths, float3 *__restrict__ new_polarizations,
+	     float *__restrict__ new_times, unsigned int *__restrict__ new_histories,
+	     int *__restrict__ new_last_hit_triangles, float *__restrict__ new_weights, unsigned int *__restrict__ new_evidx)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     
@@ -146,8 +171,8 @@ copy_photon_queue(int first_photon, int nthreads, unsigned int *queue,
 
 __global__ void
 count_photon_hits(int first_photon, int nphotons, unsigned int detection_state,
-            unsigned int *histories, int *solid_map, int *last_hit_triangles,
-            Detector *detector, unsigned int *index_counter)
+            const unsigned int *__restrict__ histories, const int *__restrict__ solid_map, const int *__restrict__ last_hit_triangles,
+            const Detector *__restrict__ detector, unsigned int *__restrict__ index_counter)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     __shared__ unsigned int counter;
@@ -174,53 +199,65 @@ count_photon_hits(int first_photon, int nphotons, unsigned int detection_state,
 }
 
 __global__ void
-copy_photon_hits(int first_photon, int nphotons, unsigned int detection_state, 
-            int *solid_map, Detector *detector, unsigned int *index_counter,
-            float3 *positions, float3 *directions,
-            float *wavelengths, float3 *polarizations,
-            float *times, unsigned int *histories,
-            int *last_hit_triangles, float *weights, unsigned int *evidx,
-            float3 *new_positions, float3 *new_directions,
-            float *new_wavelengths, float3 *new_polarizations,
-            float *new_times, unsigned int *new_histories,
-            int *new_last_hit_triangles, float *new_weights, unsigned int *new_evidx,
-            int *new_channels)
+copy_photon_hits(int first_photon, int nphotons, unsigned int detection_state,
+            const int *__restrict__ solid_map, const Detector *__restrict__ detector, unsigned int *__restrict__ index_counter,
+            const float3 *__restrict__ positions, const float3 *__restrict__ directions,
+            const float *__restrict__ wavelengths, const float3 *__restrict__ polarizations,
+            const float *__restrict__ times, const unsigned int *__restrict__ histories,
+            const int *__restrict__ last_hit_triangles, const float *__restrict__ weights, const unsigned int *__restrict__ evidx,
+            float3 *__restrict__ new_positions, float3 *__restrict__ new_directions,
+            float *__restrict__ new_wavelengths, float3 *__restrict__ new_polarizations,
+            float *__restrict__ new_times, unsigned int *__restrict__ new_histories,
+            int *__restrict__ new_last_hit_triangles, float *__restrict__ new_weights, unsigned int *__restrict__ new_evidx,
+            int *__restrict__ new_channels)
 {
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     
     if (id < nphotons) {
-	    int photon_id = first_photon + id;
-	    if (histories[photon_id] & detection_state) {
-	        int triangle_id = last_hit_triangles[photon_id];
-        	if (triangle_id > -1) {
-	            int solid_id = solid_map[triangle_id];
-	            int channel_index = detector->solid_id_to_channel_index[solid_id];
-	            if (channel_index >= 0) {
-	                int offset = atomicAdd(index_counter, 1);	
-	                new_positions[offset] = positions[photon_id];
-	                new_directions[offset] = directions[photon_id];
-	                new_polarizations[offset] = polarizations[photon_id];
-	                new_wavelengths[offset] = wavelengths[photon_id];
-	                new_times[offset] = times[photon_id];
-	                new_histories[offset] = histories[photon_id];
-	                new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
-	                new_weights[offset] = weights[photon_id];
-	                new_evidx[offset] = evidx[photon_id];
-	                new_channels[offset] = channel_index;
-	            }
-	        }
-	    }
+        int photon_id = first_photon + id;
+        int triangle_id = last_hit_triangles[photon_id];
+        int channel_index = -1;
+        unsigned int hit = 0u;
+        if ((histories[photon_id] & detection_state) && triangle_id > -1) {
+            int solid_id = solid_map[triangle_id];
+            channel_index = detector->solid_id_to_channel_index[solid_id];
+            hit = (channel_index >= 0) ? 1u : 0u;
+        }
+
+        unsigned int mask = __ballot_sync(0xffffffff, hit);
+        int lane = threadIdx.x & 31;
+        int warp_count = __popc(mask);
+        int warp_prefix = __popc(mask & ((1u << lane) - 1u));
+        unsigned int base = 0;
+        if (lane == 0 && warp_count > 0) {
+            base = atomicAdd(index_counter, (unsigned int)warp_count);
+        }
+        base = __shfl_sync(0xffffffff, base, 0);
+
+        if (hit) {
+            int offset = base + warp_prefix;
+            new_positions[offset] = positions[photon_id];
+            new_directions[offset] = directions[photon_id];
+            new_polarizations[offset] = polarizations[photon_id];
+            new_wavelengths[offset] = wavelengths[photon_id];
+            new_times[offset] = times[photon_id];
+            new_histories[offset] = histories[photon_id];
+            new_last_hit_triangles[offset] = last_hit_triangles[photon_id];
+            new_weights[offset] = weights[photon_id];
+            new_evidx[offset] = evidx[photon_id];
+            new_channels[offset] = channel_index;
+        }
     }
 }
 
 	      
 __global__ void
-propagate(int first_photon, int nthreads, unsigned int *input_queue,
-	  unsigned int *output_queue, curandState *rng_states,
-	  float3 *positions, float3 *directions,
-	  float *wavelengths, float3 *polarizations,
-	  float *times, unsigned int *histories,
-	  int *last_hit_triangles, float *weights, unsigned int *evidx,
+propagate(int first_photon, int nthreads, const unsigned int *__restrict__ input_queue,
+	  unsigned int *__restrict__ output_queue, curandState *rng_states,
+	  float3 *__restrict__ positions, float3 *__restrict__ directions,
+	  float *__restrict__ wavelengths, float3 *__restrict__ polarizations,
+	  float *__restrict__ times, unsigned int *__restrict__ histories,
+	  int *__restrict__ last_hit_triangles, float *__restrict__ weights, unsigned int *__restrict__ evidx,
 	  int max_steps, int use_weights, int scatter_first,
 	  Geometry *g)
 {
@@ -311,10 +348,20 @@ propagate(int first_photon, int nthreads, unsigned int *input_queue,
     weights[photon_id] = p.weight;
     evidx[photon_id] = p.evidx;
 
-    // Not done, put photon in output queue
-    if ((p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB | NAN_ABORT)) == 0) {
-	int out_idx = atomicAdd(output_queue, 1);
-	output_queue[out_idx] = photon_id;
+    // Not done, put photon in output queue using warp-aggregated atomics
+    unsigned int still_alive = ((p.history & (NO_HIT | BULK_ABSORB | SURFACE_DETECT | SURFACE_ABSORB | NAN_ABORT)) == 0) ? 1u : 0u;
+    unsigned int mask = __ballot_sync(0xffffffff, still_alive);
+    int lane = threadIdx.x & 31;
+    int warp_count = __popc(mask);
+    int warp_prefix = __popc(mask & ((1u << lane) - 1u));
+    unsigned int base = 0;
+    if (lane == 0 && warp_count > 0) {
+        base = atomicAdd(output_queue, (unsigned int)warp_count);
+    }
+    base = __shfl_sync(0xffffffff, base, 0);
+    if (still_alive) {
+        int out_idx = base + warp_prefix;
+        output_queue[out_idx] = photon_id;
     }
 } // propagate
 

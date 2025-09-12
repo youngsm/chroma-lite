@@ -12,6 +12,10 @@
 
 #define WEIGHT_LOWER_THRESHOLD 0.0001f
 
+#ifndef CHROMA_FORCE_SCATTER_AT_PASS
+#define CHROMA_FORCE_SCATTER_AT_PASS 0
+#endif
+
 struct Photon
 {
     float3 position;
@@ -83,43 +87,235 @@ get_theta(const float3 &a, const float3 &b)
 __device__ void
 fill_state(State &s, Photon &p, Geometry *g)
 {
-    p.last_hit_triangle = intersect_mesh(p.position, p.direction, g,
-                                         s.distance_to_boundary,
-                                         p.last_hit_triangle);
+    // 1) query mesh BVH for nearest triangle boundary
+    int mesh_triangle = intersect_mesh(p.position, p.direction, g,
+                                       s.distance_to_boundary,
+                                       p.last_hit_triangle);
+    float best_distance = (mesh_triangle == -1) ? 1e30f : s.distance_to_boundary;
 
-    if (p.last_hit_triangle == -1) {
-        p.history |= NO_HIT;
-        return;
+    // 2) analytic wire-plane candidate (if present)
+    int nplanes = g->nwireplanes;
+    int analytic_surface = -1;
+    int analytic_mat_inner = -1;
+    int analytic_mat_outer = -1;
+    float3 analytic_normal = make_float3(0.0f,0.0f,0.0f);
+    int analytic_plane_idx = -1;
+    float analytic_distance = 1e30f; // do not prune analytic by mesh incumbent
+    // extra analytic bookkeeping for robust classification
+    float3 analytic_normal_raw = make_float3(0.0f,0.0f,0.0f);
+    float analytic_dot_raw = 0.0f;
+
+    if (nplanes > 0 && g->wireplanes != 0) {
+        for (int ip=0; ip<nplanes; ++ip) {
+            const WirePlane *wp = g->wireplanes[ip];
+            if (wp == 0) continue;
+
+            // orthonormal frame in FP64
+            const double ux = (double)wp->u.x, uy = (double)wp->u.y, uz = (double)wp->u.z;
+            const double vx0 = (double)wp->v.x, vy0 = (double)wp->v.y, vz0 = (double)wp->v.z;
+            const double un = 1.0 / sqrt(ux*ux + uy*uy + uz*uz);
+            const double ux1 = ux*un, uy1 = uy*un, uz1 = uz*un;
+            const double vdotu = vx0*ux1 + vy0*uy1 + vz0*uz1;
+            const double vx1 = vx0 - vdotu*ux1;
+            const double vy1 = vy0 - vdotu*uy1;
+            const double vz1 = vz0 - vdotu*uz1;
+            const double vn = 1.0 / sqrt(vx1*vx1 + vy1*vy1 + vz1*vz1);
+            const double vx = vx1*vn, vy = vy1*vn, vz = vz1*vn;
+            const double nx = uy1*vz - uz1*vy;
+            const double ny = uz1*vx - ux1*vz;
+            const double nz = ux1*vy - uy1*vx;
+
+            float3 w = p.position - wp->origin;
+            double du = (double)p.direction.x*ux1 + (double)p.direction.y*uy1 + (double)p.direction.z*uz1;
+            double dv = (double)p.direction.x*vx  + (double)p.direction.y*vy  + (double)p.direction.z*vz;
+            double dn = (double)p.direction.x*nx  + (double)p.direction.y*ny  + (double)p.direction.z*nz;
+            double wu = (double)w.x*ux1 + (double)w.y*uy1 + (double)w.z*uz1;
+            double wv0 = (double)w.x*vx  + (double)w.y*vy  + (double)w.z*vz - (double)wp->v0;
+            double wn0 = (double)w.x*nx  + (double)w.y*ny  + (double)w.z*nz;
+
+            // u-extent cull (FP64)
+            double t_in = -1.0e300, t_out = 1.0e300;
+            if (fabs(du) < 1e-15) {
+                if (wu < (double)wp->umin || wu > (double)wp->umax) continue;
+            } else {
+                double t1 = ((double)wp->umin - wu) / du;
+                double t2 = ((double)wp->umax - wu) / du;
+                if (t1 > t2) { double tmp=t1; t1=t2; t2=tmp; }
+                if (t1 > t_in) t_in = t1;
+                if (t2 < t_out) t_out = t2;
+                if (t_in > t_out) continue;
+            }
+
+            // iterate all k across full plane span
+            int kmin = (int)ceil(((double)wp->vmin - (double)wp->v0) / (double)wp->pitch);
+            int kmax = (int)floor(((double)wp->vmax - (double)wp->v0) / (double)wp->pitch);
+            double A = dv*dv + dn*dn;
+
+            for (int k=kmin; k<=kmax; ++k) {
+                double wv = wv0 - (double)k * (double)wp->pitch;
+                double B = wv*dv + wn0*dn;
+                double C = wv*wv + wn0*wn0 - (double)wp->radius*(double)wp->radius;
+                double disc = B*B - A*C;
+                if (disc < 0.0) continue;
+                double sqrt_disc = sqrt(disc);
+                double t_small = (-B - sqrt_disc) / A;
+                double t_large = (-B + sqrt_disc) / A;
+                // robust epsilon to avoid immediate self-hit at boundary
+                const double t_min = 1.0e-4; // mm
+                const double r2_wire = (double)wp->radius*(double)wp->radius;
+                const double r2_0 = wv*wv + wn0*wn0; // squared radius at ray start for this k
+                const double eps0 = fmax(1e-18, 1e-12 * r2_wire);
+
+                double t;
+                if (r2_0 > r2_wire + eps0) {
+                    // origin outside: require a valid forward entry root; otherwise skip
+                    if (t_small <= t_min) continue;
+                    t = t_small;
+                } else if (r2_0 < r2_wire - eps0) {
+                    // origin inside: must use forward exit root
+                    if (t_large <= t_min) continue;
+                    t = t_large;
+                } else {
+                    // origin numerically on boundary: take a small step forward
+                    t = t_min;
+                }
+                double uc = wu + du * t;
+                if (uc < wp->umin || uc > wp->umax) continue;
+                if ((float)t >= analytic_distance) continue;
+                // enforce u-slab window
+                if (t < t_in || t > t_out) continue;
+
+                double vn_hit = wv + dv * t;
+                double nn_hit = wn0 + dn * t;
+                double len = sqrt(vn_hit*vn_hit + nn_hit*nn_hit);
+                if (len <= 0.0) continue;
+                float3 n_local = make_float3((float)((vn_hit/len)*vx + (nn_hit/len)*nx),
+                                             (float)((vn_hit/len)*vy + (nn_hit/len)*ny),
+                                             (float)((vn_hit/len)*vz + (nn_hit/len)*nz));
+                float3 n_world_raw = n_local; // outward cylinder normal (unoriented)
+                float dot_raw_local = dot(n_world_raw, -p.direction);
+
+                analytic_distance = (float)t;
+                analytic_surface = wp->surface_index;
+                analytic_mat_inner = wp->material_inner_index;
+                analytic_mat_outer = wp->material_outer_index;
+                analytic_normal_raw = n_world_raw;
+                analytic_dot_raw = dot_raw_local;
+                analytic_plane_idx = ip;
+            }
+        }
     }
 
-    Triangle t = get_triangle(g, p.last_hit_triangle);
-
-    unsigned int material_code = g->material_codes[p.last_hit_triangle];
-
-    int inner_material_index = convert(0xFF & (material_code >> 24));
-    int outer_material_index = convert(0xFF & (material_code >> 16));
-    s.surface_index = convert(0xFF & (material_code >> 8));
-
-    float3 v01 = t.v1 - t.v0;
-    float3 v12 = t.v2 - t.v1;
-
-    s.surface_normal = normalize(cross(v01, v12));
+    bool use_analytic = false;
+    if (analytic_surface >= 0) {
+        double da = (double)analytic_distance;
+        double dm = (double)best_distance;
+        use_analytic = (da + 1e-12 < dm);
+    }
 
     Material *material1, *material2;
-    if (dot(s.surface_normal,-p.direction) > 0.0f) {
-        // outside to inside
-        material1 = g->materials[outer_material_index];
-        material2 = g->materials[inner_material_index];
+    if (use_analytic) {
+        // printf("Analytic hit: distance=%.6f mesh_distance=%.6f plane_idx=%d wavelength=%.1f\n", 
+        //        analytic_distance, best_distance, analytic_plane_idx, p.wavelength);
 
-        s.inside_to_outside = false;
-    }
-    else {
-        // inside to outside
-        material1 = g->materials[inner_material_index];
-        material2 = g->materials[outer_material_index];
-        s.surface_normal = -s.surface_normal;
+        // choose analytic hit
+        s.distance_to_boundary = analytic_distance;
+        s.surface_index = analytic_surface;
+        p.last_hit_triangle = -2;
+        // classification using raw outward normal from chosen wire and incident ray
+        if (analytic_plane_idx >= 0) {
+            const WirePlane *wp = g->wireplanes[analytic_plane_idx];
+            // // boundary point in FP64 (for logging)
+            // const double xb_x = (double)p.position.x + (double)s.distance_to_boundary * (double)p.direction.x;
+            // const double xb_y = (double)p.position.y + (double)s.distance_to_boundary * (double)p.direction.y;
+            // const double xb_z = (double)p.position.z + (double)s.distance_to_boundary * (double)p.direction.z;
 
-        s.inside_to_outside = true;
+            // decide outside/inside purely from raw normal and ray (physically robust)
+            const float dot_raw = analytic_dot_raw;
+            bool outside_now = (dot_raw > 0.0f); // outside->inside if true
+            if (outside_now) {
+                material1 = g->materials[analytic_mat_outer];
+                material2 = g->materials[analytic_mat_inner];
+                s.surface_normal = analytic_normal_raw; // already outward; faces incoming when outside
+                s.inside_to_outside = false;
+            } else {
+                material1 = g->materials[analytic_mat_inner];
+                material2 = g->materials[analytic_mat_outer];
+                s.surface_normal = -analytic_normal_raw; // flip to face incoming when inside
+                s.inside_to_outside = true;
+            }
+
+            // const double ux = (double)wp->u.x, uy = (double)wp->u.y, uz = (double)wp->u.z;
+            // const double vx0 = (double)wp->v.x, vy0 = (double)wp->v.y, vz0 = (double)wp->v.z;
+            // const double un = 1.0 / sqrt(ux*ux + uy*uy + uz*uz);
+            // const double ux1 = ux*un, uy1 = uy*un, uz1 = uz*un;
+            // const double vdotu = vx0*ux1 + vy0*uy1 + vz0*uz1;
+            // const double vx1 = vx0 - vdotu*ux1;
+            // const double vy1 = vy0 - vdotu*uy1;
+            // const double vz1 = vz0 - vdotu*uz1;
+            // const double vn = 1.0 / sqrt(vx1*vx1 + vy1*vy1 + vz1*vz1);
+            // const double vx = vx1*vn, vy = vy1*vn, vz = vz1*vn;
+            // const double nx = uy1*vz - uz1*vy;
+            // const double ny = uz1*vx - ux1*vz;
+            // const double nz = ux1*vy - uy1*vx;
+            // const double wbx = xb_x - (double)wp->origin.x;
+            // const double wby = xb_y - (double)wp->origin.y;
+            // const double wbz = xb_z - (double)wp->origin.z;
+            // const double wv_b = wbx*vx + wby*vy + wbz*vz;
+            // const double wn_b = wbx*nx + wby*ny + wbz*nz;
+            // const double dv_b = wv_b - (double)wp->v0;
+            // const double pitch = (double)wp->pitch;
+            // const double kf = floor(dv_b / pitch + 0.5);
+            // const double yb = dv_b - kf * pitch;
+            // const double r2_b = yb*yb + wn_b*wn_b;
+            // const double r2_wire = (double)wp->radius * (double)wp->radius;
+
+            // printf("Boundary classification: r2_b=%.6e r2_wire=%.6e diff=%.6e dot=%.6f outside=%d\n",
+            //     r2_b, r2_wire, fabs(r2_b - r2_wire), dot_raw, outside_now);
+            // printf("Boundary Xb=(%.6f,%.6f,%.6f)\n", xb_x, xb_y, xb_z);
+
+        } else {
+            // fallback to dot-based if plane index missing
+            if (dot(s.surface_normal,-p.direction) > 0.0f) {
+                material1 = g->materials[analytic_mat_outer];
+                material2 = g->materials[analytic_mat_inner];
+                s.inside_to_outside = false;
+            } else {
+                material1 = g->materials[analytic_mat_inner];
+                material2 = g->materials[analytic_mat_outer];
+                s.surface_normal = -s.surface_normal;
+                s.inside_to_outside = true;
+            }
+        }
+    } else if (mesh_triangle != -1) {
+        // use mesh hit
+        p.last_hit_triangle = mesh_triangle;
+        Triangle t = get_triangle(g, p.last_hit_triangle);
+
+        unsigned int material_code = g->material_codes[p.last_hit_triangle];
+        int inner_material_index = convert(0xFF & (material_code >> 24));
+        int outer_material_index = convert(0xFF & (material_code >> 16));
+        s.surface_index = convert(0xFF & (material_code >> 8));
+
+        float3 v01 = t.v1 - t.v0;
+        float3 v12 = t.v2 - t.v1;
+        s.surface_normal = normalize(cross(v01, v12));
+
+        if (dot(s.surface_normal,-p.direction) > 0.0f) {
+            material1 = g->materials[outer_material_index];
+            material2 = g->materials[inner_material_index];
+            s.inside_to_outside = false;
+        } else {
+            material1 = g->materials[inner_material_index];
+            material2 = g->materials[outer_material_index];
+            s.surface_normal = -s.surface_normal;
+            s.inside_to_outside = true;
+        }
+    } else {
+        // no hit at all
+        p.last_hit_triangle = -1;
+        p.history |= NO_HIT;
+        return;
     }
 
     s.refractive_index1 = interp_property(material1, p.wavelength,
@@ -130,7 +326,6 @@ fill_state(State &s, Photon &p, Geometry *g)
                                           material1->absorption_length);
     s.scattering_length = interp_property(material1, p.wavelength,
                                           material1->scattering_length);
-
     s.material1 = material1;
 } // fill_state
 
@@ -316,6 +511,8 @@ propagate_at_boundary(Photon &p, State &s, curandState &rng)
     float3 incident_plane_normal = cross(p.direction, s.surface_normal);
     float incident_plane_normal_length = norm(incident_plane_normal);
 
+    // printf("Fresnel: inc=%.6f n1=%.6f n2=%.6f last=%d\n", incident_angle, s.refractive_index1, s.refractive_index2, p.last_hit_triangle);
+
     // Photons at normal incidence do not have a unique plane of incidence,
     // so we have to pick the plane normal to be the polarization vector
     // to get the correct logic below
@@ -336,9 +533,11 @@ propagate_at_boundary(Photon &p, State &s, curandState &rng)
             p.direction = rotate(s.surface_normal, incident_angle, incident_plane_normal);
                         
             p.history |= REFLECT_SPECULAR;
+            // printf("Fresnel REFLECT last=%d\n", p.last_hit_triangle);
         }
         else {
             p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
+            // printf("Fresnel TRANSMIT last=%d\n", p.last_hit_triangle);
         }
 
         p.polarization = incident_plane_normal;
@@ -351,9 +550,12 @@ propagate_at_boundary(Photon &p, State &s, curandState &rng)
             p.direction = rotate(s.surface_normal, incident_angle, incident_plane_normal);
                         
             p.history |= REFLECT_SPECULAR;
+            // printf("Fresnel REFLECT last=%d\n", p.last_hit_triangle);
+
         }
         else {
             p.direction = rotate(s.surface_normal, PI-refracted_angle, incident_plane_normal);
+            // printf("Fresnel TRANSMIT last=%d\n", p.last_hit_triangle);
         }
 
         p.polarization = cross(incident_plane_normal, p.direction);
@@ -707,6 +909,22 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
         float reflect_diffuse = interp_property(surface, p.wavelength, surface->reflect_diffuse);
         float reflect_specular = interp_property(surface, p.wavelength, surface->reflect_specular);
 
+        // numerically enforce probabilities to sum to 1.0 to avoid unintended PASS
+#if CHROMA_FORCE_SCATTER_AT_PASS
+        float sum_probs = absorb + detect + reflect_diffuse + reflect_specular;
+        if (sum_probs > 0.0f) {
+            float inv_sum = 1.0f / sum_probs;
+            absorb *= inv_sum;
+            detect *= inv_sum;
+            reflect_diffuse *= inv_sum;
+            reflect_specular *= inv_sum;
+        }
+        // allocate any tiny residual due to rounding to specular so total is exactly 1
+        float sum2 = absorb + detect + reflect_diffuse + reflect_specular;
+        if (sum2 != 1.0f) {
+            reflect_specular += (1.0f - sum2);
+        }
+#endif
         float uniform_sample = curand_uniform(&rng);
 
         if (use_weights && p.weight > WEIGHT_LOWER_THRESHOLD 
@@ -741,7 +959,12 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
         else if (uniform_sample < absorb + detect + reflect_diffuse + reflect_specular)
             return propagate_at_specular_reflector(p, s);
         else
+#if CHROMA_FORCE_SCATTER_AT_PASS
+            /* include any residual in specular to avoid PASS */
+            return propagate_at_specular_reflector(p, s);
+#else
             return PASS;
+#endif
     }
 
 } // propagate_at_surface

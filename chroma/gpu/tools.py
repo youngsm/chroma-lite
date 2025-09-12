@@ -9,9 +9,33 @@ import pycuda.compiler
 from pycuda import gpuarray as ga
 import os
 from chroma.cuda import srcdir
+from . import profiler as _gpu_profiler
+from chroma.log import logger
 
 # standard nvcc options
-cuda_options = ('--use_fast_math',)#, '--ptxas-options=-v']
+# Prefer L1 caching for global loads on modern GPUs and fast math intrinsics
+cuda_options = (
+    "--use_fast_math",
+    "-Xptxas=-dlcm=ca",
+    "-diag-suppress=177,20044",
+)  #, '--ptxas-options=-v']
+
+# Optional device-side profiling (inner-kernel). Enable with CHROMA_DEVICE_PROFILE=1
+if os.environ.get('CHROMA_DEVICE_PROFILE', '').strip().lower() in ('1','true','yes','on'):
+    cuda_options += ('-DCHROMA_DEVICE_PROFILE=1',)
+    logger.info("CHROMA_DEVICE_PROFILE=1")
+
+# Optional: force scatter at pass to avoid PASS
+if os.environ.get("CHROMA_FORCE_SCATTER_AT_PASS", "1").strip().lower() in (
+    "0",
+    "false",
+    "no",
+    "off",
+):
+    cuda_options += ("-DCHROMA_FORCE_SCATTER_AT_PASS=0",)
+    logger.info("CHROMA_FORCE_SCATTER_AT_PASS=0")
+else:
+    logger.info("CHROMA_FORCE_SCATTER_AT_PASS=1")
 
 # add conda prefix to include paths if it exist
 if 'CONDA_PREFIX' in os.environ:
@@ -85,6 +109,8 @@ class GPUFuncs(object):
             return self.funcs[name]
         except KeyError:
             f = self.module.get_function(name)
+            # Always return a wrapper; it is a no-op if profiling is disabled
+            f = _gpu_profiler.wrap_function(f, name)
             self.funcs[name] = f
             return f
 

@@ -38,6 +38,25 @@ struct AngularProps
     unsigned int nangles;   
 };
 
+// analytic wire-plane descriptor
+struct WirePlane
+{
+    float3 origin;   // a point on the plane
+    float3 u;        // unit vector along wire axes
+    float3 v;        // unit vector in-plane, perpendicular to wires
+    float  pitch;    // center-to-center spacing along v
+    float  radius;   // wire radius
+    float  umin;     // finite extent along u (min)
+    float  umax;     // finite extent along u (max)
+    float  vmin;     // finite extent along v (min)
+    float  vmax;     // finite extent along v (max)
+    float  v0;       // offset of wire centers along v
+    int    surface_index;        // surface index (-1 for none)
+    int    material_outer_index; // medium outside wire
+    int    material_inner_index; // wire bulk medium
+    unsigned int color;          // optional display color
+};
+
 struct Surface
 {
     float *detect;
@@ -76,6 +95,32 @@ struct Node
     unsigned int nchild;
 };
 
+// Analytic, procedural wire-plane primitive: periodic array of parallel cylinders
+// struct WirePlane
+// {
+//     // A point on the plane (typically plane center)
+//     float3 origin;
+//     // Unit vector along wire axis (u) and in-plane perpendicular to wires (v)
+//     float3 u;
+//     float3 v;
+//     // Period (pitch) along v and cylinder radius
+//     float pitch;
+//     float radius;
+//     // Finite bounds along u and v in local coordinates (relative to origin)
+//     float umin;
+//     float umax;
+//     float vmin;
+//     float vmax;
+//     // Optional offset of wire centers along v relative to origin
+//     float v0;
+//     // Indices into global materials/surfaces tables
+//     int surface_index;
+//     int material_outer_index; // material outside the wire (e.g., LAr)
+//     int material_inner_index; // material inside the wire (e.g., metal)
+//     // Optional display color
+//     unsigned int color;
+// };
+
 struct Geometry
 {
     float3 *vertices;
@@ -86,9 +131,11 @@ struct Geometry
     uint4 *extra_nodes;
     Material **materials;
     Surface **surfaces;
+    WirePlane **wireplanes; // array of pointers to WirePlane structs
     float3 world_origin;
     float world_scale;
     int nprimary_nodes;
+    int nwireplanes;
 };
 
 #endif
