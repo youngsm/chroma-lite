@@ -381,15 +381,6 @@ class DeviceQueueWrapper {
     std::size_t scratch_capacity_ = 0;
 };
 
-}  // namespace
-
-}  // namespace queue
-}  // namespace chroma2
-
-PYBIND11_MODULE(_queue_ext, m) {
-
-}  // namespace
-
 }  // namespace queue
 }  // namespace chroma2
 
