@@ -75,6 +75,16 @@ extern "C" cudaError_t dq_launch_pop(chroma2::queue::DeviceQueue queue,
                                       dim3 grid,
                                       dim3 block,
                                       cudaStream_t stream);
+extern "C" cudaError_t dq_launch_persistent(chroma2::queue::DeviceQueue active_queue,
+                                               chroma2::queue::DeviceQueue spawn_queue,
+                                               chroma2::queue::DeviceQueue finished_queue,
+                                               unsigned int max_iterations,
+                                               unsigned int idle_threshold,
+                                               unsigned int spawn_interval,
+                                               unsigned int payload_increment,
+                                               dim3 grid,
+                                               dim3 block,
+                                               cudaStream_t stream);
 extern "C" cudaError_t dq_launch_drain(chroma2::queue::DeviceQueue queue,
                                         unsigned int *counter,
                                         cudaStream_t stream);

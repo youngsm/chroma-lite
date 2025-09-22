@@ -75,6 +75,10 @@ class DeviceQueueWrapper {
 
     std::pair<int, int> launch_config() const { return {block_dim_, grid_dim_}; }
 
+    queue::DeviceQueue raw_queue() const { return device_queue(); }
+
+    cudaStream_t stream() const { return stream_; }
+
     void set_launch_config(std::pair<int, int> config) {
         auto [block_dim, grid_dim] = config;
         if (block_dim <= 0 || grid_dim <= 0) {
@@ -193,4 +197,44 @@ PYBIND11_MODULE(_queue_ext, m) {
                       &chroma2::queue::DeviceQueueWrapper::set_launch_config,
                       "Get or set the (block_dim, grid_dim) launch configuration.")
         .def_property_readonly("capacity", &chroma2::queue::DeviceQueueWrapper::capacity);
+
+    m.def("run_persistent_kernel",
+          [](chroma2::queue::DeviceQueueWrapper &active,
+             chroma2::queue::DeviceQueueWrapper &spawn,
+             chroma2::queue::DeviceQueueWrapper &finished,
+             unsigned int max_iterations,
+             unsigned int idle_threshold,
+             unsigned int spawn_interval,
+             unsigned int payload_increment,
+             int block_dim,
+             int grid_dim) {
+              if (max_iterations == 0u) {
+                  throw std::invalid_argument("max_iterations must be positive");
+              }
+              if (block_dim <= 0 || grid_dim <= 0) {
+                  throw std::invalid_argument("block_dim and grid_dim must be positive");
+              }
+              auto stream = active.stream();
+              CUDA_RT_CHECK(dq_launch_persistent(active.raw_queue(),
+                                                spawn.raw_queue(),
+                                                finished.raw_queue(),
+                                                max_iterations,
+                                                idle_threshold,
+                                                spawn_interval,
+                                                payload_increment,
+                                                dim3(grid_dim, 1, 1),
+                                                dim3(block_dim, 1, 1),
+                                                stream));
+              CUDA_RT_CHECK(cudaStreamSynchronize(stream));
+          },
+          py::arg("active"),
+          py::arg("spawn"),
+          py::arg("finished"),
+          py::arg("max_iterations"),
+          py::arg("idle_threshold") = 1024u,
+          py::arg("spawn_interval") = 0u,
+          py::arg("payload_increment") = 0u,
+          py::arg("block_dim") = 128,
+          py::arg("grid_dim") = 1,
+          "Run a minimal persistent kernel that drains the active queue and routes items to spawn or finished queues.");
 }

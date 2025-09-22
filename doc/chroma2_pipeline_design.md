@@ -30,6 +30,7 @@ Python API -> Event Builder -> Pipeline Orchestrator -> Runtime Services
 - Manages stream pools: dedicated streams for copies, initialization kernels, propagation kernels, and reduction/postprocessing.
 - Hosts metrics collectors (CUDA events, Nsight ranges) and exposes an instrumentation bus consumed by logging or dashboards.
 - Supplies synchronization primitives: CUDA fences and lightweight host futures to coordinate overlapping events.
+- Publishes stateless RNG utilities so kernels can derive reproducible random sequences without per-photon state.
 
 ### Work Queues & Scheduling (`chroma2/runtime/queue`)
 - Implements lock-free ring buffers in global memory for `active_photons`, `spawn_queue`, and `finished_photons`.
@@ -48,6 +49,8 @@ Python API -> Event Builder -> Pipeline Orchestrator -> Runtime Services
 
 ### Data Residency & Layout (`chroma2/runtime/state.py`)
 - Photon state stored in SoA pages: positions, directions, wavelengths, times-of-flight, RNG seeds, flags; padded to 128B boundaries for coalescing.
+- Isotropic sources mark an `ISOTROPIC_INIT` flag (and optional seeds) so directions can be generated on-device, trimming staging traffic for random emitters.
+- Stateless RNG counters live in compact per-photon metadata pages, enabling reconstruction of random draws during requeue without loading global RNG state.
 - Geometry acceleration structures (BVH, material tables) stay in device memory across events; host updates use diff uploads when needed.
 - Host-visible pinned buffers mirror `finished_photons` segments, enabling overlapped copies and zero-copy inspection for small batches.
 
