@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import pycuda.driver as cuda
 from pycuda import gpuarray as ga
 from pycuda import characterize
@@ -518,6 +519,22 @@ class GPUGeometry(object):
                                         self.world_scale,
                                         np.int32(len(self.nodes)),
                                         np.int32(len(self.wireplane_ptrs))])
+
+        self.optix_raycaster = None
+        optix_env = os.environ.get("CHROMA_USE_OPTIX", "1").lower()
+        use_optix = optix_env not in {"0", "false", "off"}
+        if use_optix:
+            try:
+                import chroma.gpu.optix as optix_backend
+
+                if optix_backend.is_available():
+                    vertices_np = np.asarray(geometry.mesh.vertices, dtype=np.float32)
+                    triangles_np = np.asarray(geometry.mesh.triangles, dtype=np.uint32)
+                    self.optix_raycaster = optix_backend.create_raycaster(vertices_np, triangles_np)
+                    logger.info('OptiX raycaster initialized for geometry')
+            except Exception as exc:  # pragma: no cover - depends on GPU runtime
+                logger.debug('OptiX raycaster unavailable: %s', exc)
+                self.optix_raycaster = None
 
         self.geometry = geometry
 

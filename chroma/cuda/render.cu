@@ -37,7 +37,10 @@ extern "C"
 __global__ void
 render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
        unsigned int alpha_depth, unsigned int *pixels, float *_dx,
-       unsigned int *dxlen, float4 *_color, unsigned int bg_color)
+       unsigned int *dxlen, float4 *_color, unsigned int bg_color,
+       const float *__restrict__ optix_distances,
+       const int *__restrict__ optix_triangles,
+       int use_optix)
 {
     __shared__ Geometry sg;
 
@@ -57,96 +60,107 @@ render(int nthreads, float3 *_origin, float3 *_direction, Geometry *g,
     float3 direction = _direction[id];
     unsigned int n = dxlen[id];
 
-    float distance;
-
-    Node root = get_node(g, 0);
-
-    float3 neg_origin_inv_dir = -origin / direction;
-    float3 inv_dir = 1.0f / direction;
-
-    if (n < 1 && !intersect_node(neg_origin_inv_dir, inv_dir, g, root)) {
-	pixels[id] = bg_color;
-	return;
-    }
-
-    unsigned int child_ptr_stack[STACK_SIZE];
-    unsigned int nchild_ptr_stack[STACK_SIZE];
-    child_ptr_stack[0] = root.child;
-    nchild_ptr_stack[0] = root.nchild;
-
-    int curr = 0;
-
-    unsigned int count = 0;
-    unsigned int tri_count = 0;
-
     float *dx = _dx + id*alpha_depth;
     float4 *color_a = _color + id*alpha_depth;
+    unsigned int n = dxlen[id];
 
-    while (curr >= 0) {
-	unsigned int first_child = child_ptr_stack[curr];
-	unsigned int nchild = nchild_ptr_stack[curr];
-	curr--;
+    if( use_optix )
+    {
+        unsigned int hits = 0;
+        float3 norm_dir = normalize(direction);
+        for( unsigned int depth = 0; depth < alpha_depth; ++depth )
+        {
+            float dist = optix_distances ? optix_distances[depth * nthreads + id] : -1.0f;
+            int tri_idx = optix_triangles ? optix_triangles[depth * nthreads + id] : -1;
+            if( dist < 0.0f || tri_idx < 0 )
+                continue;
 
-	for (unsigned int i=first_child; i < first_child + nchild; i++) {
-	    Node node = get_node(g, i);
-	    count++;
+            Triangle t = get_triangle(g, tri_idx);
+            dx[hits]   = dist;
+            color_a[hits] = get_color(norm_dir, t, g->colors[tri_idx]);
+            ++hits;
+            if( hits >= alpha_depth )
+                break;
+        }
 
-	    if (intersect_node(neg_origin_inv_dir, inv_dir, g, node)) {
+        dxlen[id] = hits;
+        if( hits < 1 )
+        {
+            pixels[id] = bg_color;
+            return;
+        }
+    }
+    else
+    {
+        float distance;
+        Node root = get_node(g, 0);
 
-	      if (node.nchild == 0) { /* leaf node */
+        float3 neg_origin_inv_dir = -origin / direction;
+        float3 inv_dir = 1.0f / direction;
 
-		// This node wraps a triangle
-		tri_count++;
-		Triangle t = get_triangle(g, node.child);
-		if (intersect_triangle(origin, direction, t, distance)) {
-		  if (n < 1) {
-		    dx[0] = distance;
-		    
-		    unsigned int rgba = g->colors[node.child];
-		    float4 color = get_color(direction, t, rgba);
-		    
-		    color_a[0] = color;
-		  }
-		  else {
-		    unsigned long j = searchsorted(n, dx, distance);
-		    
-		    if (j <= alpha_depth-1) {
-		      insert(alpha_depth, dx, j, distance);
-		      
-		      unsigned int rgba = g->colors[node.child];
-		      float4 color = get_color(direction, t, rgba);
-		      
-		      insert(alpha_depth, color_a, j, color);
-		    }
-		  }
-		  
-		  if (n < alpha_depth)
-		    n++;
-		  
-		} // if hit triangle
-		
-	      } else {
-		curr++;
-		child_ptr_stack[curr] = node.child;
-		nchild_ptr_stack[curr] = node.nchild;
-	      } // leaf or internal node?
-	    } // hit node?
-	    
-	    //if (curr >= STACK_SIZE) {
-	    //	printf("warning: intersect_mesh() aborted; node > tail\n");
-	    //	break;
-	    //}
-	} // loop over children, starting with first_child
-	
-    } // while nodes on stack
-    
+        if( n < 1 && !intersect_node( neg_origin_inv_dir, inv_dir, g, root ) )
+        {
+            pixels[id] = bg_color;
+            return;
+        }
 
-    if (n < 1) {
-	pixels[id] = bg_color;
-	return;
+        unsigned int child_ptr_stack[STACK_SIZE];
+        unsigned int nchild_ptr_stack[STACK_SIZE];
+        child_ptr_stack[0] = root.child;
+        nchild_ptr_stack[0] = root.nchild;
+
+        int curr = 0;
+
+        float3 norm_dir = normalize(direction);
+
+        while( curr >= 0 )
+        {
+            unsigned int first_child = child_ptr_stack[curr];
+            unsigned int nchild      = nchild_ptr_stack[curr];
+            curr--;
+
+            for( unsigned int i = first_child; i < first_child + nchild; i++ )
+            {
+                Node node = get_node( g, i );
+
+                if( intersect_node( neg_origin_inv_dir, inv_dir, g, node ) )
+                {
+                    if( node.nchild == 0 )
+                    {
+                        Triangle t = get_triangle( g, node.child );
+                        if( intersect_triangle( origin, direction, t, distance ) )
+                        {
+                            unsigned int insert_index = ( n < 1 ) ? 0 : searchsorted( n, dx, distance );
+                            if( insert_index <= alpha_depth - 1 )
+                            {
+                                insert( alpha_depth, dx, insert_index, distance );
+                                unsigned int rgba = g->colors[node.child];
+                                float4 color      = get_color( norm_dir, t, rgba );
+                                insert( alpha_depth, color_a, insert_index, color );
+                                if( n < alpha_depth )
+                                    ++n;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        curr++;
+                        child_ptr_stack[curr]  = node.child;
+                        nchild_ptr_stack[curr] = node.nchild;
+                    }
+                }
+            }
+        }
+
+        if( n < 1 )
+        {
+            pixels[id] = bg_color;
+            return;
+        }
+        dxlen[id] = n;
     }
 
-    dxlen[id] = n;
+    n = dxlen[id];
 
     float scale = 1.0f;
     float fr = 0.0;

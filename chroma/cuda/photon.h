@@ -85,13 +85,29 @@ get_theta(const float3 &a, const float3 &b)
 }
 
 __device__ void
-fill_state(State &s, Photon &p, Geometry *g)
+fill_state(State &s, Photon &p, Geometry *g,
+           const float* optix_distances = nullptr,
+           const int* optix_triangles = nullptr,
+           int optix_index = -1,
+           bool use_optix = false)
 {
-    // 1) query mesh BVH for nearest triangle boundary
-    int mesh_triangle = intersect_mesh(p.position, p.direction, g,
+    int mesh_triangle = -1;
+    float best_distance = 1e30f;
+
+    if( use_optix && optix_distances && optix_triangles && optix_index >= 0 )
+    {
+        mesh_triangle = optix_triangles[optix_index];
+        s.distance_to_boundary = optix_distances[optix_index];
+        best_distance = (mesh_triangle == -1) ? 1e30f : s.distance_to_boundary;
+    }
+    else
+    {
+        // 1) query mesh BVH for nearest triangle boundary
+        mesh_triangle = intersect_mesh(p.position, p.direction, g,
                                        s.distance_to_boundary,
                                        p.last_hit_triangle);
-    float best_distance = (mesh_triangle == -1) ? 1e30f : s.distance_to_boundary;
+        best_distance = (mesh_triangle == -1) ? 1e30f : s.distance_to_boundary;
+    }
 
     // 2) analytic wire-plane candidate (if present)
     int nplanes = g->nwireplanes;
@@ -970,4 +986,3 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
 } // propagate_at_surface
 
 #endif
-

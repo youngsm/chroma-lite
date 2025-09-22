@@ -3,11 +3,37 @@ import sys
 import gc
 from pycuda import gpuarray as ga
 import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
 
 from chroma.tools import profile_if_possible
 from chroma import event
 from chroma.gpu.tools import get_cu_module, cuda_options, GPUFuncs, \
     chunk_iterator, to_float3
+
+# runtime probe flag to avoid repeatedly compiling PyCUDA take() kernels for vec3
+_GA_TAKE_VEC3_SUPPORTED = None
+
+
+def _build_gather_float3_kernel():
+    src = r"""
+    extern "C" __global__ void gather_float3(const unsigned int *indices,
+                                              const float3 *src,
+                                              float *dst,
+                                              const unsigned int n)
+    {
+        unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i >= n) return;
+        unsigned int j = indices[i];
+        float3 v = src[j];
+        unsigned int base = 3u * i;
+        dst[base + 0] = v.x;
+        dst[base + 1] = v.y;
+        dst[base + 2] = v.z;
+    }
+    """
+    mod = SourceModule(src, options=list(cuda_options), no_extern_c=True)
+    return mod.get_function("gather_float3")
+
 
 
 class GPUPhotons(object):
@@ -229,9 +255,114 @@ class GPUPhotons(object):
             else:
                 nsteps = 1
 
+            optix_raycaster = getattr(gpu_geometry, 'optix_raycaster', None)
+
             for first_photon, photons_this_round, blocks in \
                     chunk_iterator(nphotons, nthreads_per_block, max_blocks):
-                self.gpu_funcs.propagate(np.int32(first_photon), np.int32(photons_this_round), input_queue_gpu[1:], output_queue_gpu, rng_states, self.pos, self.dir, self.wavelengths, self.pol, self.t, self.flags, self.last_hit_triangles, self.weights, self.evidx, np.int32(nsteps), np.int32(use_weights), np.int32(scatter_first), gpu_geometry.gpudata, block=(nthreads_per_block,1,1), grid=(blocks, 1))
+
+                indices_gpu = input_queue_gpu[1 + first_photon:1 + first_photon + photons_this_round]
+
+                use_optix_flag = 0
+                optix_distances_gpu = self.wavelengths  # placeholder; unused when use_optix_flag == 0
+                optix_triangles_gpu = self.last_hit_triangles
+                optix_normals_dev = None
+
+                if optix_raycaster is not None and photons_this_round > 0:
+                    try:
+                        if not hasattr(self, '_gather_float3'):
+                            self._gather_float3 = _build_gather_float3_kernel()
+
+                        # allocate temporary buffers for gathered pos/dir (packed as [x,y,z]*N)
+                        gathered_pos = ga.empty(photons_this_round * 3, dtype=np.float32)
+                        gathered_dir = ga.empty(photons_this_round * 3, dtype=np.float32)
+                        last_hits_gpu = ga.take(self.last_hit_triangles, indices_gpu)
+
+                        threads = 256
+                        gblocks = (int(photons_this_round) + threads - 1) // threads
+                        self._gather_float3(
+                            indices_gpu,
+                            self.pos,
+                            gathered_pos,
+                            np.uint32(photons_this_round),
+                            block=(threads, 1, 1), grid=(int(gblocks), 1)
+                        )
+                        self._gather_float3(
+                            indices_gpu,
+                            self.dir,
+                            gathered_dir,
+                            np.uint32(photons_this_round),
+                            block=(threads, 1, 1), grid=(int(gblocks), 1)
+                        )
+
+                        origins_gpu = gathered_pos.view(np.float32).reshape(photons_this_round, 3)
+                        directions_gpu = gathered_dir.view(np.float32).reshape(photons_this_round, 3)
+
+                        distances_dev, triangles_dev, normals_dev = optix_raycaster.trace_many(
+                            origins_gpu,
+                            directions_gpu,
+                            last_hits=last_hits_gpu,
+                            tmin=1e-4,
+                            tmax=1e16,
+                            return_device=True,
+                        )
+
+                        optix_distances_gpu = _device_array_to_gpuarray(distances_dev)
+                        optix_triangles_gpu = _device_array_to_gpuarray(triangles_dev)
+                        optix_normals_dev = normals_dev
+                        use_optix_flag = 1
+                    except Exception as e:
+                        raise e
+                        print("Optix flag set to 0", e)
+                        # Fall back to host path
+                        photon_ids = indices_gpu.get()
+                        pos_host = self.pos.get().view(np.float32).reshape((-1, 3))[photon_ids]
+                        dir_host = self.dir.get().view(np.float32).reshape((-1, 3))[photon_ids]
+                        last_hit_host = self.last_hit_triangles.get()[photon_ids]
+
+                        dir_norm = np.linalg.norm(dir_host, axis=1, keepdims=True)
+                        dir_norm[dir_norm == 0.0] = 1.0
+                        dir_unit = dir_host / dir_norm
+
+                        distances_host, triangles_host, _ = optix_raycaster.trace_many(
+                            pos_host.astype(np.float32),
+                            dir_unit.astype(np.float32),
+                            last_hits=last_hit_host.astype(np.int32),
+                            tmin=1e-4,
+                            tmax=1e16,
+                            return_device=False,
+                        )
+
+                        optix_distances_gpu = ga.to_gpu(distances_host.astype(np.float32))
+                        optix_triangles_gpu = ga.to_gpu(triangles_host.astype(np.int32))
+                        use_optix_flag = 1
+
+                self.gpu_funcs.propagate(
+                    np.int32(first_photon),
+                    np.int32(photons_this_round),
+                    input_queue_gpu[1:],
+                    output_queue_gpu,
+                    rng_states,
+                    self.pos,
+                    self.dir,
+                    self.wavelengths,
+                    self.pol,
+                    self.t,
+                    self.flags,
+                    self.last_hit_triangles,
+                    self.weights,
+                    self.evidx,
+                    np.int32(nsteps),
+                    np.int32(use_weights),
+                    np.int32(scatter_first),
+                    gpu_geometry.gpudata,
+                    optix_distances_gpu,
+                    optix_triangles_gpu,
+                    np.int32(use_optix_flag),
+                    block=(nthreads_per_block, 1, 1),
+                    grid=(blocks, 1),
+                )
+
+                optix_normals_dev = None
             
             if track: #save the next step for all photons in the input queue
                 step_photon_ids.append(input_queue_gpu[1:nphotons+1].get())
@@ -379,3 +510,23 @@ class GPUPhotonsSlice(GPUPhotons):
 
     def __del__(self):
         pass # Do nothing, because we don't own any of our GPU memory
+class _DeviceArrayHolder(cuda.PointerHolderBase):
+    def __init__(self, device_array):
+        super().__init__()
+        self.device_array = device_array
+
+    def get_pointer(self):
+        return int(self.device_array.ptr)
+
+
+def _device_array_to_gpuarray(device_array):
+    iface = device_array.__cuda_array_interface__
+    shape = tuple(int(dim) for dim in iface['shape'])
+    strides = iface.get('strides')
+    dtype = np.dtype(iface['typestr'])
+
+    holder = _DeviceArrayHolder(device_array)
+    gpu_arr = ga.GPUArray(shape, dtype, gpudata=holder, strides=strides)
+    gpu_arr._device_array_holder = holder
+    gpu_arr._device_array_ref = device_array
+    return gpu_arr

@@ -20,12 +20,28 @@ class TestRayIntersection(unittest.TestCase):
         self.dx_standard = np.load(os.path.join(testdir,
                                                 'data/ray_intersection.npy'))
 
-    @unittest.skip('Ray data file needs to be updated')
+    # @unittest.skip('Ray data file needs to be updated')
     def test_intersection_distance(self):
-        dx = ga.zeros(self.pos_gpu.size, dtype=np.float32)
-        self.gpu_funcs.distance_to_mesh(np.int32(self.pos_gpu.size), self.pos_gpu, self.dir_gpu, self.box.gpudata, dx, block=(64,1,1), grid=(self.pos_gpu.size//64+1,1))
+        optix = getattr(self.box, 'optix_raycaster', None)
+        if optix is not None:
+            origins_gpu = self.pos_gpu.view(np.float32).reshape(self.pos_gpu.size, 3)
+            directions_gpu = self.dir_gpu.view(np.float32).reshape(self.dir_gpu.size, 3)
+            distances, _, _ = optix.trace_many(origins_gpu, directions_gpu, tmin=1e-4, tmax=1e16)
+            dx = np.asarray(distances, dtype=np.float32)
+        else:
+            dx_gpu = ga.zeros(self.pos_gpu.size, dtype=np.float32)
+            self.gpu_funcs.distance_to_mesh(
+                np.int32(self.pos_gpu.size),
+                self.pos_gpu,
+                self.dir_gpu,
+                self.box.gpudata,
+                dx_gpu,
+                block=(64, 1, 1),
+                grid=(self.pos_gpu.size // 64 + 1, 1),
+            )
+            dx = dx_gpu.get()
 
-        self.assertTrue((dx.get() == self.dx_standard).all())
+        self.assertTrue((dx == self.dx_standard).all())
 
     def tearDown(self):
         self.context.pop()

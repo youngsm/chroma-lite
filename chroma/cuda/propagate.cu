@@ -259,7 +259,10 @@ propagate(int first_photon, int nthreads, const unsigned int *__restrict__ input
 	  float *__restrict__ times, unsigned int *__restrict__ histories,
 	  int *__restrict__ last_hit_triangles, float *__restrict__ weights, unsigned int *__restrict__ evidx,
 	  int max_steps, int use_weights, int scatter_first,
-	  Geometry *g)
+	  Geometry *g,
+	  const float *__restrict__ optix_distances,
+	  const int *__restrict__ optix_triangles,
+	  int use_optix_results)
 {
     __shared__ Geometry sg;
 
@@ -276,6 +279,10 @@ propagate(int first_photon, int nthreads, const unsigned int *__restrict__ input
     g = &sg;
 
     curandState rng = rng_states[id];
+
+    const bool use_optix = (use_optix_results != 0);
+    const float* optix_distances_ptr = use_optix ? optix_distances : nullptr;
+    const int* optix_triangles_ptr = use_optix ? optix_triangles : nullptr;
 
     int photon_id = input_queue[first_photon + id];
 
@@ -309,7 +316,11 @@ propagate(int first_photon, int nthreads, const unsigned int *__restrict__ input
 	    break;
 	}
 
-	fill_state(s, p, g);
+	fill_state(s, p, g,
+	           optix_distances_ptr,
+	           optix_triangles_ptr,
+	           id,
+	           use_optix);
 
 	if (p.last_hit_triangle == -1)
 	    break;

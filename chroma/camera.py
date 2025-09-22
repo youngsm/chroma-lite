@@ -381,16 +381,46 @@ class Camera(multiprocessing.Process):
 
     def update_viewing_angle(self):
         if self.display3d:
-            distance_gpu = ga.empty(self.scope_rays.pos.size, dtype=np.float32)
-            distance_gpu.fill(1e9)
+            total_rays = self.scope_rays.pos.size
+            use_optix = all(getattr(geom, 'optix_raycaster', None) is not None for geom in self.gpu_geometries)
 
-            for i, gpu_geometry in enumerate(self.gpu_geometries):
-                self.gpu_funcs.distance_to_mesh(np.int32(self.scope_rays.pos.size), self.scope_rays.pos, self.scope_rays.dir, gpu_geometry.gpudata, distance_gpu, block=(self.nblocks,1,1), grid=(self.scope_rays.pos.size//self.nblocks,1))
+            if use_optix and total_rays > 0:
+                origins_gpu = self.scope_rays.pos.view(np.float32).reshape(total_rays, 3)
+                directions_gpu = self.scope_rays.dir.view(np.float32).reshape(total_rays, 3)
 
-                if i == 0:
-                    distance = distance_gpu.get()
-                else:
-                    distance = np.minimum(distance, distance_gpu.get())
+                distance = np.full(total_rays, 1e9, dtype=np.float32)
+
+                for geom in self.gpu_geometries:
+                    distances_host, triangles_host, _ = geom.optix_raycaster.trace_many(
+                        origins_gpu,
+                        directions_gpu,
+                        tmin=1e-4,
+                        tmax=1e16,
+                        return_device=False,
+                    )
+
+                    distances_host = np.asarray(distances_host, dtype=np.float32)
+                    distances_host = np.where(distances_host < 0.0, 1e9, distances_host)
+                    distance = np.minimum(distance, distances_host)
+            else:
+                distance_gpu = ga.empty(total_rays, dtype=np.float32)
+                distance_gpu.fill(1e9)
+
+                for i, gpu_geometry in enumerate(self.gpu_geometries):
+                    self.gpu_funcs.distance_to_mesh(
+                        np.int32(total_rays),
+                        self.scope_rays.pos,
+                        self.scope_rays.dir,
+                        gpu_geometry.gpudata,
+                        distance_gpu,
+                        block=(self.nblocks, 1, 1),
+                        grid=(total_rays // self.nblocks, 1),
+                    )
+
+                    if i == 0:
+                        distance = distance_gpu.get()
+                    else:
+                        distance = np.minimum(distance, distance_gpu.get())
 
             baseline = distance.min()
 
