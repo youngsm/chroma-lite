@@ -26,7 +26,23 @@ class GPUPhotons(object):
                    The amount of GPU storage will be proportionally
                    larger if ncopies > 1, so be careful.
         """
-        nphotons = len(photons)
+        def _resolve_nphotons(ph):
+            try:
+                return len(ph)
+            except TypeError:
+                pass
+            true_n = getattr(ph, 'true_nphotons', None)
+            if true_n is not None:
+                return int(true_n)
+            pos_attr = getattr(ph, 'pos', None)
+            if pos_attr is not None:
+                try:
+                    return len(pos_attr)
+                except TypeError:
+                    pass
+            raise TypeError(f"Cannot determine photon count from object of type {type(ph)!r}")
+
+        nphotons = _resolve_nphotons(photons)
         self.pos = ga.empty(shape=nphotons*ncopies, dtype=ga.vec.float3)
         self.dir = ga.empty(shape=nphotons*ncopies, dtype=ga.vec.float3)
         self.pol = ga.empty(shape=nphotons*ncopies, dtype=ga.vec.float3)
@@ -47,18 +63,36 @@ class GPUPhotons(object):
 
         # Assign the provided photons to the beginning (possibly
         # the entire array if ncopies is 1
-        self.pos[:nphotons].set(to_float3(photons.pos))
-        self.dir[:nphotons].set(to_float3(photons.dir))
-        self.pol[:nphotons].set(to_float3(photons.pol))
-        self.wavelengths[:nphotons].set(photons.wavelengths.astype(np.float32))
-        self.t[:nphotons].set(photons.t.astype(np.float32))
+        def _copy_vec_field(dest, source):
+            dest_slice = dest[:nphotons]
+            if isinstance(source, ga.GPUArray):
+                count = min(len(source), nphotons)
+                cuda.memcpy_dtod(dest_slice.gpudata, source.gpudata,
+                                 int(count * dest_slice.dtype.itemsize))
+            else:
+                dest_slice.set(to_float3(source))
+
+        def _copy_scalar_field(dest, source, dtype):
+            dest_slice = dest[:nphotons]
+            if isinstance(source, ga.GPUArray):
+                count = min(len(source), nphotons)
+                cuda.memcpy_dtod(dest_slice.gpudata, source.gpudata,
+                                 int(count * dest_slice.dtype.itemsize))
+            else:
+                dest_slice.set(np.asarray(source, dtype=dtype))
+
+        _copy_vec_field(self.pos, photons.pos)
+        _copy_vec_field(self.dir, photons.dir)
+        _copy_vec_field(self.pol, photons.pol)
+        _copy_scalar_field(self.wavelengths, photons.wavelengths, np.float32)
+        _copy_scalar_field(self.t, photons.t, np.float32)
         if copy_triangles:
-            self.last_hit_triangles[:nphotons].set(photons.last_hit_triangles.astype(np.int32))
+            _copy_scalar_field(self.last_hit_triangles, photons.last_hit_triangles, np.int32)
         if copy_flags:
-            self.flags[:nphotons].set(photons.flags.astype(np.uint32))
+            _copy_scalar_field(self.flags, photons.flags, np.uint32)
         if copy_weights:
-            self.weights[:nphotons].set(photons.weights.astype(np.float32))
-        self.evidx[:nphotons].set(photons.evidx.astype(np.uint32))
+            _copy_scalar_field(self.weights, photons.weights, np.float32)
+        _copy_scalar_field(self.evidx, photons.evidx, np.uint32)
 
         module = get_cu_module('propagate.cu', options=cuda_options)
         self.gpu_funcs = GPUFuncs(module)
@@ -78,7 +112,7 @@ class GPUPhotons(object):
 
 
         # Save the duplication information for the iterate_copies() method
-        self.true_nphotons = nphotons
+        self.true_nphotons = getattr(photons, 'true_nphotons', nphotons)
         self.ncopies = ncopies
 
     def get(self):

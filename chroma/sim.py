@@ -2,12 +2,14 @@
 import time
 import os
 import numpy as np
+from types import SimpleNamespace
 
 from chroma import gpu
 from chroma import event
 from chroma import itertoolset
 from chroma.tools import profile_if_possible
 
+from pycuda import gpuarray as ga
 import pycuda.driver as cuda
 
 from timeit import default_timer as timer
@@ -55,19 +57,38 @@ class Simulation(object):
            Yields the fully formed events. Do not call directly.'''
         
         t_start = timer()
-        
-        #Idea: allocate memory on gpu and copy photons into it, instead of concatenating on CPU?
-        batch_photons = event.Photons.join([ev.photons_beg for ev in batch_events])
-        batch_bounds = np.cumsum(np.concatenate([[0],[len(ev.photons_beg) for ev in batch_events]]))
-        
+
+        photon_sources = [ev.photons_beg for ev in batch_events]
+        batch_bounds = np.cumsum(np.concatenate([[0], [len(src) for src in photon_sources]]))
+
+        copy_flags = True
+        copy_triangles = False
+        copy_weights = False
+
+        # Join photons either on the GPU (preferred) or fall back to CPU concatenation.
+        stacked_gpu_view = self._stack_gpu_photon_sources(
+            photon_sources,
+            copy_flags=copy_flags,
+            copy_triangles=copy_triangles,
+            copy_weights=copy_weights,
+        )
+        batch_photons_source = stacked_gpu_view
+        if stacked_gpu_view is None:
+            batch_photons_source = event.Photons.join(photon_sources)
+
         #This copy to gpu has a _lot_ of overhead, want 100k photons at least, hence batches
         #Assume triangles, and weights are unimportant to copy to GPU
         t_copy_start = timer()
-        gpu_photons = gpu.GPUPhotons(batch_photons,copy_triangles=False,copy_weights=False)
+        gpu_photons = gpu.GPUPhotons(
+            batch_photons_source,
+            copy_flags=copy_flags,
+            copy_triangles=copy_triangles,
+            copy_weights=copy_weights,
+        )
         t_copy_end = timer()
         if verbose:
             print('GPU copy took %0.2f s' % (t_copy_end-t_copy_start))
-        
+
         t_prop_start = timer()
         tracking = gpu_photons.propagate(self.gpu_geometry, self.rng_states,
                               nthreads_per_block=self.nthreads_per_block,
@@ -87,7 +108,7 @@ class Simulation(object):
             
         if hasattr(self.detector, 'num_channels') and (keep_hits or keep_flat_hits):
             batch_hits = gpu_photons.get_flat_hits(self.gpu_geometry)
-                
+
         for i,(batch_ev,(start_photon,end_photon)) in enumerate(zip(batch_events,zip(batch_bounds[:-1],batch_bounds[1:]))):
                     
             if not keep_photons_beg:
@@ -132,6 +153,75 @@ class Simulation(object):
                     
             yield batch_ev
 
+    @staticmethod
+    def _is_gpu_photon_source(photons, copy_flags=True, copy_triangles=False, copy_weights=False):
+        required_fields = ['pos', 'dir', 'pol', 'wavelengths', 't', 'evidx']
+        if copy_flags:
+            required_fields.append('flags')
+        if copy_triangles:
+            required_fields.append('last_hit_triangles')
+        if copy_weights:
+            required_fields.append('weights')
+        for name in required_fields:
+            arr = getattr(photons, name, None)
+            if not isinstance(arr, ga.GPUArray):
+                return False
+        return True
+
+    @classmethod
+    def _stack_gpu_photon_sources(cls, photon_sources, copy_flags=True, copy_triangles=False, copy_weights=False):
+        if not photon_sources or not all(cls._is_gpu_photon_source(ph, copy_flags, copy_triangles, copy_weights) for ph in photon_sources):
+            return None
+
+        total = sum(len(ph) for ph in photon_sources)
+        reference = photon_sources[0]
+
+        def _allocate(field):
+            template = getattr(reference, field, None)
+            if template is None:
+                raise AttributeError(f"GPU photon input missing '{field}' field")
+            return ga.empty(shape=total, dtype=template.dtype)
+
+        arrays = {
+            'pos': _allocate('pos'),
+            'dir': _allocate('dir'),
+            'pol': _allocate('pol'),
+            'wavelengths': _allocate('wavelengths'),
+            't': _allocate('t'),
+            'evidx': _allocate('evidx'),
+        }
+
+        if copy_flags:
+            arrays['flags'] = _allocate('flags')
+        if copy_triangles:
+            arrays['last_hit_triangles'] = _allocate('last_hit_triangles')
+        if copy_weights:
+            arrays['weights'] = _allocate('weights')
+
+        def _copy_field(field, dest):
+            if dest is None:
+                return
+            offset = 0
+            element_size = dest.dtype.itemsize
+            for photons in photon_sources:
+                count = len(photons)
+                if count == 0:
+                    continue
+                src = getattr(photons, field)
+                dst_slice = dest[offset:offset+count]
+                src_slice = src[:count]
+                cuda.memcpy_dtod(dst_slice.gpudata, src_slice.gpudata, int(count * element_size))
+                offset += count
+
+        for field_name, dest_array in arrays.items():
+            if dest_array is not None:
+                _copy_field(field_name, dest_array)
+
+        namespace_kwargs = {key: value for key, value in arrays.items() if value is not None}
+        namespace_kwargs['true_nphotons'] = total
+
+        return SimpleNamespace(**namespace_kwargs)
+
     def simulate(self, iterable, keep_photons_beg=False, keep_photons_end=False,
                  keep_hits=True, keep_flat_hits=True, run_daq=False, max_steps=1000,
                  photons_per_batch=1000000):
@@ -141,7 +231,7 @@ class Simulation(object):
             first_element, iterable = itertoolset.peek(iterable)
 
         if isinstance(first_element, event.Event):
-            raise NotImplementedError("Event input not supported in Chroma")
+            pass
         elif isinstance(first_element, event.Photons):
             iterable = (event.Event(photons_beg=x) for x in iterable)
         elif isinstance(first_element, event.Vertex):
@@ -153,7 +243,15 @@ class Simulation(object):
         for ev in iterable:
             
             ev.nphotons = len(ev.photons_beg)
-            ev.photons_beg.evidx[:] = len(batch_events)
+            event_index = len(batch_events)
+            evidx_field = getattr(ev.photons_beg, 'evidx', None)
+            if evidx_field is not None:
+                if isinstance(evidx_field, ga.GPUArray):
+                    if ev.nphotons > 0:
+                        evidx_slice = evidx_field[:ev.nphotons]
+                        evidx_slice.fill(np.uint32(event_index))
+                else:
+                    evidx_field[:ev.nphotons] = np.uint32(event_index)
             
             nphotons += ev.nphotons
             batch_events.append(ev)
@@ -165,7 +263,8 @@ class Simulation(object):
                                                 keep_photons_end=keep_photons_end,
                                                 keep_hits=keep_hits,
                                                 keep_flat_hits=keep_flat_hits,
-                                                run_daq=run_daq, max_steps=max_steps)
+                                                run_daq=run_daq, max_steps=max_steps,
+                                                )
                 nphotons = 0
                 batch_events = []
                 
@@ -175,7 +274,8 @@ class Simulation(object):
                                             keep_photons_end=keep_photons_end,
                                             keep_hits=keep_hits,
                                             keep_flat_hits=keep_flat_hits,
-                                            run_daq=run_daq, max_steps=max_steps)
+                                            run_daq=run_daq, max_steps=max_steps,
+                                            )
 
 
     def __del__(self):
