@@ -15,7 +15,7 @@
    less than `min_distance`, return true, else return false. */
 __device__ bool
 intersect_node(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
-	       Geometry *g, const Node &node, const float min_distance=-1.0f)
+	       const Geometry *g, const Node &node, const float min_distance=-1.0f)
 {
     CHROMA_PROF_FUNC_START(CHROMA_PROF_INTERSECT_NODE);
     float distance_to_box;
@@ -43,7 +43,7 @@ intersect_node(const float3 &neg_origin_inv_dir, const float3 &inv_dir,
    the intersection and return the index of the triangle which the ray
    intersected, else return -1. */
 __device__ int
-intersect_mesh(const float3 &origin, const float3& direction, Geometry *g,
+intersect_mesh(const float3 &origin, const float3& direction, const Geometry *g,
 	       float &min_distance, int last_hit_triangle = -1)
 {
     CHROMA_PROF_FUNC_START(CHROMA_PROF_INTERSECT_MESH);
@@ -130,7 +130,7 @@ extern "C"
 
 __global__ void
 distance_to_mesh(int nthreads, float3 *_origin, float3 *_direction,
-		 Geometry *g, float *_distance)
+		 const Geometry *g, float *_distance)
 {
     __shared__ Geometry sg;
 

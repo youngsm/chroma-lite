@@ -26,7 +26,7 @@ struct Photon
   
     float weight;
   
-    unsigned int history;
+    unsigned short history;
 
     int last_hit_triangle;
     
@@ -64,7 +64,7 @@ enum
     BULK_REEMIT      = 0x1 << 9,
     CHERENKOV        = 0x1 << 10,
     SCINTILLATION    = 0x1 << 11,
-    NAN_ABORT        = 0x1 << 31
+    NAN_ABORT        = 0x1 << 15
 }; // processes
 
 enum { BREAK, CONTINUE, PASS }; // return value from propagate_to_boundary
@@ -85,7 +85,7 @@ get_theta(const float3 &a, const float3 &b)
 }
 
 __device__ void
-fill_state(State &s, Photon &p, Geometry *g)
+fill_state(State &s, Photon &p, const Geometry *g)
 {
     // 1) query mesh BVH for nearest triangle boundary
     int mesh_triangle = intersect_mesh(p.position, p.direction, g,
@@ -106,6 +106,7 @@ fill_state(State &s, Photon &p, Geometry *g)
     float analytic_dot_raw = 0.0f;
 
     if (nplanes > 0 && g->wireplanes != 0) {
+        CHROMA_PROF_FUNC_START(CHROMA_PROF_FILL_ANALYTIC);
         for (int ip=0; ip<nplanes; ++ip) {
             const WirePlane *wp = g->wireplanes[ip];
             if (wp == 0) continue;
@@ -146,15 +147,75 @@ fill_state(State &s, Photon &p, Geometry *g)
                 if (t_in > t_out) continue;
             }
 
-            // iterate all k across full plane span
-            int kmin = (int)ceil(((double)wp->vmin - (double)wp->v0) / (double)wp->pitch);
-            int kmax = (int)floor(((double)wp->vmax - (double)wp->v0) / (double)wp->pitch);
+            const double pitch = (double)wp->pitch;
+            const double inv_pitch = (pitch != 0.0) ? (1.0 / pitch) : 0.0;
+            const double wire_radius = (double)wp->radius;
+            const double wire_thickness = 2.0 * wire_radius;
+            const double pad_v = 0.5 * wire_thickness + 1e-6;
+            const double pad_n = 0.5 * wire_thickness + 1e-6;
+
+            int kmin = (int)ceil(((double)wp->vmin - (double)wp->v0) / pitch);
+            int kmax = (int)floor(((double)wp->vmax - (double)wp->v0) / pitch);
             double A = dv*dv + dn*dn;
 
-            for (int k=kmin; k<=kmax; ++k) {
-                double wv = wv0 - (double)k * (double)wp->pitch;
+            int k_start = kmin;
+            int k_stop = kmax;
+
+            if (kmin <= kmax) {
+                const double t_eps = 1.0e-4;
+                double t_lo = fmax(t_in, t_eps);
+                double t_hi = t_out;
+                double best_cap = (double)best_distance;
+                if (best_cap < t_hi)
+                    t_hi = best_cap;
+
+                if (fabs(dn) > 1e-12) {
+                    double tn1 = (-pad_n - wn0) / dn;
+                    double tn2 = ( pad_n - wn0) / dn;
+                    if (tn1 > tn2) { double tmp = tn1; tn1 = tn2; tn2 = tmp; }
+                    t_lo = fmax(t_lo, tn1);
+                    t_hi = fmin(t_hi, tn2);
+                } else {
+                    if (fabs(wn0) > pad_n)
+                        continue;
+                }
+
+                if (t_hi < t_lo)
+                    continue;
+
+                if (fabs(dn) <= 1e-12 && fabs(dv) > 1e-12) {
+                    double t_span = (pitch + wire_thickness) / fabs(dv);
+                    t_hi = fmin(t_hi, t_lo + t_span);
+                }
+
+                double v_entry = wv0 + dv * t_lo;
+                double v_exit = wv0 + dv * t_hi;
+                double v_lo = fmin(v_entry, v_exit) - pad_v;
+                double v_hi = fmax(v_entry, v_exit) + pad_v;
+
+                if (wv0 - pad_v < v_lo)
+                    v_lo = wv0 - pad_v;
+                if (wv0 + pad_v > v_hi)
+                    v_hi = wv0 + pad_v;
+
+                long long k_lo = (long long)floor(v_lo * inv_pitch);
+                long long k_hi = (long long)ceil(v_hi * inv_pitch);
+
+                if (k_lo < kmin)
+                    k_lo = kmin;
+                if (k_hi > kmax)
+                    k_hi = kmax;
+                if (k_lo > k_hi)
+                    continue;
+
+                k_start = (int)k_lo;
+                k_stop = (int)k_hi;
+            }
+
+            for (int k=k_start; k<=k_stop; ++k) {
+                double wv = wv0 - (double)k * pitch;
                 double B = wv*dv + wn0*dn;
-                double C = wv*wv + wn0*wn0 - (double)wp->radius*(double)wp->radius;
+                double C = wv*wv + wn0*wn0 - wire_radius*wire_radius;
                 double disc = B*B - A*C;
                 if (disc < 0.0) continue;
                 double sqrt_disc = sqrt(disc);
@@ -162,7 +223,7 @@ fill_state(State &s, Photon &p, Geometry *g)
                 double t_large = (-B + sqrt_disc) / A;
                 // robust epsilon to avoid immediate self-hit at boundary
                 const double t_min = 1.0e-4; // mm
-                const double r2_wire = (double)wp->radius*(double)wp->radius;
+                const double r2_wire = wire_radius*wire_radius;
                 const double r2_0 = wv*wv + wn0*wn0; // squared radius at ray start for this k
                 const double eps0 = fmax(1e-18, 1e-12 * r2_wire);
 
@@ -204,6 +265,8 @@ fill_state(State &s, Photon &p, Geometry *g)
                 analytic_plane_idx = ip;
             }
         }
+
+        CHROMA_PROF_FUNC_END(CHROMA_PROF_FILL_ANALYTIC);
     }
 
     bool use_analytic = false;
@@ -213,7 +276,9 @@ fill_state(State &s, Photon &p, Geometry *g)
         use_analytic = (da + 1e-12 < dm);
     }
 
-    Material *material1, *material2;
+    Material *material1 = 0;
+    Material *material2 = 0;
+    CHROMA_PROF_FUNC_START(CHROMA_PROF_FILL_MATERIAL);
     if (use_analytic) {
         // printf("Analytic hit: distance=%.6f mesh_distance=%.6f plane_idx=%d wavelength=%.1f\n", 
         //        analytic_distance, best_distance, analytic_plane_idx, p.wavelength);
@@ -312,6 +377,7 @@ fill_state(State &s, Photon &p, Geometry *g)
             s.inside_to_outside = true;
         }
     } else {
+        CHROMA_PROF_FUNC_END(CHROMA_PROF_FILL_MATERIAL);
         // no hit at all
         p.last_hit_triangle = -1;
         p.history |= NO_HIT;
@@ -327,6 +393,7 @@ fill_state(State &s, Photon &p, Geometry *g)
     s.scattering_length = interp_property(material1, p.wavelength,
                                           material1->scattering_length);
     s.material1 = material1;
+    CHROMA_PROF_FUNC_END(CHROMA_PROF_FILL_MATERIAL);
 } // fill_state
 
 __device__ float3
@@ -884,7 +951,7 @@ propagate_at_angular(Photon &p, State &s, curandState &rng, Surface *surface, bo
 } // propagate_at_angular
 
 __device__ int
-propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
+propagate_at_surface(Photon &p, State &s, curandState &rng, const Geometry *geometry,
                      bool use_weights=false)
 {
     Surface *surface = geometry->surfaces[s.surface_index];
@@ -970,4 +1037,3 @@ propagate_at_surface(Photon &p, State &s, curandState &rng, Geometry *geometry,
 } // propagate_at_surface
 
 #endif
-
